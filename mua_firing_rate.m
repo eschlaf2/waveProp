@@ -6,5 +6,5 @@ samplingRateMs = mea.SamplingRate / 1e3;  % samples per ms
 windMs = 100;
 window = windMs * samplingRateMs;  % number of samples to use in the window
 mea.firingRate = ...
-	smoothdata(mea.events, 1, 'movmean', window) * mea.SamplingRate;
-mea.firingRate = mea.firingRate * mea.SamplingRate;  % convert to spikes per second
+	smoothdata(mea.events, 1, 'movmean', window) * ...
+	mea.SamplingRate;  % convert to spikes per second 
