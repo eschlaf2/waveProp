@@ -1,3 +1,5 @@
+function [mea] = wave_prop(mea, PLOT)
+
 %% Compute wave propagation at each discharge time as described in 
 % Liou, Jyun You, et al. ?Multivariate Regression Methods for Estimating
 % Velocity of Ictal Discharges from Human Microelectrode Recordings.?
@@ -6,9 +8,13 @@
 % 
 % All time units should be converted to ms for consistency
 
+if ~exist('PLOT', 'var')
+	PLOT = true;
+end
+
 sig = .25;
 halfWin = 50;  % half window around discharge event (ms)
-plotTitle = strrep(Name, '_', ' ');
+plotTitle = strrep(mea.Name, '_', ' ');
 
 %% Find discharge times
 % 
@@ -52,42 +58,50 @@ end
 Z = angle(complex(V(1, :), V(2, :)));
 Zu = unwrap(Z);
 
+mea.fit.beta = beta;
+mea.fit.V = V;
+mea.fit.p = p;
+mea.fit.Z = A;
+mea.fit.Zu = Zu;
+
 %% Plot results
 % Plot the mean firing rate along with the unwrapped wave angle at each
 % discharge event.
 
-figure(2); clf; fullwidth()
-subplot(1, 10, 1:7);  % Left plot
-yyaxis left  % Plot the mean firing rate
-plot(mea.TimeMs, mean(mea.firingRate, 2), 'color', .5*[1 1 1]); 
-ylabel('Mean firing rate (spikes/s)')
-yyaxis right
-plot(waveTimes, Z, 'k.')
-ylim([min(Zu), max(Zu)]); hold on;
-ylabel('Wave direction (rad)')
-cmap = jet(numWaves); 
-grid on;
-title(plotTitle)
-xlabel('Time (ms)')
+if PLOT
+	figure(2); clf; fullwidth()
+	subplot(1, 10, 1:7);  % Left plot
+	yyaxis left  % Plot the mean firing rate
+	plot(mea.TimeMs, mean(mea.firingRate, 2), 'color', .5*[1 1 1]); 
+	ylabel('Mean firing rate (spikes/s)')
+	yyaxis right
+	plot(waveTimes, Z, 'k.')
+	ylim([min(Zu), max(Zu)]); hold on;
+	ylabel('Wave direction (rad)')
+	cmap = jet(numWaves); 
+	grid on;
+	title(plotTitle)
+	xlabel('Time (ms)')
 
-subplot(1, 10, 9:10); 
-compass(V(1, p < sig), V(2, p < sig)); hold on;
-
-
-for i = 2:numWaves
-	if p(i) > sig
-		continue
-	end
-	subplot(1, 10, 1:7);  % left plot
-	yyaxis right; % right axis
-	plot(waveTimes(i), Zu(i), 'ko', 'MarkerFaceColor', cmap(i, :));
-	
 	subplot(1, 10, 9:10); 
-	h = compass(V(1, i), V(2, i)); hold on
-	h.Color = cmap(i-1, :);
-	h.LineWidth = 2;
-	
-	drawnow()
-	pause(1e-2)
+	compass(V(1, p < sig), V(2, p < sig)); hold on;
+
+
+	for i = 2:numWaves
+		if p(i) > sig
+			continue
+		end
+		subplot(1, 10, 1:7);  % left plot
+		yyaxis right; % right axis
+		plot(waveTimes(i), Zu(i), 'ko', 'MarkerFaceColor', cmap(i, :));
+
+		subplot(1, 10, 9:10); 
+		h = compass(V(1, i), V(2, i)); hold on
+		h.Color = cmap(i-1, :);
+		h.LineWidth = 2;
+
+		drawnow()
+		pause(1e-2)
+	end
+	hold off
 end
-hold off
