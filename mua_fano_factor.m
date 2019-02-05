@@ -31,12 +31,12 @@ switch method
 
 % 		fr = sum(mea.events, 2);
 % 		fr2 = reshape(fr(1:floor(numel(fr) / window) * window), window, []);
-		fr2 = reshape((mea.firingRate(1:(floor(numSamples / window) * window), :)), ...
+		fr = reshape((mea.firingRate(1:(floor(numSamples / window) * window), :)), ...
 			window, [], numCh);
-		ff2 = squeeze((var(fr2) + 1) ./ mean(fr2 + 1));
+		ff = squeeze((var(fr) + 1) ./ mean(fr + 1));
 		
 		if PLOT
-			figure(3); plot(mea.Time(window:window:end), mean(ff2, 2))
+			figure(3); plot(mea.Time(window:window:end), mean(ff, 2))
 			title([strrep(mea.Name, '_', ' ') ': Fano factor'])
 			xlabel('Time (s)');
 			ylabel('FF')
@@ -64,3 +64,4 @@ switch method
 %%		
 end
 
+mea.ff = ff;
