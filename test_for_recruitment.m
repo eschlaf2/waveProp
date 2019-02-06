@@ -1,4 +1,4 @@
-function mea = test_for_recruitment(mea)
+function mea = test_for_recruitment(mea, PLOT)
 % Test to see if the electrode array was recruited to the seizure as
 % described in ?Schevon, Catherine A., et al. ?Evidence of an Inhibitory
 % Restraint of Seizure Activity in Humans.? Nature Communications, vol. 3,
@@ -6,6 +6,10 @@ function mea = test_for_recruitment(mea)
 % doi:10.1038/ncomms2056.
 % 
 % Uses weighted phase locking index
+
+if ~exist('PLOT', 'var')
+	PLOT = true;
+end
 
 %% Downsample lfp
 ds_freq = 1e3;  % Hz
@@ -47,12 +51,15 @@ for ti = 1:winstep:nSamples  % step through time at winstep increments
 	wpli_mean(i) = mean(wpli(:).^2, 'omitnan');
 end
 
-figure(4); fullwidth()
-plot(T(1:winstep:ti), wpli_mean);
-title([strrep(mea.Name, '_', ' '), ' Coherence'])
-ylabel('Mean square WPLI')
-xlabel('Time (s)')
-
+if PLOT
+	figure(4); fullwidth()
+	plot(T(1:winstep:ti), wpli_mean);
+	title([strrep(mea.Name, '_', ' '), ' Coherence'])
+	ylabel('Mean square WPLI')
+	xlabel('Time (s)')
+	axis tight
+end
+	
 mea.wpli = wpli_mean;
 mea.wpliF = f;
 
