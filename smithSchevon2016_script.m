@@ -1,12 +1,35 @@
 disp('Loading data')
-% load('/Volumes/Samsung USB/MG49/MG49_Seizure36_interpolated.mat')
+m = matfile('MG49_Seizure43.mat');
+filename = m.Name;
+outfile = [filename '_meaFilt'];
+
+% The isfield() function does not return as expected for matfile objects so
+% use this instead
+isfield_or_var = @(struct_or_matfile, fieldname) ...
+	any(strcmp(fieldnames(struct_or_matfile), fieldname));
+
 %%
-if ~exist('mea', 'var')
-	mea = Neuroport;
-	ecog = ECoG;
-	clear Neuroport ECoG
+
+try
+	mea = m.mea;
+% 	ecog = m.ecog;
+catch ME
+	switch ME.identifier
+		case 'MATLAB:MatFile:VariableNotInFile'
+% 			errorLog = {errorLog; ME};
+			clear ME
+			try 
+				mea = matfile(outfile, 'writable', true);
+			catch ME				
+				mea = m.Neuroport;
+% 				ecog = m.ECoG;
+			end
+		otherwise
+			rethrow(ME)
+	end
 end
-%%
+	
+%% Make figures pres ready
 set(groot, 'defaultLineLineWidth', 1);
 set(groot, 'defaultAxesLineWidth', 1);
 set(groot, 'defaultFigureColor', [1 1 1], 'defaultAxesFontSize', 16, 'defaultHistogramLineWidth',1);
@@ -17,11 +40,16 @@ aic = @(predictors, dev) dev + 2 * size(predictors, 2);
 
 tmax = Inf;
 %% Filter
-%%
-disp('Filtering');
-if ~isfield(mea, 'lfp')
-	[mea, ecog] = filter_mea_ecog(mea, ecog);
+
+if ~isfield_or_var(mea, 'lfp')
+	disp('Filtering');
+% 	[mea, ecog] = filter_mea_ecog(mea, ecog);
+	mea = filter_mea_ecog(mea);
+	mea = rmfield(mea, 'Data');
+	save(outfile, '-struct', 'mea')
+	mea = matfile(outfile, 'writable', true);
 end
+
 %% Get MUA events
 % Negative peaks in this signal were detected and those peaks that exceeded 
 % four times the s.d. of the signal in the negative direction, and that occurred 
@@ -30,7 +58,7 @@ end
 
 disp('Getting MUA events');
 
-if ~isfield(mea, 'events')
+if ~isfield_or_var(mea, 'event_inds')
 	mea = mua_events(mea);
 end
 %% Compute firing rate
@@ -39,7 +67,7 @@ end
 
 disp('Computing firing rate');
 
-if ~isfield(mea, 'firingRate')
+if ~isfield_or_var(mea, 'firingRate')
 	mea = mua_firing_rate(mea);
 end
 %% Test for recruitment
@@ -49,32 +77,32 @@ end
 
 disp('Computing coherence')
 
-if ~isfield(mea, 'wpli')
-	mea = test_for_recruitment(mea);
+if ~isfield_or_var(mea, 'wpli')
+	mea = test_for_recruitment(mea, 'wpli');
 end
 
 disp('Computing Fano factor')
 
-if ~isfield(mea, 'ff')
-	mea = mua_fano_factor(mea);
+if ~isfield_or_var(mea, 'ff')
+	mea = test_for_recruitment(mea, 'fano');
 end
 %% Compute wave velocity at discharges
-%%
+
 disp('Performing spatial linear regression')
 
 mea = wave_prop(mea);
-%% Save results
-%%
-disp('Saving')
 
-nn = strrep(Name, 'Seizure', '');
+%% Save figures
+
+disp('Saving figures')
+
+nn = strrep(m.Name, 'Seizure', '');
 
 print(2, nn, '-dpng')
 print(3, [nn '_FF'], '-dpng')
 print(4, [nn, '_coh'], '-dpng')
 
-save(Name, 'Date', 'ecog', 'mea', 'MatFile', 'Name', ...
-    'Patient', '-v7.3')
+
 %% Define epochs and IDIs
 % The ictal wavefront epoch was defined as the time of the first channel?s mean 
 % minus its s.d. until the last channel?s mean plus its s.d. (Smith et al., 2016). 
