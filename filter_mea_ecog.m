@@ -5,6 +5,12 @@ MEA = exist('mea', 'var');
 ECOG = exist('ecog', 'var');
 
 if MEA
+
+	if isfield(mea, 'Position')  % deprecated
+		mea.ElectrodeXY = mea.Position;
+		rmfield(mea, 'Position')
+	end
+
 	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
 		'CutoffFrequency1',2,'CutoffFrequency2',50, ...
 		'SampleRate', mea.SamplingRate);
@@ -32,6 +38,12 @@ if MEA
 end
 
 if ECOG
+
+	if isfield(ecog, 'Position')  % deprecated
+		ecog.ElectrodeXY = ecog.Position;
+		rmfield(ecog, 'Position')
+	end
+
 	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
 		'CutoffFrequency1',2,'CutoffFrequency2',50, ...
 		'SampleRate', ecog.SamplingRate);
