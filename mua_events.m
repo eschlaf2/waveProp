@@ -7,9 +7,12 @@ EVENT_THRESH = 4;      % min peak distance from baseline (in negative direction)
 MIN_DIST = 1;          % min time between peaks [ms]
 ARTEFACT_THRESH = 16;  % activity outside this range is considered artefact [sd] 
 
+% Import fields
 data = mea.mua;
+time = mea.Time;
+
 intervalM = mea.SamplingRate / 1e3 * MIN_DIST;  % samples per MIN_DIST
-mn = mean(data(mea.Time < 0, :), 1);   % get the mean of the baseline
+mn = mean(data(time < 0, :), 1);   % get the mean of the baseline
 sd = std(data);                              % and the overall sd
 temp = (data - mn) ./ sd;                    % zscore based on baseline mean
 
@@ -22,7 +25,7 @@ data(artefacts) = nan;
 events = false(size(temp));
 for ch = 1:size(temp, 2)
 	temp = data(:, ch);
-	[~, inds] = findpeaks(-normalize(temp), ...
+	[~, inds] = findpeaks(-zscore(temp(~isnan(temp))), ...
 		'minpeakdistance', intervalM, 'minpeakheight', EVENT_THRESH);  
 	events(inds, ch) = true;
 end
