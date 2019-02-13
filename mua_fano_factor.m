@@ -30,9 +30,9 @@ switch method
 %%
 		windMS = 1e3;  % ms window to use
 		window = mea.SamplingRate * 1e-3 * windMS;  % samples per ms * ms to use
-		[numSamples, numCh] = size(mea.firingRate);  % array size
-
-		fr = reshape((mea.firingRate(1:(floor(numSamples / window) * window), :)), ...
+		fr = mea.firingRate;
+		[numSamples, numCh] = size(fr);  % array size
+		fr = reshape((fr(1:(floor(numSamples / window) * window), :)), ...
 			window, [], numCh);
 		ff = squeeze((var(fr) + 1) ./ mean(fr + 1));
 		
