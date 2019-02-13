@@ -26,7 +26,8 @@ catch ME
 		'minpeakprom', 10, ...  % ... use discrete peaks
 		'minpeakdistance', 100);  % ... peaks should be at least 100 ms apart
 
-	waveTimes = waveTimes - mea.Padding(1) * 1e3;  % Account for padding (in ms)
+	padding = mea.Padding;
+	waveTimes = waveTimes - padding(1) * 1e3;  % Account for padding (in ms)
 	TimeMs = mea.Time * 1000;  % Convert times to ms
 
 	% Sizing variables
