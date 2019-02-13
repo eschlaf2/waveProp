@@ -11,6 +11,9 @@ if ~exist('method', 'var')
 	method = 2;
 end
 
+Time = mea.Time;
+
+%%
 switch method
 	case 1  % ff of sum of all events (fine grain - step = 1)
 %%
@@ -29,14 +32,12 @@ switch method
 		window = mea.SamplingRate * 1e-3 * windMS;  % samples per ms * ms to use
 		[numSamples, numCh] = size(mea.firingRate);  % array size
 
-% 		fr = sum(mea.events, 2);
-% 		fr2 = reshape(fr(1:floor(numel(fr) / window) * window), window, []);
 		fr = reshape((mea.firingRate(1:(floor(numSamples / window) * window), :)), ...
 			window, [], numCh);
 		ff = squeeze((var(fr) + 1) ./ mean(fr + 1));
 		
 		if PLOT
-			figure(3); plot(mea.Time(window:window:end), mean(ff, 2))
+			figure(3); plot(Time(window:window:end), mean(ff, 2))
 			title([strrep(mea.Name, '_', ' ') ': Fano factor'])
 			xlabel('Time (s)');
 			ylabel('FF')
@@ -59,7 +60,7 @@ switch method
 		
 		if PLOT
 			figure(3);
-			plot(mea.Time(window:window:end), mean(ff, 2, 'omitnan'))  % plot the mean ff
+			plot(Time(window:window:end), mean(ff, 2, 'omitnan'))  % plot the mean ff
 		end
 %%		
 end
