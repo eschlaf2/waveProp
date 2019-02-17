@@ -46,7 +46,7 @@ if ~isfield_or_var(mea, 'lfp')
 % 	[mea, ecog] = filter_mea_ecog(mea, ecog);
 	mea = filter_mea_ecog(mea);
 	mea = rmfield(mea, 'Data');
-	save(outfile, '-struct', 'mea')
+	save(outfile, '-v7.3', '-struct', 'mea')
 	mea = matfile(outfile, 'writable', true);
 end
 

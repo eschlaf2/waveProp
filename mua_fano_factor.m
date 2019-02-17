@@ -34,10 +34,10 @@ switch method
 		[numSamples, numCh] = size(fr);  % array size
 		fr = reshape((fr(1:(floor(numSamples / window) * window), :)), ...
 			window, [], numCh);
-		ff = squeeze((var(fr) + 1) ./ mean(fr + 1));
+		ff = squeeze((var(fr, 'omitnan') + 1) ./ mean(fr + 1, 'omitnan'));
 		
 		if PLOT
-			figure(3); plot(Time(window:window:end), mean(ff, 2))
+			figure(3); plot(Time(window:window:end), mean(ff, 2, 'omitnan'))
 			title([strrep(mea.Name, '_', ' ') ': Fano factor'])
 			xlabel('Time (s)');
 			ylabel('FF')
