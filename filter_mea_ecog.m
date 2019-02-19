@@ -41,6 +41,7 @@ if MEA
 	temp = single(filtfilt(bpFilt, double(data)));
 	temp(:, BadChannels) = [];
 	mea.lfp = temp;
+	clear temp;
 	
 	disp('Filtering mua band.')
 	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
@@ -49,6 +50,7 @@ if MEA
 	temp = single(filtfilt(bpFilt, double(data)));
 	temp(:, BadChannels) = [];
 	mea.mua = temp;
+	clear temp;
 
 	disp('Filtering high-gamma band.')
 	bpFilt = designfilt('bandpassfir', 'FilterOrder', 150, ...
@@ -57,6 +59,7 @@ if MEA
 	temp = single(filtfilt(bpFilt, double(data)));
 	temp(:, BadChannels) = [];
 	mea.highg = temp;
+	clear temp;
 	
 	mea.X = ElectrodeXY(:, 1);
 	mea.X(BadChannels) = [];
