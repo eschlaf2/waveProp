@@ -1,9 +1,9 @@
 function [mea, ecog] = filter_mea_ecog(mea, ecog, outfile, bands)
 
 
-MEA = exist('mea', 'var');
-ECOG = exist('ecog', 'var');
-if ~exist('outfile', 'var')
+MEA = exist('mea', 'var') && ~isempty(mea);
+ECOG = exist('ecog', 'var') && ~isempty(ecog);
+if ~exist('outfile', 'var') || isempty(outfile)
 	if MEA 
 		outfile = [mea.Name '_Filt'];
 	end
@@ -11,8 +11,8 @@ if ~exist('outfile', 'var')
 		outfile = [ecog.Name '_Filt'];
 	end
 end
-if ~exist('bands', 'var')
-	bands = {'lfp', 'mua'};
+if ~exist('bands', 'var') || isempty(bands)
+	bands = {'mua'};
 end
 
 
