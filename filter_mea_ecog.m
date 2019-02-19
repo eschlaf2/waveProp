@@ -30,43 +30,50 @@ if MEA
 		end
 
 		rmfield(mea, 'Data');
-		disp('Converting mea to matfile.')
+		disp('Converting mea to matfile...')
 		save(outfile, '-v7.3', '-struct', 'mea');
 		clear mea
-		mea = matfile(outfile, 'writable', true)
+		mea = matfile(outfile, 'writable', true);
+		disp('Done.')
 	end
 
 	if any(strcmpi(bands, 'lfp'))
-		disp('Filtering lfp band.')
+		disp('Filtering lfp band...')
 		bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
 			'CutoffFrequency1',2,'CutoffFrequency2',50, ...
 			'SampleRate', SamplingRate);
 
 		temp = single(filtfilt(bpFilt, double(data)));
 		temp(:, BadChannels) = [];
+		disp('Writing to file...')
 		mea.lfp = temp;
+		disp('Done.')
 		clear temp;
 	end
 	
 	if any(strcmpi(bands, 'mua'))
-		disp('Filtering mua band.')
+		disp('Filtering mua band...')
 		bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
 			'CutoffFrequency1',3e2,'CutoffFrequency2',3e3, ...
 			'SampleRate',SamplingRate);
 		temp = single(filtfilt(bpFilt, double(data)));
 		temp(:, BadChannels) = [];
+		disp('Writing to file...')
 		mea.mua = temp;
+		disp('Done.')
 		clear temp;
 	end
 
 	if any(strcmpi(bands, 'highg'))
-		disp('Filtering high-gamma band.')
+		disp('Filtering high-gamma band...')
 		bpFilt = designfilt('bandpassfir', 'FilterOrder', 150, ...
 			'CutoffFrequency1', 50, 'CutoffFrequency2', 300, ...
 			'SampleRate', SamplingRate);
 		temp = single(filtfilt(bpFilt, double(data)));
 		temp(:, BadChannels) = [];
+		disp('Writing to file...')
 		mea.highg = temp;
+		disp('Done.')
 		clear temp;
 	end
 	
