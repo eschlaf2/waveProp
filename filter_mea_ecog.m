@@ -23,16 +23,17 @@ if MEA
 
 		if isfield(mea, 'Position')  % deprecated
 			mea.ElectrodeXY = mea.Position;
-			rmfield(mea, 'Position')
+			rmfield(mea, 'Position');
 		end
 
 		rmfield(mea, 'Data');
+		disp('Converting mea to matfile.')
 		save(outfile, '-v7.3', '-struct', 'mea');
 		clear mea
 		mea = matfile(outfile, 'writable', true)
 	end
 
-
+	disp('Filtering lfp band.')
 	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
 		'CutoffFrequency1',2,'CutoffFrequency2',50, ...
 		'SampleRate', SamplingRate);
@@ -41,6 +42,7 @@ if MEA
 	temp(:, BadChannels) = [];
 	mea.lfp = temp;
 	
+	disp('Filtering mua band.')
 	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
 		'CutoffFrequency1',3e2,'CutoffFrequency2',3e3, ...
 		'SampleRate',SamplingRate);
@@ -48,6 +50,7 @@ if MEA
 	temp(:, BadChannels) = [];
 	mea.mua = temp;
 
+	disp('Filtering high-gamma band.')
 	bpFilt = designfilt('bandpassfir', 'FilterOrder', 150, ...
 		'CutoffFrequency1', 50, 'CutoffFrequency2', 300, ...
 		'SampleRate', SamplingRate);
@@ -77,11 +80,13 @@ if ECOG
 		end
 
 		rmfield(ecog, 'Data');
+		disp('Converting ecog to matfile.')
 		save(outfile, '-v7.3', '-struct', 'ecog');
 		clear ecog
 		ecog = matfile(outfile, 'writable', true)
 	end
 
+	disp('Filtering ecog to lfp band.')
 	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
 		'CutoffFrequency1',2,'CutoffFrequency2',50, ...
 		'SampleRate', SamplingRate);
@@ -89,6 +94,7 @@ if ECOG
 	temp(:, BadChannels) = [];
 	ecog.lfp = temp
 
+	disp('Filtering ecog to high-gamma band.')
 	bpFilt = designfilt('bandpassfir', 'FilterOrder', 150, ...
 		'CutoffFrequency1', 50, 'CutoffFrequency2', 124, ...  % 150 in the Schevon paper, but max is 124.93 given sampling freq
 		'SampleRate', SamplingRate);
