@@ -1,4 +1,4 @@
-function [mea, ecog] = filter_mea_ecog(mea, ecog, outfile)
+function [mea, ecog] = filter_mea_ecog(mea, ecog, outfile, bands)
 
 
 MEA = exist('mea', 'var');
@@ -10,6 +10,9 @@ if ~exist('outfile', 'var')
 	if ECOG
 		outfile = [ecog.Name '_ecogFilt'];
 	end
+end
+if ~exist('bands', 'var')
+	bands = {'mua'};
 end
 
 
@@ -33,33 +36,39 @@ if MEA
 		mea = matfile(outfile, 'writable', true)
 	end
 
-	disp('Filtering lfp band.')
-	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
-		'CutoffFrequency1',2,'CutoffFrequency2',50, ...
-		'SampleRate', SamplingRate);
+	if any(strcmpi(bands, 'lfp'))
+		disp('Filtering lfp band.')
+		bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
+			'CutoffFrequency1',2,'CutoffFrequency2',50, ...
+			'SampleRate', SamplingRate);
 
-	temp = single(filtfilt(bpFilt, double(data)));
-	temp(:, BadChannels) = [];
-	mea.lfp = temp;
-	clear temp;
+		temp = single(filtfilt(bpFilt, double(data)));
+		temp(:, BadChannels) = [];
+		mea.lfp = temp;
+		clear temp;
+	end
 	
-	disp('Filtering mua band.')
-	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
-		'CutoffFrequency1',3e2,'CutoffFrequency2',3e3, ...
-		'SampleRate',SamplingRate);
-	temp = single(filtfilt(bpFilt, double(data)));
-	temp(:, BadChannels) = [];
-	mea.mua = temp;
-	clear temp;
+	if any(strcmpi(bands, 'mua'))
+		disp('Filtering mua band.')
+		bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
+			'CutoffFrequency1',3e2,'CutoffFrequency2',3e3, ...
+			'SampleRate',SamplingRate);
+		temp = single(filtfilt(bpFilt, double(data)));
+		temp(:, BadChannels) = [];
+		mea.mua = temp;
+		clear temp;
+	end
 
-	disp('Filtering high-gamma band.')
-	bpFilt = designfilt('bandpassfir', 'FilterOrder', 150, ...
-		'CutoffFrequency1', 50, 'CutoffFrequency2', 300, ...
-		'SampleRate', SamplingRate);
-	temp = single(filtfilt(bpFilt, double(data)));
-	temp(:, BadChannels) = [];
-	mea.highg = temp;
-	clear temp;
+	if any(strcmpi(bands, 'highg'))
+		disp('Filtering high-gamma band.')
+		bpFilt = designfilt('bandpassfir', 'FilterOrder', 150, ...
+			'CutoffFrequency1', 50, 'CutoffFrequency2', 300, ...
+			'SampleRate', SamplingRate);
+		temp = single(filtfilt(bpFilt, double(data)));
+		temp(:, BadChannels) = [];
+		mea.highg = temp;
+		clear temp;
+	end
 	
 	mea.X = ElectrodeXY(:, 1);
 	mea.X(BadChannels) = [];
