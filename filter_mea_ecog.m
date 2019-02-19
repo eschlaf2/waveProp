@@ -5,10 +5,10 @@ MEA = exist('mea', 'var');
 ECOG = exist('ecog', 'var');
 if ~exist('outfile', 'var')
 	if MEA 
-		outfile = [mea.Name '_meaFilt'];
+		outfile = [mea.Name '_Filt'];
 	end
 	if ECOG
-		outfile = [ecog.Name '_ecogFilt'];
+		outfile = [ecog.Name '_Filt'];
 	end
 end
 if ~exist('bands', 'var')
@@ -31,9 +31,7 @@ if MEA
 
 		rmfield(mea, 'Data');
 		disp('Converting mea to matfile...')
-		try
-			save(outfile, '-v7.3', '-struct', 'mea', '-append');
-		catch
+		if ~exist(outfile, 'file')
 			save(outfile, '-v7.3', '-struct', 'mea');
 		end
 		clear mea
