@@ -12,7 +12,7 @@ if ~exist('outfile', 'var')
 	end
 end
 if ~exist('bands', 'var')
-	bands = {'mua'};
+	bands = {'lfp', 'mua'};
 end
 
 
@@ -31,7 +31,11 @@ if MEA
 
 		rmfield(mea, 'Data');
 		disp('Converting mea to matfile...')
-		save(outfile, '-v7.3', '-struct', 'mea');
+		try
+			save(outfile, '-v7.3', '-struct', 'mea', '-append');
+		catch
+			save(outfile, '-v7.3', '-struct', 'mea');
+		end
 		clear mea
 		mea = matfile(outfile, 'writable', true);
 		disp('Done.')
