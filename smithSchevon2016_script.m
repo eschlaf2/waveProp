@@ -18,7 +18,7 @@ catch ME
 		case 'MATLAB:MatFile:VariableNotInFile'
 % 			errorLog = {errorLog; ME};
 			clear ME
-			if isempty(whos(outfile))
+			if isempty(outfile)
 				mea = m.Neuroport;
 % 				ecog = m.ECoG;
 			else
