@@ -1,4 +1,4 @@
-function [] = electrode_vid(temp, X, Y, Time, endTime, FrameRate, outfile)
+function [v] = electrode_vid(temp, X, Y, Time, endTime, FrameRate, outfile)
 
 CREATEVID = true;
 if ~exist('outfile', 'var') || isempty(outfile)
@@ -28,7 +28,7 @@ end
 
 %% Write video
 if CREATEVID
-	v = VideoWriter(outfile, 'MPEG-4');
+	v = VideoWriter(outfile);
 	v.FrameRate = FrameRate;
 	open(v);
 end
