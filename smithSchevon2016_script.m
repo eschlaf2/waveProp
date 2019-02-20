@@ -1,7 +1,8 @@
 disp('Loading data')
-m = matfile('MG49_Seizure36.mat');
+m = matfile('MG49_Seizure43.mat');
 filename = m.Name;
-outfile = [filename '_meaFilt'];
+outfile = [];
+% outfile = [filename '_meaFilt'];
 
 % The isfield() function does not return as expected for matfile objects so
 % use this instead
@@ -44,7 +45,8 @@ tmax = Inf;
 if ~isfield_or_var(mea, 'lfp')
 	disp('Filtering');
 % 	[mea, ecog] = filter_mea_ecog(mea, ecog);
-	mea = filter_mea_ecog(mea);
+	mea = filter_mea_ecog(mea, [], [], {'mua'});
+	mea = filter_mea_ecog(mea, [], [], {'lfp'});
 	mea = rmfield(mea, 'Data');
 	save(outfile, '-v7.3', '-struct', 'mea')
 	mea = matfile(outfile, 'writable', true);
