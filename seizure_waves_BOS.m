@@ -14,7 +14,9 @@ position = [mea.X mea.Y];
 disp('Computing coherence and phase')
 
 if strcmp(which('chronux'), '') % required toolbox
-	error('Chronux toolbox not found. Add the toolbox to your matlab path using `addpath(genpath(path_to_chronux))`.');
+	error(['Chronux toolbox not found. ' ...
+		'Add the toolbox to your matlab path using ' ...
+		'`addpath(genpath(path_to_chronux))`.']);
 end
 
 BAND = [1 13];                  % Select a frequency range to analyze
