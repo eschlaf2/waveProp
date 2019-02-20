@@ -17,19 +17,23 @@ end
 
 
 if MEA
+	
+	if any(strcmpi(fieldnames(mea), 'Position'))  % deprecated
+		mea.ElectrodeXY = mea.Position;
+		mea.Position = 'Renamed as ElectrodeXY';
+	end
+
 	data = mea.Data;
 	SamplingRate = mea.SamplingRate;
 	BadChannels = mea.BadChannels;
-	ElectrodeXY = mea.ElectrodeXY;
+	try
+		ElectrodeXY = mea.ElectrodeXY;
+	catch
+		ElectrodeXY = mea.Position;
+	end
 
 	if isstruct(mea)
 
-		if isfield(mea, 'Position')  % deprecated
-			mea.ElectrodeXY = mea.Position;
-			rmfield(mea, 'Position');
-		end
-
-		rmfield(mea, 'Data');
 		disp('Converting mea to matfile...')
 		if ~exist(outfile, 'file')
 			save(outfile, '-v7.3', '-struct', 'mea');
