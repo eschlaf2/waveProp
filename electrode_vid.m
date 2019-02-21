@@ -6,7 +6,7 @@ if ~exist('outfile', 'var') || isempty(outfile)
 end
 
 if ~exist('FrameRate', 'var') || isempty(FrameRate)
-	FrameRate = 1 / Time(2) - Time(1);
+	FrameRate = 1 / (Time(2) - Time(1));
 end
 
 if numel(Time) ~= size(temp, 1)
