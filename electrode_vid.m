@@ -39,6 +39,10 @@ mNP = quantile(temp(:), .05);
 MNP = quantile(temp(:), .95);
 % ME = quantile(dataEWsm(:), .95);
 
+if MNP == mNP
+	MNP = mNP + 1;
+end
+
 map = make_diverging_colormap('cool', 1);
 
 figure(1); clf;
@@ -66,7 +70,7 @@ for t = 1:length(Time)
 	
 	
 	scatter(X, Y, 150, temp(t, :), 's', 'filled')
-% 	title(sprintf('T = %0.2f (%s)', Time(t), desc))
+	title(sprintf('T = %0.2f (%s)', Time(t), desc))
 % 	drawnow();
 
 % 	p2 = subplot(1, 5, 4:5);
