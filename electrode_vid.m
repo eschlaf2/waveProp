@@ -28,7 +28,7 @@ end
 
 %% Write video
 if CREATEVID
-	v = VideoWriter(outfile);
+	v = VideoWriter(outfile, 'MPEG-4');
 	v.FrameRate = FrameRate;
 	open(v);
 end
@@ -67,7 +67,7 @@ for t = 1:length(Time)
 	
 	scatter(X, Y, 150, temp(t, :), 's', 'filled')
 	title(sprintf('T = %0.2f (%s)', Time(t), desc))
-	drawnow();
+% 	drawnow();
 
 % 	p2 = subplot(1, 5, 4:5);
 % 	scatter(xNP, yNP, 200, dataNPWsm(t, :), 's', 'filled')
@@ -103,6 +103,7 @@ for t = 1:length(Time)
 end
 
 if CREATEVID
+	close(v)
 	close(v)
 	disp('Video saved and closed')
 end

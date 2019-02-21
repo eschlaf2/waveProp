@@ -1,5 +1,5 @@
-disp('Loading data')
-m = matfile('MG49_Seizure43.mat');
+% disp('Loading data')
+% m = matfile('MG49_Seizure43.mat');
 filename = m.Name;
 outfile = [];
 % outfile = [filename '_meaFilt'];
@@ -47,9 +47,6 @@ if ~isfield_or_var(mea, 'lfp')
 % 	[mea, ecog] = filter_mea_ecog(mea, ecog);
 	mea = filter_mea_ecog(mea, [], [], {'mua'});
 	mea = filter_mea_ecog(mea, [], [], {'lfp'});
-	mea = rmfield(mea, 'Data');
-	save(outfile, '-v7.3', '-struct', 'mea')
-	mea = matfile(outfile, 'writable', true);
 end
 
 %% Get MUA events
