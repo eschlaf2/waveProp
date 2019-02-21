@@ -28,7 +28,7 @@ end
 
 %% Write video
 if CREATEVID
-	v = VideoWriter(outfile, 'MPEG-4');
+	v = VideoWriter(outfile);
 	v.FrameRate = FrameRate;
 	open(v);
 end
@@ -66,7 +66,7 @@ for t = 1:length(Time)
 	
 	
 	scatter(X, Y, 150, temp(t, :), 's', 'filled')
-	title(sprintf('T = %0.2f (%s)', Time(t), desc))
+% 	title(sprintf('T = %0.2f (%s)', Time(t), desc))
 % 	drawnow();
 
 % 	p2 = subplot(1, 5, 4:5);
