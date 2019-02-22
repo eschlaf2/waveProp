@@ -18,19 +18,16 @@ end
 
 if MEA
 	
-	if any(strcmpi(fieldnames(mea), 'Position'))  % deprecated
+	if any(strcmpi(fieldnames(mea), 'Position'))  % deprecated struct field
 		mea.ElectrodeXY = mea.Position;
-		mea.Position = 'Renamed as ElectrodeXY';
+		% mea.Position = 'Renamed as ElectrodeXY';
 	end
 
 	data = mea.Data;
 	SamplingRate = mea.SamplingRate;
 	BadChannels = mea.BadChannels;
-	try
-		ElectrodeXY = mea.ElectrodeXY;
-	catch
-		ElectrodeXY = mea.Position;
-	end
+	
+	ElectrodeXY = mea.ElectrodeXY;
 
 	if isstruct(mea)
 
