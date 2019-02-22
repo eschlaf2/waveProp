@@ -80,11 +80,13 @@ if MEA
 		clear temp;
 	end
 	
-	mea.X = ElectrodeXY(:, 1);
-	mea.X(BadChannels) = [];
+	X = ElectrodeXY(:, 1);
+	X(BadChannels) = [];
+	mea.X = X;
 
-	mea.Y = ElectrodeXY(:, 2);
-	mea.Y(BadChannels) = [];
+	Y = ElectrodeXY(:, 2);
+	Y(BadChannels) = [];
+	mea.Y = Y;
 end
 
 if ECOG
