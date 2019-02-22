@@ -165,17 +165,20 @@ if PLOT
 		'TickLabels', {'start'; 'end'})
 	
 	% Create histograms of first and last n discharges
-	figure(5);  % Plot a histogram of the first twenty discharges
-	hrose = rose(wave_fit.Z(5 : 5 + n)); 
-	hrose.Color = temp(1, :); 
-	hrose.LineWidth = 2; 
-	title('Direction during first 20 discharges')
-	
-	figure(6);  % ... and the last twenty discharges
-	hroseR = rose(wave_fit.Z(end - n : end)); 
-	hroseR.Color = temp(end, :); 
-	hroseR.LineWidth = 2; 
-	title('Direction during last 20 discharges')
+	if feature('ShowFigureWindows')
+		n = 20;
+		figure(5);  % Plot a histogram of the first twenty discharges
+		hrose = rose(wave_fit.Z(5 : 5 + n)); 
+		hrose.Color = temp(1, :); 
+		hrose.LineWidth = 2; 
+		title('Direction during first 20 discharges')
+		
+		figure(6);  % ... and the last twenty discharges
+		hroseR = rose(wave_fit.Z(end - n : end)); 
+		hroseR.Color = temp(end, :); 
+		hroseR.LineWidth = 2; 
+		title('Direction during last 20 discharges')
+	end
 end
 
 
