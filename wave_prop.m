@@ -18,22 +18,20 @@ plotTitle = strrep(mea.Name, '_', ' ');
 
 %% Find discharge times
 
+fr = mea.firingRate;
+mask = mean(fr) >= 1/60;  % exclude channels with mean firing rate less than one spike per minute (Liou et al., 2018) ?\cite{Liou2018a}
+meanFr = mean(fr(:, mask), 2);
 try 
 	waveTimes = mea.waveTimes;
 catch ME
-	[~, waveTimes] = findpeaks(mean(mea.firingRate, 2), ...  % find peaks in mean firing rate
+	[~, waveTimes] = findpeaks(meanFr, ...  % find peaks in mean firing rate
 		mea.SamplingRate / 1e3, ...  % ... in ms 
-		'minpeakprom', 10, ...  % ... use discrete peaks
+		'minpeakprom', 100 * std(diff(meanFr)), ...  % ... use discrete peaks
 		'minpeakdistance', 100);  % ... peaks should be at least 100 ms apart
 
 	padding = mea.Padding;
 	waveTimes = waveTimes - padding(1) * 1e3;  % Account for padding (in ms)
-	TimeMs = mea.Time * 1000;  % Convert times to ms
 
-	% Sizing variables
-	numCh = numel(mea.X);
-	numWaves = numel(waveTimes);
-	
 	% Save wave times
 	mea.waveTimes = waveTimes;
 end
@@ -41,8 +39,14 @@ end
 % Create an array of spike times
 T = nan(size(mea.mua), 'single');
 T(mea.event_inds) = 1;
+TimeMs = mea.Time * 1000;  % Convert times to ms
 T = TimeMs' .* T;
 % T(T == 0) = nan;
+
+% Sizing variables
+numCh = numel(mea.X);
+numWaves = numel(waveTimes);
+
 
 %% Estimate wave direction at each discharge time
 
