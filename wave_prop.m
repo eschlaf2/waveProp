@@ -21,9 +21,9 @@ plotTitle = strrep(mea.Name, '_', ' ');
 fr = mea.firingRate;
 mask = mean(fr) >= 1/60;  % exclude channels with mean firing rate less than one spike per minute (Liou et al., 2018) ?\cite{Liou2018a}
 meanFr = mean(fr(:, mask), 2);
-try 
-	waveTimes = mea.waveTimes;
-catch ME
+% try 
+% 	waveTimes = mea.waveTimes;
+% catch ME
 	[~, waveTimes] = findpeaks(meanFr, ...  % find peaks in mean firing rate
 		mea.SamplingRate / 1e3, ...  % ... in ms 
 		'minpeakprom', 100 * std(diff(meanFr)), ...  % ... use discrete peaks
@@ -34,7 +34,7 @@ catch ME
 
 	% Save wave times
 	mea.waveTimes = waveTimes;
-end
+% end
 
 % Create an array of spike times
 T = nan(size(mea.mua), 'single');
