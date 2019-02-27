@@ -37,10 +37,10 @@ if CREATEVID
 	open(v);
 end
 
-mNP = quantile(temp(:), .05);
+mNP = quantile(temp(:), .025);
 % mE = quantile(dataEWsm(:), .05);
 
-MNP = quantile(temp(:), .95);
+MNP = quantile(temp(:), .975);
 % ME = quantile(dataEWsm(:), .95);
 
 if MNP == mNP
