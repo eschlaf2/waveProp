@@ -1,4 +1,4 @@
-function [v] = electrode_vid(temp, X, Y, Time, endTime, FrameRate, outfile)
+function [v] = electrode_vid(temp, X, Y, Time, endTime, FrameRate, outfile, visible)
 
 CREATEVID = true;
 if ~exist('outfile', 'var') || isempty(outfile)
@@ -7,6 +7,10 @@ end
 
 if ~exist('FrameRate', 'var') || isempty(FrameRate)
 	FrameRate = 1 / (Time(2) - Time(1));
+end
+
+if ~exist('visible', 'var') || isempty(visible)
+    visible = false;
 end
 
 if numel(Time) ~= size(temp, 1)
@@ -46,6 +50,7 @@ end
 map = make_diverging_colormap('cool', 1);
 
 figure(1); clf;
+if ~visible, set(1, 'visible', 'off'); end
 set(1, 'position', [556   422   335   254]);
 colormap(map)
 % 	p1 = subplot(1,5,1:3);

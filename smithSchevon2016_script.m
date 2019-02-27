@@ -12,7 +12,7 @@ isfield_or_var = @(struct_or_matfile, fieldname) ...
 %%
 
 try
-	mea = m.mea;
+	mea = matfile([m.Name '_Neuroport_Filt']);
 % 	ecog = m.ecog;
 catch ME
 	switch ME.identifier

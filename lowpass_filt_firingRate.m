@@ -20,4 +20,4 @@ frPct = frPct(inds, :);
 Time = Time(inds);
 
 %%
-figure(2), plot(Time(1:30:end), frPct + (1:95))
+figure(2), plot(Time, frPct + (1:size(frPct, 2)))
