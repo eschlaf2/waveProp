@@ -170,6 +170,7 @@ if PLOT
 	
 	% Create histograms of first and last n discharges
 	if feature('ShowFigureWindows')
+		temp = cmap;
 		n = 20;
 		figure(5);  % Plot a histogram of the first twenty discharges
 		hrose = rose(wave_fit.Z(5 : 5 + n)); 
