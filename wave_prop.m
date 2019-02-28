@@ -87,7 +87,6 @@ numWaves = numel(waveTimes);
 %% Plot results
 % Plot the mean firing rate along with the unwrapped wave angle at each
 % discharge event.
-% set(2,'DefaultAxesColorOrder', get(groot, 'factoryAxesColorOrder'));
 
 if PLOT
 	
@@ -95,14 +94,15 @@ if PLOT
 	figure(2); clf; fullwidth()
 	p1 = subplot(1, 10, 1:7);  % Left plot
 	p2 = subplot(1, 10, 9:10); % right plot (compass)
-	title(plotTitle)
-	xlabel('Time (ms)')
+% 	p2.NextPlot = 'replacechildren';
+	title(p1, plotTitle)
+	xlabel(p1, 'Time (ms)')
 	
 	% Left plot, right axis
 	% Put wave direction labels on the right y-axis	
 	yyaxis(p1, 'right');  
-	ylim([min(wave_fit.Zu) / pi, max(wave_fit.Zu) / pi]);  % set limits
-	hold on;
+	ylim(p1, [min(wave_fit.Zu) / pi, max(wave_fit.Zu) / pi]);  % set limits
+	hold(p1, 'on');
 	yticks(p1, (floor(min(wave_fit.Zu) / pi) : ceil(max(wave_fit.Zu) / pi)));  % Put ticks at pi rad
 	ytks = p1.YTick;  % store ticks (transform them to left axis)
 	
@@ -110,13 +110,12 @@ if PLOT
 	ylab = get(p1, 'yticklabels');
 	labs = {'\leftarrow', '\rightarrow'};
 	p1.YTickLabel = cellfun(@(x) labs{mod(round(10 * str2double(x)) / 10, 2) + 1}, ylab, 'uni', 0);
-	ylabel('Wave direction (\pi rad)')
+	ylabel(p1, 'Wave direction (\pi rad)')
 
     % Transform Zu and ytks so that you can use the left axis
 	% ... (this way you get a colorbar)
-	fr = mean(mea.firingRate, 2);
 	x = [1 min(wave_fit.Zu); 1 max(wave_fit.Zu)];
-	y = [min(fr); max(fr)];
+	y = [min(meanFr); max(meanFr)];
 	b = x\y;
 	
 	% Left plot, left axis
@@ -130,17 +129,20 @@ if PLOT
 			':', 'color', tempc(1 + i, :))
 		hold on
 	end
-	xlim([TimeMs(1), TimeMs(end)])
-	ylim(x * b);
+	xlim(p1, [TimeMs(1), TimeMs(end)])
+	ylim(p1, x * b);
 	
 	% Plot the mean firing rate
-	plot(p1, TimeMs, fr, 'color', .5*[1 1 1]); 
-	ylabel('Mean firing rate (spikes/s)')
+	plot(p1, TimeMs, meanFr, 'color', .5*[1 1 1]); 
+	ylabel(p1, 'Mean firing rate (spikes/s)')
+	hold(p1, 'on');
 	
 	% Right plot
 	% Plot the velocities in a compass
-	compass(p2, wave_fit.V(1, wave_fit.p < sig), wave_fit.V(2, wave_fit.p < sig)); hold on;
-	colormap('cool');
+	hold(p2, 'off')
+	compass(p2, wave_fit.V(1, wave_fit.p < sig), wave_fit.V(2, wave_fit.p < sig)); 
+	hold(p2, 'on');
+	colormap(p2, 'cool');
 
 	
 	cmap = cool(numWaves);  % compass color corresponds to time
@@ -153,14 +155,15 @@ if PLOT
 		yyaxis(p1, 'left'); % right axis
 		scatter(p1, waveTimes(i), b(1) + b(2) * wave_fit.Zu(i), 30, wave_fit.Z(i), 'filled');
 		colormap(p1, cmapDir);
-		h = compass(p2, wave_fit.V(1, i), wave_fit.V(2, i)); hold on
+		h = compass(p2, wave_fit.V(1, i), wave_fit.V(2, i));
 		h.Color = cmap(i-1, :);
 		h.LineWidth = 2;
 
 % 		drawnow()
 % 		pause(1e-2)
 	end
-	hold off
+	hold(p1, 'off')
+	hold(p2, 'off')
 	
 	% Add colorbars
 	colorbar(p1)
@@ -170,17 +173,16 @@ if PLOT
 	
 	% Create histograms of first and last n discharges
 	if feature('ShowFigureWindows')
-		temp = cmap;
 		n = 20;
 		figure(5);  % Plot a histogram of the first twenty discharges
 		hrose = rose(wave_fit.Z(5 : 5 + n)); 
-		hrose.Color = temp(1, :); 
+		hrose.Color = tempc(1, :); 
 		hrose.LineWidth = 2; 
 		title('Direction during first 20 discharges')
 		
 		figure(6);  % ... and the last twenty discharges
 		hroseR = rose(wave_fit.Z(end - n : end)); 
-		hroseR.Color = temp(end, :); 
+		hroseR.Color = tempc(end, :); 
 		hroseR.LineWidth = 2; 
 		title('Direction during last 20 discharges')
 	end
