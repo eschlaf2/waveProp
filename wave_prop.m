@@ -50,9 +50,9 @@ numWaves = numel(waveTimes);
 
 %% Estimate wave direction at each discharge time
 
-try 
-	wave_fit = mea.fit;
-catch
+% try 
+% 	wave_fit = mea.fit;
+% catch
 	% Initialize arrays
 	beta = nan(3, numWaves);  % fit parameters
 	V = nan(2, numWaves);  % wave velocity (psuedo-inverse of beta)
@@ -82,7 +82,7 @@ catch
 	wave_fit.Z = Z;
 	wave_fit.Zu = Zu;
 	mea.fit = wave_fit;
-end
+% end
 
 %% Plot results
 % Plot the mean firing rate along with the unwrapped wave angle at each
