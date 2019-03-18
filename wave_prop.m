@@ -12,9 +12,11 @@ if ~exist('PLOT', 'var')
 	PLOT = true;
 end
 
-sig = .25;
+sig = .1;
 halfWin = 50;  % half window around discharge event (ms)
 plotTitle = strrep(mea.Name, '_', ' ');
+Time = mea.Time;
+Time = Time();
 
 %% Find discharge times
 
@@ -39,7 +41,7 @@ meanFr = mean(fr(:, mask), 2);
 % Create an array of spike times
 T = nan(size(mea.mua), 'single');
 T(mea.event_inds) = 1;
-TimeMs = mea.Time * 1000;  % Convert times to ms
+TimeMs = Time * 1000;  % Convert times to ms
 T = TimeMs' .* T;
 % T(T == 0) = nan;
 
@@ -90,6 +92,8 @@ numWaves = numel(waveTimes);
 
 if PLOT
 	
+	Z = wave_fit.Z;  % indicate whether to use Zu or Z
+	
 	% Plot the firing rate and wave velocity at each discharge
 	figure(2); clf; fullwidth()
 	p1 = subplot(1, 10, 1:7);  % Left plot
@@ -101,9 +105,9 @@ if PLOT
 	% Left plot, right axis
 	% Put wave direction labels on the right y-axis	
 	yyaxis(p1, 'right');  
-	ylim(p1, [min(wave_fit.Zu) / pi, max(wave_fit.Zu) / pi]);  % set limits
+	ylim(p1, [min(Z) / pi, max(Z) / pi]);  % set limits
 	hold(p1, 'on');
-	yticks(p1, (floor(min(wave_fit.Zu) / pi) : ceil(max(wave_fit.Zu) / pi)));  % Put ticks at pi rad
+	yticks(p1, (floor(min(Z) / pi) : ceil(max(Z) / pi)));  % Put ticks at pi rad
 	ytks = p1.YTick;  % store ticks (transform them to left axis)
 	
 	% Relabel the right axis using arrows
@@ -114,7 +118,7 @@ if PLOT
 
     % Transform Zu and ytks so that you can use the left axis
 	% ... (this way you get a colorbar)
-	x = [1 min(wave_fit.Zu); 1 max(wave_fit.Zu)];
+	x = [1 min(Z); 1 max(Z)];
 	y = [min(meanFr); max(meanFr)];
 	b = x\y;
 	
@@ -148,15 +152,15 @@ if PLOT
 	cmap = cool(numWaves);  % compass color corresponds to time
 	cmapDir = hsv;  % scatter color corresponds to direction
 	
-	for i = 2:numWaves  % Overlay colored data points each discharge
+	for i = 1:numWaves  % Overlay colored data points each discharge
 		if wave_fit.p(i) > sig
 			continue
 		end
 		yyaxis(p1, 'left'); % right axis
-		scatter(p1, waveTimes(i), b(1) + b(2) * wave_fit.Zu(i), 30, wave_fit.Z(i), 'filled');
+		scatter(p1, waveTimes(i), b(1) + b(2) * Z(i), 30, wave_fit.Z(i), 'filled');
 		colormap(p1, cmapDir);
 		h = compass(p2, wave_fit.V(1, i), wave_fit.V(2, i));
-		h.Color = cmap(i-1, :);
+		h.Color = cmap(i, :);
 		h.LineWidth = 2;
 
 % 		drawnow()
@@ -174,8 +178,9 @@ if PLOT
 	% Create histograms of first and last n discharges
 	if feature('ShowFigureWindows')
 		n = 20;
-		figure(5);  % Plot a histogram of the first twenty discharges
-		hrose = rose(wave_fit.Z(5 : 5 + n)); 
+		first_wave = find(mea.waveTimes > 0, 1);
+		figure(5);  % Plot a histogram of the first n discharges
+		hrose = rose(wave_fit.Z(first_wave : first_wave + n)); 
 		hrose.Color = tempc(1, :); 
 		hrose.LineWidth = 2; 
 		title('Direction during first 20 discharges')

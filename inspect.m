@@ -1,6 +1,6 @@
-function [] = inspect(pat)
+function [] = inspect(pat, files)
 %%
-% pat = 'CUCX3';
+% pat = 'c3';
 patPath = genpath(pat);
 addpath(patPath);
 SF = 100;
@@ -29,15 +29,24 @@ SF = 100;
 % 	'seizure_end', [] ...
 % 	);
 micros = dir([pat filesep pat '_Neuroport' filesep '*.ns5']);
-%%
-for i = 1:numel(micros)
-% 	seizures(i).ns5 = micros(i).name;
 
+if ~exist('files', 'var') || isempty(files)
+	files = 1:numel(micros);
+else
+	files(files > numel(micros)) = [];
+	files(files < 1) = [];
+end
+
+%%
+for i = files
+% 	seizures(i).ns5 = micros(i).name;
+	disp(micros(i).name);
 	nsx = openNSx(micros(i).name, 'skipfactor', SF);
 %%
 	samplingRate = nsx.MetaTags.SamplingFreq / SF;
 	if nsx.RawData.PausedFile
 % 		seizures.pausePoints = nsx.MetaTags.DataPoints;
+		nsx.Data = nsx.Data(logical(nsx.MetaTags.Timestamp));
 		Data = cell(size(nsx.Data))';
 		for di = 1:numel(nsx.Data)
 			temp = single(nsx.Data{di})';
@@ -46,29 +55,19 @@ for i = 1:numel(micros)
 		end
 		Data = cell2mat(Data);
 	else
-		Data = single(nsx.Data');
+		Data = single(nsx.Data') + 1e-6;
+		temp = smoothdata(Data ./ max(abs(Data)), 'movmean', samplingRate / 10);
+		Data = zca_whitening(temp);
 	end
 	Data = diff(Data);
-	[nSamp, nCh] = size(Data);
-	if nCh > 96
-		Data = Data(:, 1:96);
-		nCh = 96;
-	end
-% 	Data = Data ./ max(abs(Data)) / 2 + int16(1 : nCh);
-% 	Data = smoothdata(Data, 'gaussian', samplingRate / 10);
-	Data = Data ./ max(abs(Data));
-	T = (1:nSamp) / samplingRate;
-	figure(998); fullwidth(); 
-% 	plot((1:nSamp-1) / samplingRate, zscore(diff((Data))) + (1:nCh))
-	yyaxis right
-	plot(T, smoothdata(std(Data, [], 2), 'movmean', samplingRate), 'k', 'linewidth', 2); 
-	yyaxis left
-	set(gca, 'colororder', cool(nCh)); set(gca, 'nextplot', 'replacechildren')
-	plot(T, (((Data))) + (1:nCh))
-	axis tight;
+	plot_Neuroport(Data, samplingRate);
 	title([pat ' ' nsx.MetaTags.Filename]); xlabel('Time (s)'); ylabel('Channel')
-	print(998, [pat filesep pat '_' nsx.MetaTags.Filename(1:end-4) '_full'], '-dpng')
-	savefig(998, [pat filesep pat '_' nsx.MetaTags.Filename(1:end-4) '_full'])
+	try
+		savefig(998, [pat filesep pat '_' nsx.MetaTags.Filename(1:end-4) '_full'])
+	catch ME
+		display(ME)
+	end
+	close 998;
 % 	figure(999); fullwidth; 
 % 	p1 = subplot(2, 2, [1 2]); set(p1, 'colororder', cool(nCh))
 % 	p1.NextPlot = 'replaceChildren';  

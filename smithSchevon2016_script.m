@@ -31,11 +31,7 @@ catch ME
 end
 	
 %% Make figures pres ready
-set(groot, 'defaultLineLineWidth', 1);
-set(groot, 'defaultAxesLineWidth', 1);
-set(groot, 'defaultFigureColor', [1 1 1], 'defaultAxesFontSize', 16, 'defaultHistogramLineWidth',1);
-% set(groot, 'defaultAxesFontWeight', 'bold');
-set(groot, 'defaultAxesFontSize', 16);
+defaultToPresentationFigs;
 c = lines(7);
 aic = @(predictors, dev) dev + 2 * size(predictors, 2);
 

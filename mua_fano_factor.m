@@ -12,6 +12,7 @@ if ~exist('method', 'var')
 end
 
 Time = mea.Time;
+Time = Time();
 
 %%
 switch method

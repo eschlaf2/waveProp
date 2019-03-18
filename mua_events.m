@@ -10,22 +10,35 @@ ARTEFACT_THRESH = 16;  % activity outside this range is considered artefact [sd]
 % Import fields
 data = mea.mua;
 time = mea.Time;
-
-intervalM = mea.SamplingRate / 1e3 * MIN_DIST;  % samples per MIN_DIST
-mn = mean(data(time < 0, :), 1);   % get the mean of the baseline
-sd = std(data);                              % and the overall sd
-temp = (data - mn) ./ sd;                    % zscore based on baseline mean
+time = time();
 
 % define artefacts as events that are more than ARTEFACT_THRESH sd from
-% baseline; remove them (set to nan)
-artefacts = (abs(temp) > ARTEFACT_THRESH);  
+% mean; remove them (set to nan)
+artefacts = (abs(zscore(data)) > ARTEFACT_THRESH);  
 data(artefacts) = nan;
 
+intervalM = mea.SamplingRate / 1e3 * MIN_DIST;  % samples per MIN_DIST
+mn = mean(data(time < 0, :), 1, 'omitnan');     % get the mean of the preictal baseline
+sd = std(data(time < 0, :), 'omitnan');            % ... and the sd
+data = (data - mn) ./ sd;                       % zscore based on preictal state
+
 % find events on each channel
-events = false(size(temp));
-for ch = 1:size(temp, 2)
+events = false(size(data));
+for ch = 1:size(data, 2)
 	temp = data(:, ch);
-	[~, inds] = findpeaks(-zscore(temp(~isnan(temp))), ...
+	if any(isnan(temp))
+		i = find(isnan(temp), 1);
+		while i
+			i_next = find(~isnan(temp(i:end)), 1) + i;
+			y = interp1([i - 1; i_next], [temp(i - 1); temp(i_next)], i:i_next - 1);
+			temp(i:i_next - 1) = y;
+			i = find(isnan(temp),1);
+		end
+	end
+	if ~any(abs(zscore(temp)) > EVENT_THRESH)
+		continue
+	end
+	[~, inds] = findpeaks(-(temp(~isnan(temp))), ...
 		'minpeakdistance', intervalM, 'minpeakheight', EVENT_THRESH);  
 	events(inds, ch) = true;
 end
