@@ -62,6 +62,7 @@ for i = files
 	Data = diff(Data);
 	plot_Neuroport(Data, samplingRate);
 	title([pat ' ' nsx.MetaTags.Filename]); xlabel('Time (s)'); ylabel('Channel')
+	print(998, [pat filesep pat '_' nsx.MetaTags.Filename(1:end-4) '_full'], '-dpng')
 	try
 		savefig(998, [pat filesep pat '_' nsx.MetaTags.Filename(1:end-4) '_full'])
 	catch ME
