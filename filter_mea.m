@@ -1,4 +1,4 @@
-function [mea] = filter_mea(mea, outfile, bands)
+function output = filter_mea(mea, outfile, bands)
 
 
 if ~exist('outfile', 'var') || isempty(outfile)
@@ -46,6 +46,7 @@ if any(strcmpi(bands, 'lfp'))
 
 	temp = single(filtfilt(bpFilt, double(data)));
 	temp(:, BadChannels) = [];
+	output.lfp = temp;
 	disp('Writing to file...')
 	mea.lfp = temp;
 	disp('Done.')
@@ -59,6 +60,7 @@ if any(strcmpi(bands, 'mua'))
 		'SampleRate',SamplingRate);
 	temp = single(filtfilt(bpFilt, double(data)));
 	temp(:, BadChannels) = [];
+	output.mua = temp;
 	disp('Writing to file...')
 	mea.mua = temp;
 	disp('Done.')
@@ -72,6 +74,7 @@ if any(strcmpi(bands, 'highg'))
 		'SampleRate', SamplingRate);
 	temp = single(filtfilt(bpFilt, double(data)));
 	temp(:, BadChannels) = [];
+	output.highg = temp;
 	disp('Writing to file...')
 	mea.highg = temp;
 	disp('Done.')

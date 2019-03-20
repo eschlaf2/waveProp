@@ -1,4 +1,4 @@
-function mea = test_for_recruitment(mea, method, PLOT)
+function output = test_for_recruitment(mea, method, PLOT)
 % Test to see if the electrode array was recruited to the seizure as
 % described in ?Schevon, Catherine A., et al. ?Evidence of an Inhibitory
 % Restraint of Seizure Activity in Humans.? Nature Communications, vol. 3,
@@ -85,6 +85,8 @@ if any(strcmpi(method, 'wpli'))
 	disp('Saving WPLI')
 	mea.wpli = wpli_mean;
 	mea.wpliFreq = freq;
+	output.wpli = wpli_mean;
+	output.wpliFreq = freq;
 
 	if PLOT
 		figure(4); clf; fullwidth()
@@ -99,6 +101,6 @@ end
 
 %% Compute Fano factor
 if any(strcmpi(method, 'fano'))
-	mea = mua_fano_factor(mea);
+	output = mua_fano_factor(mea);
 end
 

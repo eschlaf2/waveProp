@@ -1,4 +1,4 @@
-function mea = mua_fano_factor(mea, PLOT, method)
+function ff = mua_fano_factor(mea, PLOT, method)
 % From Schevon et al., 2012 - details not published, but that the FF
 % decreases to below baseline while the firing rate is still high once the
 % region is recruited

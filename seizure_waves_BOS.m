@@ -1,15 +1,5 @@
-function [mea] = seizure_waves_BOS(mea, PLOT)
+function [BOS] = seizure_waves_BOS(mea)
 
-%% Parse input
-if ~exist('PLOT', 'var')
-	if ~feature('ShowFigureWindows')
-		PLOT = true;
-	else
-		PLOT = false;
-	end
-end
-
-% data = mea.lfp;
 position = [mea.X mea.Y];
 
 %% Set parameters
@@ -25,6 +15,7 @@ lfp = lfp(1 : DS_STEP : end, :);  % downsample
 NSAMP = size(lfp, 1);
 
 time = mea.Time;  % import time
+time = time();
 padding = mea.Padding;
 time = time(1 : DS_STEP : end);  % downsample
 
@@ -48,23 +39,35 @@ COMPUTE_INDS = COMPUTE_INDS(TS : TE - T);  % only compute while in seizure
 N = numel(COMPUTE_INDS);
 %%
 
+% Initialize arrays
 src_dir = zeros(N, 1);
 speed = zeros(N, 1);
 ci_dir = zeros(N, 2);
 ci_sp = zeros(N, 2);
+psig = zeros(N, 1);
 
-for i = 1:N
+for i = 1:N  % For each interval during the seizure
+	
+	% get time indices over which to compute coherence
 	inds = COMPUTE_INDS(i) : (COMPUTE_INDS(i) + T * DS_FREQ - 1);
 	
+	% compute the coherence over the selected interval
 	fprintf('Estimating waves at time %d/%d\n', i, N)
 	[coh, phi, freq, coh_conf] = compute_coherence(lfp(inds, :), params);
 	
+	% compute delays on each electrode based on coherence
 	[delay, delay_ci_lo, delay_ci_up] = compute_delay(coh, coh_conf, phi, freq);
 	
-	[src_dir(i), speed(i), ci_dir(i, :), ci_sp(i, :)] = estimate_wave(delay, position, '');
+	% fit plane to delays
+	[src_dir(i), speed(i), ci_dir(i, :), ci_sp(i, :), psig(i)] = ...
+		estimate_wave(delay, position, '');
 
 end
+V = speed .* exp(1i * src_dir);
+V = [real(V) imag(V)];
 
-BOS = struct('src_dir', src_dir, 'speed', speed, 'ci_dir', ci_dir, 'ci_sp', ci_sp);
+BOS = struct('Z', src_dir, 'V', V, 'sp', speed, ...
+	'ci_Z', ci_dir, 'ci_sp', ci_sp,...
+	'wave_times', time(COMPUTE_INDS) * 1e3);  % return wave times in ms.
 mea.BOS = BOS;
 

@@ -1,4 +1,4 @@
-function [mea] = mua_events(mea)
+function [event_inds, artefact_inds] = mua_events(mea)
 % Takes a structure or matfile as input and computes event times. Events
 % are defined as peaks in MUA more than EVENT_THRESH standard deviations from the
 % baseline in the negative direction and at least MIN_DIST ms apart
@@ -8,7 +8,13 @@ MIN_DIST = 1;          % min time between peaks [ms]
 ARTEFACT_THRESH = 16;  % activity outside this range is considered artefact [sd] 
 
 % Import fields
-data = mea.mua;
+if (isfield(mea, 'mua') || isprop(mea, 'mua'))
+	data = mea.mua;
+else
+	mua = filter_mea(mea, [], 'mua');
+	data = mua.mua;
+end
+
 time = mea.Time;
 time = time();
 
@@ -44,5 +50,7 @@ for ch = 1:size(data, 2)
 end
 
 % store results to mea
-mea.artefact_inds = find(artefacts);
-mea.event_inds = find(events);
+event_inds = find(events);
+artefact_inds = find(artefacts);
+mea.artefact_inds = artefact_inds;
+mea.event_inds = event_inds;

@@ -1,5 +1,16 @@
-function [mea] = wave_prop(mea, PLOT)
+function wave_fit = wave_prop(mea, method)
 
+
+switch lower(method)
+	case 'bos'
+		wave_fit = bos_method(mea);
+	case 'nyc'
+		wave_fit = nyc_method(mea);
+end
+
+end
+
+function wave_fit = nyc_method(mea)
 %% Compute wave propagation at each discharge time as described in 
 % Liou, Jyun You, et al. ?Multivariate Regression Methods for Estimating
 % Velocity of Ictal Discharges from Human Microelectrode Recordings.?
@@ -8,13 +19,7 @@ function [mea] = wave_prop(mea, PLOT)
 % 
 % All time units should be converted to ms for consistency
 
-if ~exist('PLOT', 'var')
-	PLOT = true;
-end
-
-sig = .1;
 halfWin = 50;  % half window around discharge event (ms)
-plotTitle = strrep(mea.Name, '_', ' ');
 Time = mea.Time;
 Time = Time();
 
@@ -23,20 +28,17 @@ Time = Time();
 fr = mea.firingRate;
 mask = mean(fr) >= 1/60;  % exclude channels with mean firing rate less than one spike per minute (Liou et al., 2018) ?\cite{Liou2018a}
 meanFr = mean(fr(:, mask), 2);
-% try 
-% 	waveTimes = mea.waveTimes;
-% catch ME
-	[~, waveTimes] = findpeaks(meanFr, ...  % find peaks in mean firing rate
-		mea.SamplingRate / 1e3, ...  % ... in ms 
-		'minpeakprom', 100 * std(diff(meanFr)), ...  % ... use discrete peaks
-		'minpeakdistance', 100);  % ... peaks should be at least 100 ms apart
 
-	padding = mea.Padding;
-	waveTimes = waveTimes - padding(1) * 1e3;  % Account for padding (in ms)
+[~, waveTimes] = findpeaks(meanFr, ...  % find peaks in mean firing rate
+	mea.SamplingRate / 1e3, ...  % ... in ms 
+	'minpeakprom', 100 * std(diff(meanFr)), ...  % ... use discrete peaks
+	'minpeakdistance', 100);  % ... peaks should be at least 100 ms apart
 
-	% Save wave times
-	mea.waveTimes = waveTimes;
-% end
+padding = mea.Padding;
+waveTimes = waveTimes - padding(1) * 1e3;  % Account for padding (in ms)
+
+mea.waveTimes = waveTimes;
+
 
 % Create an array of spike times
 T = nan(size(mea.mua), 'single');
@@ -52,146 +54,117 @@ numWaves = numel(waveTimes);
 
 %% Estimate wave direction at each discharge time
 
-% try 
-% 	wave_fit = mea.fit;
-% catch
-	% Initialize arrays
-	beta = nan(3, numWaves);  % fit parameters
-	V = nan(2, numWaves);  % wave velocity (psuedo-inverse of beta)
-	p = nan(1, numWaves);  % certainty
-	position = [mea.X, mea.Y];
+% Initialize arrays
+beta = nan(3, numWaves);  % fit parameters
+V = nan(2, numWaves);  % wave velocity (psuedo-inverse of beta)
+p = nan(1, numWaves);  % certainty
+position = [mea.X, mea.Y];
 
-	for i = 1:numWaves  % estimate wave velocity for each discharge
-		t = waveTimes(i);
-		inds = find((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
-		events = T(inds, :)';
-		events = mat2cell(events, ones(size(events, 1), 1), size(events, 2));
-		for ch = 1:numCh
-			temp = events{ch};
-			temp(isnan(temp)) = [];
-			events{ch} = temp;
-		end
-		[beta(:, i), V(:, i), p(i)] = ...
-			SpatialLinearRegression(events, position, ...
-			'switch_plot', 0, 'Lossfun','L2');
+for i = 1:numWaves  % estimate wave velocity for each discharge
+	t = waveTimes(i);
+	inds = find((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
+	events = T(inds, :)';
+	events = mat2cell(events, ones(size(events, 1), 1), size(events, 2));
+	for ch = 1:numCh
+		temp = events{ch};
+		temp(isnan(temp)) = [];
+		events{ch} = temp;
 	end
-	Z = angle(complex(V(1, :), V(2, :)));
-	Zu = unwrap(Z);
+	[beta(:, i), V(:, i), p(i)] = ...
+		SpatialLinearRegression(events, position, ...
+		'switch_plot', 0, 'Lossfun','L2');
+end
+Z = angle(complex(V(1, :), V(2, :)));
+Zu = unwrap(Z);
 
-	wave_fit.beta = beta;
-	wave_fit.V = V;
-	wave_fit.p = p;
-	wave_fit.Z = Z;
-	wave_fit.Zu = Zu;
-	mea.fit = wave_fit;
-% end
+wave_fit.beta = beta;
+wave_fit.V = V;
+wave_fit.p = p;
+wave_fit.Z = Z;
+wave_fit.Zu = Zu;
+mea.wave_fit_nyc = wave_fit;
 
-%% Plot results
-% Plot the mean firing rate along with the unwrapped wave angle at each
-% discharge event.
-
-if PLOT
-	
-	Z = wave_fit.Z;  % indicate whether to use Zu or Z
-	
-	% Plot the firing rate and wave velocity at each discharge
-	figure(2); clf; fullwidth()
-	p1 = subplot(1, 10, 1:7);  % Left plot
-	p2 = subplot(1, 10, 9:10); % right plot (compass)
-% 	p2.NextPlot = 'replacechildren';
-	title(p1, plotTitle)
-	xlabel(p1, 'Time (ms)')
-	
-	% Left plot, right axis
-	% Put wave direction labels on the right y-axis	
-	yyaxis(p1, 'right');  
-	ylim(p1, [min(Z) / pi, max(Z) / pi]);  % set limits
-	hold(p1, 'on');
-	yticks(p1, (floor(min(Z) / pi) : ceil(max(Z) / pi)));  % Put ticks at pi rad
-	ytks = p1.YTick;  % store ticks (transform them to left axis)
-	
-	% Relabel the right axis using arrows
-	ylab = get(p1, 'yticklabels');
-	labs = {'\leftarrow', '\rightarrow'};
-	p1.YTickLabel = cellfun(@(x) labs{mod(round(10 * str2double(x)) / 10, 2) + 1}, ylab, 'uni', 0);
-	ylabel(p1, 'Wave direction (\pi rad)')
-
-    % Transform Zu and ytks so that you can use the left axis
-	% ... (this way you get a colorbar)
-	x = [1 min(Z); 1 max(Z)];
-	y = [min(meanFr); max(meanFr)];
-	b = x\y;
-	
-	% Left plot, left axis
-	% Create grid lines corresponding to the right axis
-	yyaxis(p1, 'left')
-	i = 1;
-	tempc = hsv(2);  % grid line colors correspond to angle
-	for y = ytks * pi
-		i = mod(i + 1, 2);
-		plot(p1, [TimeMs(1); TimeMs(end)],  b' * [1; y] * [1; 1], ... 
-			':', 'color', tempc(1 + i, :))
-		hold on
-	end
-	xlim(p1, [TimeMs(1), TimeMs(end)])
-	ylim(p1, x * b);
-	
-	% Plot the mean firing rate
-	plot(p1, TimeMs, meanFr, 'color', .5*[1 1 1]); 
-	ylabel(p1, 'Mean firing rate (spikes/s)')
-	hold(p1, 'on');
-	
-	% Right plot
-	% Plot the velocities in a compass
-	hold(p2, 'off')
-	compass(p2, wave_fit.V(1, wave_fit.p < sig), wave_fit.V(2, wave_fit.p < sig)); 
-	hold(p2, 'on');
-	colormap(p2, 'cool');
-
-	
-	cmap = cool(numWaves);  % compass color corresponds to time
-	cmapDir = hsv;  % scatter color corresponds to direction
-	
-	for i = 1:numWaves  % Overlay colored data points each discharge
-		if wave_fit.p(i) > sig
-			continue
-		end
-		yyaxis(p1, 'left'); % right axis
-		scatter(p1, waveTimes(i), b(1) + b(2) * Z(i), 30, wave_fit.Z(i), 'filled');
-		colormap(p1, cmapDir);
-		h = compass(p2, wave_fit.V(1, i), wave_fit.V(2, i));
-		h.Color = cmap(i, :);
-		h.LineWidth = 2;
-
-% 		drawnow()
-% 		pause(1e-2)
-	end
-	hold(p1, 'off')
-	hold(p2, 'off')
-	
-	% Add colorbars
-	colorbar(p1)
-	p2.CLim = [waveTimes(1) waveTimes(end)];
-	colorbar(p2, 'southoutside', 'Ticks', [waveTimes(1) waveTimes(end)], ...
-		'TickLabels', {'start'; 'end'})
-	
-	% Create histograms of first and last n discharges
-	if feature('ShowFigureWindows')
-		n = 20;
-		first_wave = find(mea.waveTimes > 0, 1);
-		figure(5);  % Plot a histogram of the first n discharges
-		hrose = rose(wave_fit.Z(first_wave : first_wave + n)); 
-		hrose.Color = tempc(1, :); 
-		hrose.LineWidth = 2; 
-		title('Direction during first 20 discharges')
-		
-		figure(6);  % ... and the last twenty discharges
-		hroseR = rose(wave_fit.Z(end - n : end)); 
-		hroseR.Color = tempc(end, :); 
-		hroseR.LineWidth = 2; 
-		title('Direction during last 20 discharges')
-	end
 end
 
 
+function wave_fit = bos_method(mea)
 
+position = [mea.X mea.Y];
+
+%% Set parameters
+% Note: the chronux toolbox must be on the path
+
+% Downsample lfp
+DS_FREQ = 1e3;  % downsampled frequency (Hz)
+DS_STEP = floor(mea.SamplingRate / DS_FREQ);  % how to step through the data
+DS_FREQ = mea.SamplingRate / DS_STEP;  % recompute DS_FREQ in case of rounding
+
+try
+	lfp = mea.lfp;  % import lfp band
+catch ME
+	lfp = filter_mea(mea, [], 'lfp');
+	lfp = lfp.lfp;
+end
+lfp = lfp(1 : DS_STEP : end, :);  % downsample
+NSAMP = size(lfp, 1);
+
+time = mea.Time;  % import time
+time = time();
+padding = mea.Padding;
+time = time(1 : DS_STEP : end);  % downsample
+
+
+BAND = [1 13];                  % Select a frequency range to analyze
+T = 2;							% Length of recording (s)
+W = 2;                          % Bandwidth
+ntapers = 2*(T * W) - 1;        % Choose the # of tapers.
+params.tapers = [T * W, ntapers];  % ... time-bandwidth product and tapers.
+params.Fs = DS_FREQ;                 % ... sampling rate
+params.pad = -1;                % ... no zero padding.
+params.fpass = BAND;            % ... freq range to pass
+params.err = [1 0.05];          % ... theoretical error bars, p=0.05.
+OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
+
+COMPUTE_INDS = [round(1 : OVERLAP_COMPLEMENT * DS_FREQ : NSAMP - T * DS_FREQ) NSAMP];
+TS = find(time(COMPUTE_INDS) > 0, 1);
+TE = find(time(COMPUTE_INDS) > (time(end) - padding(2)), 1) - 1;
+
+COMPUTE_INDS = COMPUTE_INDS(TS : TE - T);  % only compute while in seizure
+N = numel(COMPUTE_INDS);
+%%
+
+% Initialize arrays
+src_dir = zeros(N, 1);
+speed = zeros(N, 1);
+ci_dir = zeros(N, 2);
+ci_sp = zeros(N, 2);
+psig = zeros(N, 1);
+
+for i = 1:N  % For each interval during the seizure
+	
+	% get time indices over which to compute coherence
+	inds = COMPUTE_INDS(i) : (COMPUTE_INDS(i) + T * DS_FREQ - 1);
+	
+	% compute the coherence over the selected interval
+	fprintf('Estimating waves at time %d/%d\n', i, N)
+	[coh, phi, freq, coh_conf] = compute_coherence(lfp(inds, :), params);
+	
+	% compute delays on each electrode based on coherence
+	[delay, delay_ci_lo, delay_ci_up] = compute_delay(coh, coh_conf, phi, freq);
+	
+	% fit plane to delays
+	[src_dir(i), speed(i), ci_dir(i, :), ci_sp(i, :), psig(i)] = ...
+		estimate_wave(delay, position, '');
+
+end
+V = speed .* exp(1i * src_dir);  % wave velocity (for consistency with NYC method)
+V = [real(V) imag(V)];
+
+wave_fit = struct('Z', src_dir, 'V', V, 'sp', speed, ...
+	'ci_Z', ci_dir, 'ci_sp', ci_sp,...
+	'p', psig, ...							  % significance level
+	'params', params, ...                     % analysis parameters
+	'wave_times', time(COMPUTE_INDS) * 1e3);  % wave times in ms.
+mea.wave_fit_bos = wave_fit;
+
+end

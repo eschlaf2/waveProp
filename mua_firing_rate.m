@@ -1,4 +1,4 @@
-function mea = mua_firing_rate(mea)
+function fr = mua_firing_rate(mea)
 % Returns the firing rate as computed in Smith et al., 2016. Units are in
 % spikes per second
 
