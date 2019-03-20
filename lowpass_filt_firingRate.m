@@ -2,6 +2,7 @@ function [frPct, Time] = lowpass_filt_firingRate(mea)
 
 firingRate = mea.firingRate;
 Time = mea.Time;
+Time = Time();
 te = Time(end) - mea.Padding(1, 2); 
 Time = Time(1:1e3:end);
 firingRate = smoothdata(firingRate, 'movmedian', 1e3);  % smoothing over 30 ms window
