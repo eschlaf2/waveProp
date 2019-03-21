@@ -16,4 +16,5 @@ event_inds(event_inds < t0) = [];
 fr_high(event_inds) = 1;
 ds = inds(2) - inds(1);
 fr_high = smoothdata(fr_high, 1, 'movmean', ds) * ds;
-electrode_vid({fr; fr_high(inds, :)}, mea.X, mea.Y, time, time(end), [], 'c5_1', true)
+electrode_vid({fr; fr_high(inds, :)}, mea.X, mea.Y, time, time(end), [], ...
+	mea.Name, true)
