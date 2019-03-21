@@ -1,4 +1,4 @@
-function [frPct, Time] = lowpass_filt_firingRate(mea, downsample)
+function [output, Time] = lowpass_filt_firingRate(mea, downsample)
 % Tihs file is used to filter the firing rate of MEA data in preparations
 % to make a video showing ictal wavefront spread. Data are downsampled to
 % approximately 30 Hz and then low-pass filtered at 1 Hz. Finally, data are
@@ -33,11 +33,12 @@ bpFilt = designfilt('lowpassfir', 'FilterOrder', 10, ...
 frFilt = smoothdata(firingRate, 'gaussian', 5*SamplingRate);
 % frFilt = smoothdata(frFilt(1:10:end, :));  % Downsample to 30 Hz
 % frFilt = firingRate;
-frPct = (frFilt - min(frFilt)) ./ (max(frFilt) - min(frFilt));
 inds = logical((Time > 0) .* (Time < te));
+output = frFilt(inds, :);
 
-frPct = frPct(inds, :); 
+% frPct = (frFilt - min(frFilt)) ./ (max(frFilt) - min(frFilt));
+% frPct = frPct(inds, :); 
 Time = Time(inds);
 
 %%
-figure(2), plot(Time, frPct + .1*(1:size(frPct, 2)))
+figure(2), plot(Time, output + .1*(1:size(output, 2)))
