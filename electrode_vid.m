@@ -1,4 +1,4 @@
-function [v] = electrode_vid(temp, X, Y, Time, endTime, FrameRate, outfile, visible)
+function [v] = electrode_vid(data, X, Y, Time, endTime, FrameRate, outfile, visible)
 
 CREATEVID = true;
 if ~exist('outfile', 'var') || isempty(outfile)
@@ -13,9 +13,17 @@ if ~exist('visible', 'var') || isempty(visible)
     visible = false;
 end
 
-if numel(Time) ~= size(temp, 1)
+if ~iscell(data)
+	data = {data};
+end
+numPlots = numel(data);
+rows = floor(sqrt(numPlots));
+cols = ceil(numPlots / rows);
+
+if numel(Time) ~= size(data{1}, 1)
 	error('Data and Time must have the same dimensions.')
 end
+
 %% Reshape data
 % tmax = length(Time);
 % dataR = nan(tmax, max(X), max(Y));
@@ -37,31 +45,37 @@ if CREATEVID
 	open(v);
 end
 
-mNP = quantile(temp(:), .025);
-% mE = quantile(dataEWsm(:), .05);
-
-MNP = quantile(temp(:), .975);
-% ME = quantile(dataEWsm(:), .95);
-
-if MNP == mNP
-	MNP = mNP + 1;
-end
-
 map = make_diverging_colormap('cool', 1);
 
 figure(1); clf;
 if ~visible, set(1, 'visible', 'off'); end
-set(1, 'position', [556   422   335   254]);
+set(1, 'position', [0   0   335 * cols   254 * rows]);
 colormap(map)
 % 	p1 = subplot(1,5,1:3);
-scatter(X, Y, 150, temp(1, :), 's', 'filled')
-set(gca, 'clim', [mNP MNP], 'Color', .15*[1 1 1]);
-axis image
-xlim([0 max(X)+1])
-ylim([0 max(Y)+1])
-% 	imagesc(squeeze(dataE(t, :, :)), [mE ME]);
-colorbar
-set(gca,'nextplot','replacechildren');
+
+for p = 1:numPlots
+	h(p) = subplot(rows, cols, p);
+	
+	mNP = quantile(data{p}(:), .025);
+	% mE = quantile(dataEWsm(:), .05);
+
+	MNP = quantile(data{p}(:), .975);
+	% ME = quantile(dataEWsm(:), .95);
+
+	if MNP == mNP
+		MNP = mNP + 1;
+	end
+
+	
+	scatter(X, Y, 150, data{p}(1, :), 's', 'filled')
+	set(gca, 'clim', [mNP MNP], 'Color', .15*[1 1 1]);
+	axis image
+	xlim([0 max(X)+1])
+	ylim([0 max(Y)+1])
+	% 	imagesc(squeeze(dataE(t, :, :)), [mE ME]);
+	colorbar
+	set(gca,'nextplot','replacechildren');
+end
 
 for t = 1:length(Time)
 	
@@ -73,10 +87,11 @@ for t = 1:length(Time)
 		desc = 'ictal';
 	end
 	
-	
-	scatter(X, Y, 150, temp(t, :), 's', 'filled')
-	title(sprintf('T = %0.2f (%s)', Time(t), desc))
-% 	drawnow();
+	for p = 1:numPlots
+		scatter(h(p), X, Y, 150, data{p}(t, :), 's', 'filled')
+		title(h(p), sprintf('T = %0.2f (%s)', Time(t), desc))
+	end
+	drawnow();
 
 % 	p2 = subplot(1, 5, 4:5);
 % 	scatter(xNP, yNP, 200, dataNPWsm(t, :), 's', 'filled')
