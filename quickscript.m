@@ -4,8 +4,15 @@ pat = 'c5'; seizure = 3;
 patpath = genpath(pat);
 addpath(patpath);
 
-mea = matfile(sprintf('%s_Seizure%d_Neuroport', pat, seizure), ...
-	'writable', true);
+try
+	mea = matfile(sprintf('%s_Seizure%d_Neuroport', pat, seizure), ...
+		'writable', true);
+catch ME
+	m = matfile(sprintf('%s_Seizure%d', pat, seizure), ...
+		'writable', true);
+	mea = m.Neuroport;
+	
+end
 disp('Computing event times ...')
 mua_events(mea);
 disp('Computing firing rate ...')

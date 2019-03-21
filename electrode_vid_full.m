@@ -1,4 +1,4 @@
-mea = matfile('c5/c5_Seizure1_Neuroport.mat');
+% mea = matfile('c5/c5_Seizure1_Neuroport.mat');
 [fr, time] = lowpass_filt_firingRate(mea);
 Time = mea.Time;
 Time = Time();
