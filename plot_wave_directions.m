@@ -32,7 +32,7 @@ TimeMs = Time() * 1e3;
 numWaves = numel(Z);
 
 %% Plot the firing rate and wave velocity at each discharge
-output.main = figure(figbase + 2); clf; fullwidth()
+output(1) = figure(figbase + 2); clf; fullwidth()
 p1 = subplot(1, 10, 1:7);  % Left plot
 p2 = subplot(1, 10, 9:10); % right plot (compass)
 % 	p2.NextPlot = 'replacechildren';
@@ -117,13 +117,13 @@ colorbar(p2, 'southoutside', 'Ticks', [waveTimes(1) waveTimes(end)], ...
 % if feature('ShowFigureWindows')
 	n = 20;
 	first_wave = find(mea.waveTimes > 0, 1);
-	output.first = figure(figbase + 5);  % Plot a histogram of the first n discharges
+	output(2) = figure(figbase + 5);  % Plot a histogram of the first n discharges
 	hrose = rose(wave_fit.Z(first_wave : first_wave + n)); 
 	hrose.Color = tempc(1, :); 
 	hrose.LineWidth = 2; 
 	title('Direction during first 20 discharges')
 
-	output.last = figure(figbase + 6);  % ... and the last twenty discharges
+	output(3) = figure(figbase + 6);  % ... and the last twenty discharges
 	hroseR = rose(wave_fit.Z(end - n : end)); 
 	hroseR.Color = tempc(end, :); 
 	hroseR.LineWidth = 2; 
