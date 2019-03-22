@@ -1,16 +1,18 @@
-function wave_fit = wave_prop(mea, method)
+function wave_fit = wave_prop(mea, method, PLOT)
 
-
+if ~exist('PLOT', 'var')
+	PLOT = false;
+end
 switch lower(method)
 	case 'bos'
-		wave_fit = bos_method(mea);
+		wave_fit = bos_method(mea, PLOT);
 	case 'nyc'
-		wave_fit = nyc_method(mea);
+		wave_fit = nyc_method(mea, PLOT);
 end
 
 end
 
-function wave_fit = nyc_method(mea)
+function wave_fit = nyc_method(mea, PLOT)
 %% Compute wave propagation at each discharge time as described in 
 % Liou, Jyun You, et al. ?Multivariate Regression Methods for Estimating
 % Velocity of Ictal Discharges from Human Microelectrode Recordings.?
@@ -19,26 +21,25 @@ function wave_fit = nyc_method(mea)
 % 
 % All time units should be converted to ms for consistency
 
+if PLOT
+	v = VideoWriter([mea.Name '_nyc_waves']);
+	Name = strrep(mea.Name, '_', ' ');
+% 	v.FrameRate = 30;
+	open(v);
+	figure; fullwidth();
+end
+
 halfWin = 50;  % half window around discharge event (ms)
 Time = mea.Time;
 Time = Time();
 
 %% Find discharge times
 
-fr = mea.firingRate;
-mask = mean(fr) >= 1/60;  % exclude channels with mean firing rate less than one spike per minute (Liou et al., 2018) ?\cite{Liou2018a}
-meanFr = mean(fr(:, mask), 2);
-
-[~, waveTimes] = findpeaks(meanFr, ...  % find peaks in mean firing rate
-	mea.SamplingRate / 1e3, ...  % ... in ms 
-	'minpeakprom', 100 * std(diff(meanFr)), ...  % ... use discrete peaks
-	'minpeakdistance', 100);  % ... peaks should be at least 100 ms apart
-
-padding = mea.Padding;
-waveTimes = waveTimes - padding(1) * 1e3;  % Account for padding (in ms)
-
-mea.waveTimes = waveTimes;
-
+try 
+	waveTimes = mea.waveTimes; 
+catch ME
+	waveTimes = get_discharge_times(mea);
+end
 
 % Create an array of spike times
 T = nan(size(mea.mua), 'single');
@@ -72,10 +73,18 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 	end
 	[beta(:, i), V(:, i), p(i)] = ...
 		SpatialLinearRegression(events, position, ...
-		'switch_plot', 0, 'Lossfun','L2');
+		'switch_plot', 0, 'Lossfun','L2', 'switch_plot', PLOT);
+	if PLOT
+		title(sprintf('%s\n %0.3f s', Name, t));
+		frame = getframe(gcf);
+		writeVideo(v, frame);
+	end
+	
 end
 Z = angle(complex(V(1, :), V(2, :)));
 Zu = unwrap(Z);
+
+if PLOT, close(v); end
 
 wave_fit.beta = beta;
 wave_fit.V = V;
@@ -87,7 +96,18 @@ mea.wave_fit_nyc = wave_fit;
 end
 
 
-function wave_fit = bos_method(mea)
+function wave_fit = bos_method(mea, PLOT)
+
+if PLOT
+	PLOT = 'plot';
+	figure;
+	v = VideoWriter([mea.Name '_bos_waves']);
+	Name = strrep(mea.Name, '_', ' ');
+% 	v.FrameRate = 30;
+	open(v);
+else
+	PLOT = '';
+end
 
 position = [mea.X mea.Y];
 
@@ -154,7 +174,12 @@ for i = 1:N  % For each interval during the seizure
 	
 	% fit plane to delays
 	[src_dir(i), speed(i), ci_dir(i, :), ci_sp(i, :), psig(i)] = ...
-		estimate_wave(delay, position, '');
+		estimate_wave(delay, position, PLOT);
+	if PLOT
+		title(sprintf('%s\n %0.3f s', Name, time(COMPUTE_INDS(i))));
+		frame = getframe(gcf);
+		writeVideo(v, frame);
+	end
 
 end
 V = speed .* exp(1i * src_dir);  % wave velocity (for consistency with NYC method)
@@ -167,4 +192,7 @@ wave_fit = struct('Z', src_dir, 'V', V, 'sp', speed, ...
 	'wave_times', time(COMPUTE_INDS) * 1e3);  % wave times in ms.
 mea.wave_fit_bos = wave_fit;
 
+if PLOT
+	close(v);
+end
 end
