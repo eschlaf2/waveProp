@@ -114,7 +114,7 @@ colorbar(p2, 'southoutside', 'Ticks', [waveTimes(1) waveTimes(end)], ...
 	'TickLabels', {'start'; 'end'})
 
 % Create histograms of first and last n discharges
-if feature('ShowFigureWindows')
+% if feature('ShowFigureWindows')
 	n = 20;
 	first_wave = find(mea.waveTimes > 0, 1);
 	output.first = figure(figbase + 5);  % Plot a histogram of the first n discharges
@@ -128,4 +128,4 @@ if feature('ShowFigureWindows')
 	hroseR.Color = tempc(end, :); 
 	hroseR.LineWidth = 2; 
 	title('Direction during last 20 discharges')
-end
+% end
