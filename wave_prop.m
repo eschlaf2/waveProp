@@ -1,11 +1,11 @@
-function wave_fit = wave_prop(mea, method, PLOT)
+function wave_fit = wave_prop(mea, method, PLOT, varargin)
 
 if ~exist('PLOT', 'var')
 	PLOT = false;
 end
 switch lower(method)
 	case 'bos'
-		wave_fit = bos_method(mea, PLOT);
+		wave_fit = bos_method(mea, PLOT, varargin);
 	case 'nyc'
 		wave_fit = nyc_method(mea, PLOT);
 end
@@ -141,7 +141,21 @@ mea.wave_fit_nyc = wave_fit;
 end
 
 
-function wave_fit = bos_method(mea, PLOT)
+function wave_fit = bos_method(mea, PLOT, varargin)
+
+
+%% Parse input and set defaults
+
+BAND = [1 13];                  % Select a frequency range to analyze
+T = 10;		% Length of recording (s)
+W = 2;                          % Bandwidth
+ntapers = 2*(T * W) - 1;        % Choose the # of tapers.
+OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
+
+if any(cellfun(@(v) strcmpi(v, 'T'), varargin{1}))
+	ind = find(cellfun(@(v) strcmp(v, 'T'), varargin{1}));
+	T = varargin{1}{ind + 1};
+end
 
 if PLOT
 	PLOT = 'plot';
@@ -158,8 +172,6 @@ position = [mea.X mea.Y];
 
 %% Set parameters
 % Note: the chronux toolbox must be on the path
-
-
 
 try
 	lfp = mea.lfp;  % import lfp band
@@ -183,20 +195,15 @@ NSAMP = size(lfp, 1);
 time = mea.Time;  % import time
 time = time();
 time = time(1 : DS_STEP : end);  % downsample
-wave_times = mea.waveTimes;
+% wave_times = mea.waveTimes;
 padding = mea.Padding;
 
-
-BAND = [1 13];                  % Select a frequency range to analyze
-T = 10;							% Length of recording (s)
-W = 2;                          % Bandwidth
-ntapers = 2*(T * W) - 1;        % Choose the # of tapers.
 params.tapers = [T * W, ntapers];  % ... time-bandwidth product and tapers.
 params.Fs = DS_FREQ;                 % ... sampling rate
 params.pad = -1;                % ... no zero padding.
 params.fpass = BAND;            % ... freq range to pass
 params.err = [1 0.05];          % ... theoretical error bars, p=0.05.
-OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
+
 
 COMPUTE_INDS = [round(1 : OVERLAP_COMPLEMENT * DS_FREQ : NSAMP - T * DS_FREQ) NSAMP];
 % [~, COMPUTE_INDS] = arrayfun(@(t) min(abs(t - time)), wave_times / 1e3);
@@ -230,7 +237,7 @@ for i = 1:N  % For each interval during the seizure
 	[coh, phi, freq, coh_conf] = compute_coherence(lfp(inds, :), params);
 	
 	% compute delays on each electrode based on coherence
-	[delay, delay_ci_lo, delay_ci_up] = compute_delay(coh, coh_conf, phi, freq);
+	[delay, ~, ~] = compute_delay(coh, coh_conf, phi, freq);
 	
 	% fit plane to delays
 	[src_dir(i), speed(i), ci_dir(i, :), ci_sp(i, :), psig(i)] = ...
@@ -250,7 +257,11 @@ wave_fit = struct('Z', src_dir, 'V', V, 'sp', speed, ...
 	'p', psig, ...							  % significance level
 	'params', params, ...                     % analysis parameters
 	'wave_times', time(COMPUTE_INDS) * 1e3);  % wave times in ms.
-mea.wave_fit_bos = wave_fit;
+try
+	mea.wave_fit_bos = wave_fit;
+catch ME
+	warning(ME);
+end
 
 if PLOT
 	close(v);
