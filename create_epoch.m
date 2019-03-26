@@ -46,7 +46,7 @@ for s = seizures  % which seizures
     nsx.Padding = PADDING;  
     nsx.SamplingRate = nsx.MetaTags.SamplingFreq;
 	if isfield(seizure, 'exclude')
-		nsx.BadChannels = metadata.exclude;
+		nsx.BadChannels = seizure.exclude;
 	end
 %   m = matfile(outMat, 'writable', true);
     
