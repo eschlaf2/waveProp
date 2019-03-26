@@ -9,8 +9,6 @@ if ~exist('bands', 'var') || isempty(bands)
 end
 
 
-
-	
 if any(strcmpi(fieldnames(mea), 'ElectrodeXY'))  % deprecated struct field
 	mea.Position = mea.ElectrodeXY;
 	% mea.ElectrodeXY = 'Renamed as Position';
@@ -39,16 +37,19 @@ if isstruct(mea)
 end
 
 if any(strcmpi(bands, 'lfp'))
+	% Filter to 2-50 Hz using 150 order bp filter; downsample to 1000 Hz
 	disp('Filtering lfp band...')
 	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
 		'CutoffFrequency1',2,'CutoffFrequency2',50, ...
 		'SampleRate', SamplingRate);
-
+	skipfactor = round(SamplingRate / 1e3);
 	temp = single(filtfilt(bpFilt, double(data)));
 	temp(:, BadChannels) = [];
+	temp = downsample(temp, skipfactor);
 	output.lfp = temp;
 	disp('Writing to file...')
 	mea.lfp = temp;
+	mea.skipfactor = skipfactor;
 	disp('Done.')
 	clear temp;
 end
