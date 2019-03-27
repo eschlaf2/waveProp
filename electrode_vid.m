@@ -24,19 +24,6 @@ if numel(Time) ~= size(data{1}, 1)
 	error('Data and Time must have the same dimensions.')
 end
 
-%% Reshape data
-% tmax = length(Time);
-% dataR = nan(tmax, max(X), max(Y));
-% 
-% [tN, xN, yN] = size(dataR);
-% 
-% 
-% for t = 1:tmax
-% 	inds = sub2ind([tN, xN, yN], t * ones(size(X)), X, Y);
-% 	dataR(inds) = temp(t, :);
-% % 	dataR(t + (X - 1) * tN + (Y - 1) * tN * xN) = ...
-% % 		temp(t, :);
-% end
 
 %% Write video
 if CREATEVID
@@ -104,22 +91,18 @@ for t = 1:length(Time)
 
 
 	if CREATEVID
+		figure(1);
 		try
 			frame = getframe(gcf);
-			writeVideo(v,frame);
+			writeVideo(v, frame);
 		catch ME
 			try
 				writeVideo(v, frame);
 			catch ME
 				fprintf('%d', t)
 			end
-% 			close(v);
-% 			disp(t);
-% 			rethrow(ME);
 		end
 	end
-% 		drawnow()
-% 	end
 
 	if ~mod(t, 10)
 		disp(['t = ', num2str(t)])
