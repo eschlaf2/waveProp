@@ -151,6 +151,7 @@ T = 10;		% Length of recording (s)
 W = 2;                          % Bandwidth
 ntapers = 2*(T * W) - 1;        % Choose the # of tapers.
 OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
+Name = mea.Name;
 
 if any(cellfun(@(v) strcmpi(v, 'T'), varargin{1}))
 	ind = find(cellfun(@(v) strcmp(v, 'T'), varargin{1}));
