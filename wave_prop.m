@@ -227,7 +227,7 @@ ci_dir = zeros(N, 2);
 ci_sp = zeros(N, 2);
 psig = zeros(N, 1);
 
-for i = 1:N  % For each interval during the seizure
+parfor i = 1:N  % For each interval during the seizure
 	
 	% get time indices over which to compute coherence
 	inds = COMPUTE_INDS(i) : (COMPUTE_INDS(i) + T * DS_FREQ - 1);
