@@ -258,7 +258,7 @@ wave_fit = struct('Z', src_dir, 'V', V, 'sp', speed, ...
 	'params', params, ...                     % analysis parameters
 	'wave_times', time(COMPUTE_INDS) * 1e3);  % wave times in ms.
 try
-	mea.wave_fit_bos = wave_fit;
+	mea.(sprintf('wave_fit_bos_%d', T)) = wave_fit;
 catch ME
 	warning(ME);
 end
