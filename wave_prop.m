@@ -1,5 +1,6 @@
 function wave_fit = wave_prop(mea, method, PLOT, varargin)
 
+defaultToPresentationFigs;
 if ~exist('PLOT', 'var')
 	PLOT = false;
 end
@@ -161,9 +162,13 @@ end
 if PLOT
 	PLOT = 'plot';
 	figure;
-	v = VideoWriter(sprintf('%s_wave_prop_bos_T%d', mea.Name, T));
+	img_dir = sprintf('%s_wave_prop_bos_T%d', mea.Name, T);
+	if ~exist(img_dir, 'dir')
+		mkdir(img_dir);
+	end
+% 	v = VideoWriter(sprintf('%s_wave_prop_bos_T%d', mea.Name, T));
 % 	v.FrameRate = 30;
-	open(v);
+% 	open(v);
 else
 	PLOT = '';
 end
@@ -244,8 +249,9 @@ parfor i = 1:N  % For each interval during the seizure
 		estimate_wave(delay, position, PLOT);
 	if PLOT
 		title(sprintf('%s\n %0.3f s', Name, time(COMPUTE_INDS(i))));
-		frame = getframe(gcf);
-		writeVideo(v, frame);
+		print(gcf, fullfile(img_dir, num2str(i, '%03d')), '-dpng')
+% 		frame = getframe(gcf);
+% 		writeVideo(v, frame);
 	end
 
 end
@@ -263,7 +269,7 @@ catch ME
 	warning(ME);
 end
 
-if PLOT
-	close(v);
-end
+% if PLOT
+% 	close(v);
+% end
 end
