@@ -272,7 +272,7 @@ catch ME
 	warning(ME);
 end
 
-% if PLOT
-% 	close(v);
-% end
+if PLOT
+	png2avi(img_dir);
+end
 end
