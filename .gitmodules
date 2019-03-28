@@ -1,0 +1,3 @@
+[submodule "Seizure-Waves"]
+	path = ../Seizure-Waves
+	url = https://github.com/eschlaf2/Seizure-Waves.git
