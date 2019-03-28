@@ -240,6 +240,7 @@ parfor i = 1:N  % For each interval during the seizure
 	
 	% compute the coherence over the selected interval
 	fprintf('Estimating waves at time %d/%d\n', i, N)
+	try
 	[coh, phi, freq, coh_conf] = compute_coherence(lfp(inds, :), params);
 	
 	% compute delays on each electrode based on coherence
@@ -249,6 +250,13 @@ parfor i = 1:N  % For each interval during the seizure
 	% fit plane to delays
 	[src_dir(i), speed(i), ci_dir(i, :), ci_sp(i, :), psig(i)] = ...
 		estimate_wave(delay, position, PLOT);
+	
+	catch ME
+		disp(ME)
+		disp(i)
+		continue
+	end
+	
 	if PLOT
 		title(sprintf('%s\n %0.3f s', Name, time(COMPUTE_INDS(i))));
 		print(gcf, fullfile(img_dir, num2str(i, '%03d')), '-dpng')
