@@ -151,7 +151,7 @@ T = 10;		% Length of recording (s)
 W = 2;                          % Bandwidth
 ntapers = 2*(T * W) - 1;        % Choose the # of tapers.
 OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
-Name = mea.Name;
+Name = strrep(mea.Name, '_', ' ');
 
 if any(cellfun(@(v) strcmpi(v, 'T'), varargin{1}))
 	ind = find(cellfun(@(v) strcmp(v, 'T'), varargin{1}));
@@ -161,8 +161,7 @@ end
 if PLOT
 	PLOT = 'plot';
 	figure;
-	v = VideoWriter([mea.Name '_wave_prop_bos']);
-	Name = strrep(mea.Name, '_', ' ');
+	v = VideoWriter(sprintf('%s_wave_prop_bos_T%d', mea.Name, T));
 % 	v.FrameRate = 30;
 	open(v);
 else
@@ -259,7 +258,7 @@ wave_fit = struct('Z', src_dir, 'V', V, 'sp', speed, ...
 	'params', params, ...                     % analysis parameters
 	'wave_times', time(COMPUTE_INDS) * 1e3);  % wave times in ms.
 try
-	mea.(sprintf('wave_fit_bos_%d', T)) = wave_fit;
+	mea.(sprintf('wave_fit_bos_T%d', T)) = wave_fit;
 catch ME
 	warning(ME);
 end
