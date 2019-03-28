@@ -15,4 +15,4 @@ if ~exist('framerate', 'var') || isempty(framerate)
 	framerate = vid.FrameRate;
 end
 	
-figure(1); movie(gcf, mov, 1, framerate)
+figure(); movie(gcf, mov, 1, framerate)
