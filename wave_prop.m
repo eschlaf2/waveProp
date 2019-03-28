@@ -148,7 +148,7 @@ function wave_fit = bos_method(mea, PLOT, varargin)
 %% Parse input and set defaults
 
 BAND = [1 13];                  % Select a frequency range to analyze
-T = 10;		% Length of recording (s)
+T = 10;                         % Length of recording (s)
 W = 2;                          % Bandwidth
 ntapers = 2*(T * W) - 1;        % Choose the # of tapers.
 OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
@@ -173,17 +173,17 @@ else
 	PLOT = '';
 end
 
-position = [mea.X mea.Y];
-
-%% Set parameters
-% Note: the chronux toolbox must be on the path
-
 try
 	lfp = mea.lfp;  % import lfp band
 catch ME
 	lfp = filter_mea(mea, [], 'lfp');
 	lfp = lfp.lfp;
 end
+
+position = [mea.X mea.Y];
+
+%% Set parameters
+% Note: the chronux toolbox must be on the path
 
 % Downsample lfp
 if isprop(mea, 'skipfactor')
@@ -231,7 +231,7 @@ speed = zeros(N, 1);
 ci_dir = zeros(N, 2);
 ci_sp = zeros(N, 2);
 psig = zeros(N, 1);
-delays = zeros(N, numel(mea.X), numel(mea.X));
+delays = zeros(N, length(position), length(position));
 
 parfor i = 1:N  % For each interval during the seizure
 	
