@@ -231,7 +231,7 @@ speed = zeros(N, 1);
 ci_dir = zeros(N, 2);
 ci_sp = zeros(N, 2);
 psig = zeros(N, 1);
-delays = zeros(N, length(position), length(position));
+delays = zeros(N, length(position), length(position), 'single');
 
 parfor i = 1:N  % For each interval during the seizure
 	
