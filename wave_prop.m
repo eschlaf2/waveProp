@@ -231,6 +231,7 @@ speed = zeros(N, 1);
 ci_dir = zeros(N, 2);
 ci_sp = zeros(N, 2);
 psig = zeros(N, 1);
+delays = zeros(N, numel(mea.X), numel(mea.X));
 
 parfor i = 1:N  % For each interval during the seizure
 	
@@ -243,6 +244,7 @@ parfor i = 1:N  % For each interval during the seizure
 	
 	% compute delays on each electrode based on coherence
 	[delay, ~, ~] = compute_delay(coh, coh_conf, phi, freq);
+	delays(i, :, :) = delay;
 	
 	% fit plane to delays
 	[src_dir(i), speed(i), ci_dir(i, :), ci_sp(i, :), psig(i)] = ...
@@ -260,6 +262,7 @@ V = [real(V) imag(V)];
 
 wave_fit = struct('Z', src_dir, 'V', V, 'sp', speed, ...
 	'ci_Z', ci_dir, 'ci_sp', ci_sp,...
+	'delays', delays, ...
 	'p', psig, ...							  % significance level
 	'params', params, ...                     % analysis parameters
 	'wave_times', time(COMPUTE_INDS) * 1e3);  % wave times in ms.
