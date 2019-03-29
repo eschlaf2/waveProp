@@ -1,14 +1,28 @@
-function nsx = create_epoch(pat, seizures, options)
+function nsx = create_epoch(pat, seizures, varargin)
 %% Function to create an Epoch file
 
 %% Parse input and set defaults
-if ~exist('options', 'var')
-	options.padding = [60 60];
-	options.datapath = pwd;
+PADDING = [60 60];
+DATAPATH = pwd;
+
+for ii = 1:2:numel(varargin)
+	v = varargin{ii + 1};
+	switch lower(varargin{ii})
+		case 'padding'
+			if ~(isnumeric(v) && numel(v) == 2)
+				error('Padding should be a numeric vector with two elements')
+			end
+			PADDING = varargin{ii + 1};
+		case 'datapath'
+			if ~exist(v, 'dir')
+				error('Datapath directory not found')
+			end
+			DATAPATH = varargin{ii + 1};
+		otherwise
+			error('Argument ''%s'' not recognized (padding, datapath).', varargin{ii});
+	end
 end
 
-PADDING = options.padding;
-DATAPATH = options.datapath;
 
 %% Get metadata and seizures
 patPath = genpath(fullfile(DATAPATH, pat));
