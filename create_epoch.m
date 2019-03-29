@@ -1,4 +1,4 @@
-function nsx = create_epoch(pat, seizures, varargin)
+function [] = create_epoch(pat, seizures, varargin)
 %% Function to create an Epoch file
 
 %% Parse input and set defaults
@@ -19,7 +19,7 @@ for ii = 1:2:numel(varargin)
 			end
 			DATAPATH = varargin{ii + 1};
 		otherwise
-			error('Argument ''%s'' not recognized (padding, datapath).', varargin{ii});
+			error('Argument ''%s'' not recognized (Padding, Datapath).', varargin{ii});
 	end
 end
 
