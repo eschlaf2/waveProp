@@ -1,6 +1,16 @@
-% mea = matfile('c5/c5_Seizure1_Neuroport.mat');
+% Creates a video of the electrode array for the matfile variable mea,
+% which should be in the workspace already.
+% Example:
+%     mea = matfile('c5/c5_Seizure1_Neuroport.mat');
+%     quickscript;
+
 [fr, time] = lowpass_filt_firingRate(mea);
-lfp = mea.lfp;
+try
+	lfp = mea.lfp;
+catch 
+	lfp = filter_mea(mea, [], {'lfp'});
+	lfp = lfp.lfp;
+end
 Time = mea.Time;
 Time = Time();
 te = Time(end) - mea.Padding(1, 2);
@@ -11,11 +21,6 @@ else
 	skipfactor = 1;
 end
 	
-% fr_high = mea.firingRate;
-% fr_high = fr_high - min(fr_high);
-% fr_high = fr_high ./ max(fr_high);
-% fr_high = mea.mua;
-% fr_high = zscore(fr_high);
 fr_high = zeros(size(mea.mua));
 event_inds = mea.event_inds;
 t0 = find(Time == 0, 1);
