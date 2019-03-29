@@ -3,7 +3,13 @@ function fr = mua_firing_rate(mea)
 % spikes per second
 
 % Load necessary variables (faster with matfile objects)
-event_inds = mea.event_inds;
+try
+	event_inds = mea.event_inds;
+catch ME
+	disp(ME);
+	disp('Computing event times.')
+	event_inds = mua_events(mea);
+end
 dims = size(mea.mua);
 samplingRate = mea.SamplingRate;
 
