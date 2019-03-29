@@ -13,8 +13,13 @@ function [output, Time] = lowpass_filt_firingRate(mea, downsample)
 if ~exist('downsample', 'var') || isempty(downsample)
 	downsample = 30;
 end
-
-firingRate = mea.firingRate;
+try
+	firingRate = mea.firingRate;
+catch ME
+	disp(ME);
+	disp('Computing firing rate');
+	firingRate = mua_firing_rate(mea);
+end
 Time = mea.Time;
 Time = Time();
 te = Time(end) - mea.Padding(1, 2); 
