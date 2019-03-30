@@ -2,7 +2,7 @@
 % which should be in the workspace already.
 % Example:
 %     mea = matfile('c5/c5_Seizure1_Neuroport.mat');
-%     quickscript;
+%     electrode_vid_full;
 
 [fr, time] = lowpass_filt_firingRate(mea);
 try
