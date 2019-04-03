@@ -2,6 +2,10 @@ function output = plot_wave_directions(mea, method, sig)
 % Make a summary plot of wave directions computed according to method (NYC
 % or BOS).
 
+% Figure subplot dimensions
+rows = 2;
+cols = 10; 
+
 %% Parse input and set defaults
 if ~exist('sig', 'var')
 	sig = 0.05;
@@ -32,9 +36,9 @@ TimeMs = Time() * 1e3;
 numWaves = numel(Z);
 
 %% Plot the firing rate and wave velocity at each discharge
-output(1) = figure(figbase + 2); clf; fullwidth()
-p1 = subplot(1, 10, 1:7);  % Left plot
-p2 = subplot(1, 10, 9:10); % right plot (compass)
+output(1) = figure(figbase + 2); clf; fullwidth(true)
+p1 = subplot(rows, cols, 1:7);  % Left plot
+p2 = subplot(rows, cols, 9:10); % right plot (compass)
 % 	p2.NextPlot = 'replacechildren';
 title(p1, plotTitle)
 xlabel(p1, 'Time (ms)')
@@ -114,19 +118,33 @@ p2.CLim = [waveTimes(1) waveTimes(end)];
 colorbar(p2, 'southoutside', 'Ticks', [waveTimes(1) waveTimes(end)], ...
 	'TickLabels', {'start'; 'end'})
 
-% Create histograms of first and last n discharges
-% if feature('ShowFigureWindows')
-	n = 20;
-	first_wave = find(mea.waveTimes > 0, 1);
-	output(2) = figure(figbase + 5);  % Plot a histogram of the first n discharges
-	hrose = rose(wave_fit.Z(first_wave : first_wave + n)); 
-	hrose.Color = tempc(1, :); 
-	hrose.LineWidth = 2; 
-	title('Direction during first 20 discharges')
+%% Plot direction and speed as a function of time
+p3 = subplot(rows, cols, 11:17);
+yyaxis(p3, 'right')
+speed = sqrt(V(:, 1).^2 + V(:, 2).^2);
+semilogy(p3, waveTimes, speed, 'o', 'filled', 'color', .5 * [1 1 1]);
+ylabel('Log speed')
 
-	output(3) = figure(figbase + 6);  % ... and the last twenty discharges
-	hroseR = rose(wave_fit.Z(end - n : end)); 
-	hroseR.Color = tempc(end, :); 
-	hroseR.LineWidth = 2; 
-	title('Direction during last 20 discharges')
-% end
+yyaxis(p3, 'left')
+scatter(p3, Time(), Z, 25, log(speed));
+xlabel('Time (s)'); 
+ylabel('Direction');
+
+grid on
+
+%% Create histograms of first and last n discharges
+n = 20;
+first_wave = find(mea.waveTimes > 0, 1);
+% 	output(2) = figure(figbase + 5);  % Plot a histogram of the first n discharges
+subplot(rows, cols, 19);
+hrose = rose(wave_fit.Z(first_wave : first_wave + n)); 
+hrose.Color = tempc(1, :); 
+hrose.LineWidth = 2; 
+title('First 20 discharges')
+
+% 	output(3) = figure(figbase + 6);  % ... and the last twenty discharges
+subplot(rows, cols, 20);
+hroseR = rose(wave_fit.Z(end - n : end)); 
+hroseR.Color = tempc(end, :); 
+hroseR.LineWidth = 2; 
+title('Last 20 discharges')
