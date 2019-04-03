@@ -123,7 +123,7 @@ p3 = subplot(rows, cols, 11:17);
 yyaxis(p3, 'right')
 speed = sqrt(sum(V.^2));
 semilogy(p3, waveTimes, speed, 'color', .5 * [1 1 1]);
-ylabel('Log speed')
+ylabel('Wave speed (log)')
 
 yyaxis(p3, 'left')
 scatter(p3, waveTimes, Z, 25, log(speed), 'filled');
