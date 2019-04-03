@@ -42,20 +42,20 @@ xlabel(p1, 'Time (ms)')
 % Left plot, right axis
 % Put wave direction labels on the right y-axis	
 yyaxis(p1, 'right');  
-ylim(p1, [min(Z) / pi, max(Z) / pi]);  % set limits
+ylim(p1, [-pi, pi]);  % set limits
 hold(p1, 'on');
-yticks(p1, (floor(min(Z) / pi) : ceil(max(Z) / pi)));  % Put ticks at pi rad
+yticks(p1, [-pi, 0, pi]);  % Put ticks at pi rad
 ytks = p1.YTick;  % store ticks (transform them to left axis)
 
 % Relabel the right axis using arrows
-ylab = get(p1, 'yticklabels');
-labs = {'\rightarrow', '\leftarrow'};
-p1.YTickLabel = cellfun(@(x) labs{mod(round(10 * str2double(x)) / 10, 2) + 1}, ylab, 'uni', 0);
+% ylab = get(p1, 'yticklabels');
+labs = {'\leftarrow'; '\rightarrow'; '\leftarrow'};
+p1.YTickLabel = labs;
 ylabel(p1, 'Wave direction (\pi rad)')
 
-% Transform Zu and ytks so that you can use the left axis
+% Transform Z and ytks so that you can use the left axis
 % ... (this way you get a colorbar)
-x = [1 min(Z); 1 max(Z)];
+x = [1 -pi; 1 pi];
 y = [min(meanFr); max(meanFr)];
 b = x\y;
 
@@ -89,14 +89,15 @@ colormap(p2, 'cool');
 
 cmap = cool(numWaves);  % compass color corresponds to time
 cmapDir = hsv;  % scatter color corresponds to direction
-
+colormap(p1, cmapDir);
+p1.CLim = [-pi pi];
+	
 for i = 1:numWaves  % Overlay colored data points each discharge
 	if wave_fit.p(i) > sig
 		continue
 	end
 	yyaxis(p1, 'left'); % right axis
 	scatter(p1, waveTimes(i), b(1) + b(2) * Z(i), 30, wave_fit.Z(i), 'filled');
-	colormap(p1, cmapDir);
 	h = compass(p2, wave_fit.V(1, i), wave_fit.V(2, i));
 	h.Color = cmap(i, :);
 	h.LineWidth = 2;
