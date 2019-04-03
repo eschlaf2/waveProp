@@ -126,7 +126,8 @@ semilogy(p3, waveTimes, speed, 'color', .5 * [1 1 1]);
 ylabel('Log speed')
 
 yyaxis(p3, 'left')
-scatter(p3, Time(), Z, 25, log(speed));
+scatter(p3, waveTimes, Z, 25, log(speed));
+xlim([TimeMs(1), TimeMs(end)]);
 xlabel('Time (s)'); 
 ylabel('Direction');
 
