@@ -122,7 +122,7 @@ colorbar(p2, 'southoutside', 'Ticks', [waveTimes(1) waveTimes(end)], ...
 p3 = subplot(rows, cols, 11:17);
 yyaxis(p3, 'right')
 speed = sqrt(sum(V.^2));
-semilogy(p3, waveTimes, speed, 'o', 'filled', 'color', .5 * [1 1 1]);
+semilogy(p3, waveTimes, speed, 'color', .5 * [1 1 1]);
 ylabel('Log speed')
 
 yyaxis(p3, 'left')
