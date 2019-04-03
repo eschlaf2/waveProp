@@ -126,8 +126,9 @@ semilogy(p3, waveTimes, speed, 'color', .5 * [1 1 1]);
 ylabel('Log speed')
 
 yyaxis(p3, 'left')
-scatter(p3, waveTimes, Z, 25, log(speed));
+scatter(p3, waveTimes, Z, 25, log(speed), 'filled');
 xlim([TimeMs(1), TimeMs(end)]);
+colorbar(p3)
 xlabel('Time (s)'); 
 ylabel('Direction');
 
@@ -137,15 +138,16 @@ grid on
 n = 20;
 first_wave = find(mea.waveTimes > 0, 1);
 % 	output(2) = figure(figbase + 5);  % Plot a histogram of the first n discharges
-subplot(rows, cols, 19);
+p4 = subplot(rows, cols, 19:20);
 hrose = rose(wave_fit.Z(first_wave : first_wave + n)); 
 hrose.Color = tempc(1, :); 
 hrose.LineWidth = 2; 
-title('First 20 discharges')
+title('First and last 20 discharges')
 
 % 	output(3) = figure(figbase + 6);  % ... and the last twenty discharges
-subplot(rows, cols, 20);
+% subplot(rows, cols, 20);
+hold(p4, 'on');
 hroseR = rose(wave_fit.Z(end - n : end)); 
 hroseR.Color = tempc(end, :); 
 hroseR.LineWidth = 2; 
-title('Last 20 discharges')
+% title('Last 20 discharges')
