@@ -28,13 +28,13 @@ METHOD = 'lfp';
 position = [mea.X, mea.Y];
 
 if PLOT
-	v1 = VideoWriter([mea.Name '_wave_prop_nyc_1']);
-	v2 = VideoWriter([mea.Name '_wave_prop_nyc_2']);
+	v = VideoWriter([mea.Name '_wave_prop_nyc']);
+% 	v2 = VideoWriter([mea.Name '_wave_prop_nyc_2']);
 	Name = strrep(mea.Name, '_', ' ');
 % 	v.FrameRate = 30;
-	open(v1); open (v2);
+	open(v); 
 	h(1) = figure; fullwidth();
-	h(2) = figure; fullwidth();
+	h(2) = figure; fullwidth(true);
 	
 	img = nan(10);
 	addy = sub2ind([10 10], position(:, 1), position(:, 2));
@@ -109,8 +109,7 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 		'Lossfun', 'L2', 'switch_plot', PLOT);
 	if PLOT
 		title(sprintf('%s\n %0.3f s', Name, t / 1e3));
-		frame = getframe(h(1));
-		writeVideo(v1, frame);
+		frame1 = getframe(h(1));
 		
 		figure(h(2));
 		img(addy) = [data{:}];
@@ -121,8 +120,11 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 		plot(temp); axis tight
 		title(sprintf('%s\n %0.3f s', Name, t / 1e3));
 		hold on; plot([data{:}]', temp(sub2ind(size(temp), [data{:}], 1:numCh))', '*'); hold off
-		frame = getframe(h(2));
-		writeVideo(v2, frame)
+		frame2 = getframe(h(2));
+		
+		frame.cdata = [frame1.cdata; frame2.cdata];
+		frame.colormap = [];
+		writeVideo(v, frame)
 		
 	end
 	
@@ -137,7 +139,12 @@ wave_fit.V = V;
 wave_fit.p = p;
 wave_fit.Z = Z;
 wave_fit.Zu = Zu;
-mea.wave_fit_nyc = wave_fit;
+try
+	mea.wave_fit_nyc = wave_fit;
+catch ME
+	disp(ME)
+	disp('Fit not saved to matfile.')
+end
 
 end
 
@@ -160,57 +167,64 @@ if any(cellfun(@(v) strcmpi(v, 'T'), varargin{1}))
 end
 
 if PLOT
+	% 
 	PLOT = 'plot';
 	figure;
 	img_dir = sprintf('%s_wave_prop_bos_T%d', mea.Name, T);
 	if ~exist(img_dir, 'dir')
 		mkdir(img_dir);
 	end
-% 	v = VideoWriter(sprintf('%s_wave_prop_bos_T%d', mea.Name, T));
-% 	v.FrameRate = 30;
-% 	open(v);
 else
 	PLOT = '';
 end
 
 try
 	lfp = mea.lfp;  % import lfp band
+	if isprop(mea, 'skipfactor')
+		skipfactor = mea.skipfactor;
+	else
+		skipfactor = 1;
+	end
 catch ME
 	lfp = filter_mea(mea, [], 'lfp');
+	skipfactor = lfp.skipfactor;
 	lfp = lfp.lfp;
 end
 
-position = [mea.X mea.Y];
+position = mea.Position;
+if isprop(mea, 'BadChannels')
+	position(mea.BadChannels, :) = [];
+end
 
 %% Set parameters
 % Note: the chronux toolbox must be on the path
 
 % Downsample lfp
-if isprop(mea, 'skipfactor')
-	DS_STEP = mea.skipfactor;
-else
-	DS_FREQ = 1e3;  % downsampled frequency (Hz)
-	DS_STEP = floor(mea.SamplingRate / DS_FREQ);  % how to step through the data
-	lfp = lfp(1 : DS_STEP : end, :);  % downsample
-
-end
-DS_FREQ = mea.SamplingRate / DS_STEP;  % recompute DS_FREQ in case of rounding
-NSAMP = size(lfp, 1);
+	
+ds_freq = 1e3;  % downsampled frequency (Hz)
+samplingRate = mea.SamplingRate;
+lfp_freq = samplingRate / skipfactor;
+ds_step = floor(max(1, lfp_freq / ds_freq));  % how to step through the data
+lfp = lfp(1 : ds_step : end, :);  % downsample
+		
+ds_freq = lfp_freq / ds_step;  % recompute DS_FREQ in case of rounding
+nsamp = size(lfp, 1);
 
 time = mea.Time;  % import time
 time = time();
-time = time(1 : DS_STEP : end);  % downsample
+time = time(1:skipfactor:end);  % downsample to match lfp
+time = time(1 : ds_step : end);  % downsample further if necessary
 % wave_times = mea.waveTimes;
 padding = mea.Padding;
 
 params.tapers = [T * W, ntapers];  % ... time-bandwidth product and tapers.
-params.Fs = DS_FREQ;                 % ... sampling rate
+params.Fs = ds_freq;                 % ... sampling rate
 params.pad = -1;                % ... no zero padding.
 params.fpass = BAND;            % ... freq range to pass
 params.err = [1 0.05];          % ... theoretical error bars, p=0.05.
 
 
-COMPUTE_INDS = [round(1 : OVERLAP_COMPLEMENT * DS_FREQ : NSAMP - T * DS_FREQ) NSAMP];
+COMPUTE_INDS = [round(1 : OVERLAP_COMPLEMENT * ds_freq : nsamp - T * ds_freq) nsamp];
 % [~, COMPUTE_INDS] = arrayfun(@(t) min(abs(t - time)), wave_times / 1e3);
 
 TS = find(time(COMPUTE_INDS) > 0, 1);
@@ -232,20 +246,27 @@ ci_dir = zeros(N, 2);
 ci_sp = zeros(N, 2);
 psig = zeros(N, 1);
 delays = zeros(N, length(position), length(position), 'single');
+if PLOT
+	phis = cell(N, 1);
+end
 
-parfor i = 1:N  % For each interval during the seizure
+for i = 1:N  % For each interval during the seizure
 	
 	% get time indices over which to compute coherence
-	inds = COMPUTE_INDS(i) : (COMPUTE_INDS(i) + T * DS_FREQ - 1);
+	inds = COMPUTE_INDS(i) : (COMPUTE_INDS(i) + T * ds_freq - 1);
 	
 	% compute the coherence over the selected interval
 	fprintf('Estimating waves at time %d/%d\n', i, N)
 	try
 	[coh, phi, freq, coh_conf] = compute_coherence(lfp(inds, :), params);
-	
 	% compute delays on each electrode based on coherence
 	[delay, ~, ~] = compute_delay(coh, coh_conf, phi, freq);
 	delays(i, :, :) = delay;
+	
+	if PLOT
+		phi(coh < coh_conf) = NaN;
+		phis{i} = phi;
+	end
 	
 	% fit plane to delays
 	[src_dir(i), speed(i), ci_dir(i, :), ci_sp(i, :), psig(i)] = ...
@@ -274,10 +295,16 @@ wave_fit = struct('Z', src_dir, 'V', V, 'sp', speed, ...
 	'p', psig, ...							  % significance level
 	'params', params, ...                     % analysis parameters
 	'wave_times', time(COMPUTE_INDS) * 1e3);  % wave times in ms.
+if PLOT
+	wave_fit.phis = phis;
+end
 try
 	mea.(sprintf('wave_fit_bos_T%d', T)) = wave_fit;
 catch ME
-	warning(ME);
+	disp(ME);
+	disp('Fit not saved to matfile!')
+	[~, fn, ~] = fileparts(mea.Properties.Source);
+	save([fn '_wave_fit'], wave_fit, '-v7.3');
 end
 
 if PLOT

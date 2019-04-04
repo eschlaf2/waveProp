@@ -126,7 +126,7 @@ semilogy(p3, waveTimes, speed, 'color', .5 * [1 1 1]);
 ylabel('Wave speed (log)')
 
 yyaxis(p3, 'left')
-scatter(p3, waveTimes, Z, 25, log(speed), 'filled');
+scatter(p3, waveTimes, Z, 30, log(speed), 'filled');
 xlim([TimeMs(1), TimeMs(end)]);
 colorbar(p3)
 xlabel('Time (s)'); 

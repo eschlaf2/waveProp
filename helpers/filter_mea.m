@@ -47,9 +47,15 @@ if any(strcmpi(bands, 'lfp'))
 	temp(:, BadChannels) = [];
 	temp = downsample(temp, skipfactor);
 	output.lfp = temp;
+	output.skipfactor = skipfactor;
 	disp('Writing to file...')
-	mea.lfp = temp;
-	mea.skipfactor = skipfactor;
+	try
+		mea.lfp = temp;
+		mea.skipfactor = skipfactor;
+	catch ME
+		disp(ME)
+		warning('LFP band not written to matfile.')
+	end
 	disp('Done.')
 	clear temp;
 end
@@ -63,7 +69,12 @@ if any(strcmpi(bands, 'mua'))
 	temp(:, BadChannels) = [];
 	output.mua = temp;
 	disp('Writing to file...')
-	mea.mua = temp;
+	try
+		mea.mua = temp;
+	catch ME
+		disp(ME)
+		warning('MUA band not written to file.')
+	end
 	disp('Done.')
 	clear temp;
 end
@@ -77,18 +88,23 @@ if any(strcmpi(bands, 'highg'))
 	temp(:, BadChannels) = [];
 	output.highg = temp;
 	disp('Writing to file...')
-	mea.highg = temp;
+	try
+		mea.highg = temp;
+	catch ME
+		disp(ME)
+		warning('High-gamma band not written to file.')
+	end
 	disp('Done.')
 	clear temp;
 end
 
-X = ElectrodeXY(:, 1);
-X(BadChannels) = [];
-mea.X = X;
-
-Y = ElectrodeXY(:, 2);
-Y(BadChannels) = [];
-mea.Y = Y;
+% X = ElectrodeXY(:, 1);
+% X(BadChannels) = [];
+% mea.X = X;
+% 
+% Y = ElectrodeXY(:, 2);
+% Y(BadChannels) = [];
+% mea.Y = Y;
 
 
 
