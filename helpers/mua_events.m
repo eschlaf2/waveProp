@@ -1,4 +1,4 @@
-function [event_inds, artefact_inds] = mua_events(mea)
+function [event_inds, artefact_inds, mea] = mua_events(mea)
 % Takes a structure or matfile as input and computes event times. Events
 % are defined as peaks in MUA more than EVENT_THRESH standard deviations from the
 % baseline in the negative direction and at least MIN_DIST ms apart
@@ -11,8 +11,10 @@ ARTEFACT_THRESH = 16;  % activity outside this range is considered artefact [sd]
 if (isfield(mea, 'mua') || isprop(mea, 'mua'))
 	data = mea.mua;
 else
+	if ~isstruct(mea), mea = load(mea.Properties.Source); end
 	mua = filter_mea(mea, [], 'mua');
 	data = mua.mua;
+	mea.mua = data;
 end
 
 time = mea.Time;
@@ -52,5 +54,10 @@ end
 % store results to mea
 event_inds = find(events);
 artefact_inds = find(artefacts);
-mea.artefact_inds = artefact_inds;
-mea.event_inds = event_inds;
+try
+	mea.artefact_inds = artefact_inds;
+	mea.event_inds = event_inds;
+catch ME
+	disp(ME)
+	disp('Artefact and event indices not saved to matfile.')
+end

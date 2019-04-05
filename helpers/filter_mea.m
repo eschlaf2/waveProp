@@ -1,9 +1,11 @@
-function output = filter_mea(mea, outfile, bands)
+function [output, mea] = filter_mea(mea, ~, bands)
 
-
-if ~exist('outfile', 'var') || isempty(outfile)
-	outfile = [mea.Name '_Filt'];
+if ~isstruct(mea)
+	if ~mea.Properties.Writable
+		mea = load(mea.Properties.Source); 
+	end
 end
+
 if ~exist('bands', 'var') || isempty(bands)
 	bands = {'mua'};
 end
@@ -17,24 +19,14 @@ end
 data = mea.Data;
 SamplingRate = mea.SamplingRate;
 BadChannels = [];
-if isprop(mea, 'BadChannels')
+if any(strcmpi(fieldnames(mea), 'BadChannels'))
 	BadChannels = mea.BadChannels;
-elseif isprop(mea, 'Exclude')
+elseif any(strcmpi(fieldnames(mea), 'Exclude'))
 	BadChannels = mea.Exclude;
+	mea.BadChannels = BadChannels;
 end
 
 ElectrodeXY = mea.Position;
-
-if isstruct(mea)
-
-	disp('Converting mea to matfile...')
-	if ~exist(outfile, 'file')
-		save(outfile, '-v7.3', '-struct', 'mea');
-	end
-	clear mea
-	mea = matfile(outfile, 'writable', true);
-	disp('Done.')
-end
 
 if any(strcmpi(bands, 'lfp'))
 	% Filter to 2-50 Hz using 150 order bp filter; downsample to 1000 Hz
@@ -48,14 +40,7 @@ if any(strcmpi(bands, 'lfp'))
 	temp = downsample(temp, skipfactor);
 	output.lfp = temp;
 	output.skipfactor = skipfactor;
-	disp('Writing to file...')
-	try
-		mea.lfp = temp;
-		mea.skipfactor = skipfactor;
-	catch ME
-		disp(ME)
-		warning('LFP band not written to matfile.')
-	end
+	if ~isstruct(mea), disp('Writing to file...'), end
 	disp('Done.')
 	clear temp;
 end
@@ -68,13 +53,8 @@ if any(strcmpi(bands, 'mua'))
 	temp = single(filtfilt(bpFilt, double(data)));
 	temp(:, BadChannels) = [];
 	output.mua = temp;
-	disp('Writing to file...')
-	try
-		mea.mua = temp;
-	catch ME
-		disp(ME)
-		warning('MUA band not written to file.')
-	end
+	if ~isstruct(mea), disp('Writing to file...'), end
+	mea.mua = temp;
 	disp('Done.')
 	clear temp;
 end
@@ -87,24 +67,19 @@ if any(strcmpi(bands, 'highg'))
 	temp = single(filtfilt(bpFilt, double(data)));
 	temp(:, BadChannels) = [];
 	output.highg = temp;
-	disp('Writing to file...')
-	try
-		mea.highg = temp;
-	catch ME
-		disp(ME)
-		warning('High-gamma band not written to file.')
-	end
+	if ~isstruct(mea), disp('Writing to file...'); end
+	mea.highg = temp;
 	disp('Done.')
 	clear temp;
 end
 
-% X = ElectrodeXY(:, 1);
-% X(BadChannels) = [];
-% mea.X = X;
-% 
-% Y = ElectrodeXY(:, 2);
-% Y(BadChannels) = [];
-% mea.Y = Y;
+X = ElectrodeXY(:, 1);
+X(BadChannels) = [];
+mea.X = X;
+
+Y = ElectrodeXY(:, 2);
+Y(BadChannels) = [];
+mea.Y = Y;
 
 
 

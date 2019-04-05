@@ -1,19 +1,24 @@
-function wave_fit = wave_prop(mea, method, PLOT, varargin)
+function [wave_fit, mea] = wave_prop(mea, method, PLOT, varargin)
 
-defaultToPresentationFigs;
 if ~exist('PLOT', 'var')
 	PLOT = false;
 end
+if ~isstruct(mea)
+	if ~mea.Properties.Writable
+		mea = load(mea.Properties.Source);
+	end
+end
+	
 switch lower(method)
 	case 'bos'
-		wave_fit = bos_method(mea, PLOT, varargin);
+		[wave_fit, mea] = bos_method(mea, PLOT, varargin);
 	case 'nyc'
-		wave_fit = nyc_method(mea, PLOT);
+		[wave_fit, mea] = nyc_method(mea, PLOT);
 end
 
 end
 
-function wave_fit = nyc_method(mea, PLOT)
+function [wave_fit, mea] = nyc_method(mea, PLOT, varargin)
 %% Compute wave propagation at each discharge time as described in 
 % Liou, Jyun You, et al. ?Multivariate Regression Methods for Estimating
 % Velocity of Ictal Discharges from Human Microelectrode Recordings.?
@@ -23,9 +28,24 @@ function wave_fit = nyc_method(mea, PLOT)
 % All time units should be converted to ms for consistency
 
 METHOD = 'lfp';
-% DOWNSAMPLE = true;
 
-position = [mea.X, mea.Y];
+for i = 1:numel(varargin)
+	switch varargin{i}
+		case 'method'
+			METHOD = varargin{i + 1};
+		otherwise
+			disp(varargin{i});
+			error('Argument not recognized.');
+	end
+end
+
+position = mea.Position;
+try
+	position(mea.BadChannels, :) = [];
+catch ME
+	disp(ME)
+	disp('No bad channels found.')
+end
 
 if PLOT
 	v = VideoWriter([mea.Name '_wave_prop_nyc']);
@@ -34,7 +54,7 @@ if PLOT
 % 	v.FrameRate = 30;
 	open(v); 
 	h(1) = figure; fullwidth();
-	h(2) = figure; fullwidth(true);
+	h(2) = figure; fullwidth();
 	
 	img = nan(10);
 	addy = sub2ind([10 10], position(:, 1), position(:, 2));
@@ -45,21 +65,31 @@ Time = mea.Time;
 Time = Time();
 try
 	lfp = mea.lfp;
+	if any(strcmpi(fieldnames(mea), 'skipfactor'))
+		skipfactor = mea.skipfactor;
+	else
+		skipfactor = 1;
+	end
 catch ME
+	disp(ME);
 	lfp = filter_mea(mea, [], {'lfp'});
+	skipfactor = lfp.skipfactor;
 	lfp = lfp.lfp;
+	mea.lfp = lfp;
+	mea.skipfactor = skipfactor;
 end
-if ~isprop(mea, 'skipfactor')
-	mea.skipfactor = 1;
-end
-skipfactor = mea.skipfactor;
+
 
 %% Find discharge times
 
 try 
 	waveTimes = mea.waveTimes; 
 catch ME
-	waveTimes = get_discharge_times(mea);
+	disp(ME);
+	disp('Computing wave times.');
+	if ~isstruct(mea), mea = load(mea.Properties.Source); end
+	[waveTimes, mea] = get_discharge_times(mea);
+	mea.waveTimes = waveTimes;
 end
 
 if strcmpi(METHOD, 'events')
@@ -73,7 +103,7 @@ else
 end
 
 % Sizing variables
-numCh = numel(mea.X);
+numCh = length(position);
 numWaves = numel(waveTimes);
 
 
@@ -132,7 +162,7 @@ end
 Z = angle(complex(V(1, :), V(2, :)));
 Zu = unwrap(Z);
 
-if PLOT, close(v1); close(v2); end
+if PLOT, close(v); end
 
 wave_fit.beta = beta;
 wave_fit.V = V;
@@ -143,13 +173,13 @@ try
 	mea.wave_fit_nyc = wave_fit;
 catch ME
 	disp(ME)
-	disp('Fit not saved to matfile.')
+	disp('Fit not saved.')
 end
 
 end
 
 
-function wave_fit = bos_method(mea, PLOT, varargin)
+function [wave_fit, mea] = bos_method(mea, PLOT, varargin)
 
 
 %% Parse input and set defaults
@@ -189,6 +219,7 @@ catch ME
 	lfp = filter_mea(mea, [], 'lfp');
 	skipfactor = lfp.skipfactor;
 	lfp = lfp.lfp;
+	
 end
 
 position = mea.Position;

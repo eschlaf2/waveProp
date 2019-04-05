@@ -1,6 +1,21 @@
-function waveTimes = get_discharge_times(mea)
+function [waveTimes, mea] = get_discharge_times(mea, varargin)
 
-fr = mea.firingRate;
+VERBOSE = true;
+if ~isempty(varargin) && any(strcmpi(varargin{:}, 'verbose'))
+	VERBOSE = true;
+end
+
+try
+	fr = mea.firingRate;
+catch ME
+	if VERBOSE
+		disp(ME)
+		disp('Computing firing rate.')
+	end
+	if ~isstruct(mea), mea = load(mea.Properties.Source); end
+	fr = mua_firing_rate(mea);
+	mea.firingRate = fr;
+end
 mask = mean(fr) >= 1/60;  % exclude channels with mean firing rate less than one spike per minute (Liou et al., 2018) ?\cite{Liou2018a}
 meanFr = mean(fr(:, mask), 2);
 
