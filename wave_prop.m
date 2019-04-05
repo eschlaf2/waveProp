@@ -210,7 +210,7 @@ end
 
 try
 	lfp = mea.lfp;  % import lfp band
-	if isprop(mea, 'skipfactor')
+	if any(strcmpi(fieldnames(mea), 'skipfactor'))
 		skipfactor = mea.skipfactor;
 	else
 		skipfactor = 1;
@@ -223,7 +223,7 @@ catch ME
 end
 
 position = mea.Position;
-if isprop(mea, 'BadChannels')
+if any(strcmpi(fieldnames(mea), 'BadChannels'))
 	position(mea.BadChannels, :) = [];
 end
 
