@@ -9,20 +9,27 @@ try
 	lfp = mea.lfp;
 catch 
 	lfp = filter_mea(mea, [], {'lfp'});
+	skipfactor = lfp.skipfactor;
 	lfp = lfp.lfp;
 end
+try
+	mua = mea.mua;
+catch 
+	mua = filter_mea(mea, [], {'mua'});
+	mua = mua.mua;
+end
+
 Time = mea.Time;
 Time = Time();
 te = Time(end) - mea.Padding(1, 2);
 inds = arrayfun(@(t) find(Time == t, 1), time);
-if isprop(mea, 'skipfactor')
-	skipfactor = mea.skipfactor;
-else
-	skipfactor = 1;
-end
 	
-fr_high = zeros(size(mea.mua));
-event_inds = mea.event_inds;
+fr_high = zeros(size(mua));
+if any(strcmpi(fieldnames(mea), 'event_inds'))
+	event_inds = mea.event_inds;
+else
+	event_inds = mua_events(mea);
+end
 t0 = find(Time == 0, 1);
 event_inds(event_inds < t0) = [];
 fr_high(event_inds) = 1;
