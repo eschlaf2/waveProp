@@ -41,6 +41,8 @@ if any(strcmpi(bands, 'lfp'))
 	output.lfp = temp;
 	output.skipfactor = skipfactor;
 	if ~isstruct(mea), disp('Writing to file...'), end
+	mea.lfp = temp;
+	mea.skipfactor = skipfactor;
 	disp('Done.')
 	clear temp;
 end
