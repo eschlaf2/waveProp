@@ -289,10 +289,16 @@ for i = 1:N  % For each interval during the seizure
 	% compute the coherence over the selected interval
 	fprintf('Estimating waves at time %d/%d\n', i, N)
 	try
-	[coh, phi, freq, coh_conf] = compute_coherence(lfp(inds, :), params);
+	[~, center] = min((position(:,1) - mean(position(:,1))).^2 +...         % find the most central electrode
+				  (position(:,2) - mean(position(:,2))).^2);
+	[coh, phi, freq, coh_conf] = compute_coherence(lfp(inds, :), params, 'pairs', center);
 	% compute delays on each electrode based on coherence
 	[delay, ~, ~] = compute_delay(coh, coh_conf, phi, freq);
-	delays(i, :, :) = delay;
+	
+	
+	delay = delay(center,:);                                                % we use delays relative to the center
+
+	delays(i, :) = delay;
 	
 	if PLOT
 		phi(coh < coh_conf) = NaN;
@@ -323,6 +329,7 @@ V = [real(V) imag(V)];
 wave_fit = struct('Z', src_dir, 'V', V, 'sp', speed, ...
 	'ci_Z', ci_dir, 'ci_sp', ci_sp,...
 	'delays', delays, ...
+	'freq', freq, ...
 	'p', psig, ...							  % significance level
 	'params', params, ...                     % analysis parameters
 	'wave_times', time(COMPUTE_INDS) * 1e3);  % wave times in ms.
