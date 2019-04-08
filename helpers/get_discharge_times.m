@@ -1,21 +1,32 @@
 function [waveTimes, mea] = get_discharge_times(mea, varargin)
+% Compute peak discharge times
 
-VERBOSE = true;
-if ~isempty(varargin) && any(strcmpi(varargin{:}, 'verbose'))
-	VERBOSE = true;
+p = inputParser;
+
+addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile'));
+addParameter(p, 'verbose', true, @islogical);
+
+parse(p, mea, varargin{:})
+struct2var(p.Results)
+
+if ~isstruct(mea)
+	if ~exist(mea.Properties.Source, 'file')
+		error('File not found')
+	elseif ~mea.Properties.Writable
+		mea = load(mea.Properties.Source); 
+	end
 end
 
 try
 	fr = mea.firingRate;
 catch ME
-	if VERBOSE
+	if verbose
 		disp(ME)
-		disp('Computing firing rate.')
 	end
-	if ~isstruct(mea), mea = load(mea.Properties.Source); end
-	fr = mua_firing_rate(mea);
-	mea.firingRate = fr;
+	disp('Computing firing rate.')
+	[fr, mea] = mua_firing_rate(mea);
 end
+
 mask = mean(fr) >= 1/60;  % exclude channels with mean firing rate less than one spike per minute (Liou et al., 2018) ?\cite{Liou2018a}
 meanFr = mean(fr(:, mask), 2);
 
