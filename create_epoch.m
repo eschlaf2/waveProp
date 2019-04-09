@@ -2,30 +2,19 @@ function [] = create_epoch(pat, seizures, varargin)
 %% Function to create an Epoch file
 
 %% Parse input and set defaults
-PADDING = [60 60];
-DATAPATH = pwd;
+p = inputParser;
 
-for ii = 1:2:numel(varargin)
-	v = varargin{ii + 1};
-	switch lower(varargin{ii})
-		case 'padding'
-			if ~(isnumeric(v) && numel(v) == 2)
-				error('Padding should be a numeric vector with two elements')
-			end
-			PADDING = varargin{ii + 1};
-		case 'datapath'
-			if ~exist(v, 'dir')
-				error('Datapath directory not found')
-			end
-			DATAPATH = varargin{ii + 1};
-		otherwise
-			error('Argument ''%s'' not recognized (Padding, Datapath).', varargin{ii});
-	end
-end
+addRequired(p, 'pat', @ischar);
+addOptional(p, 'seizures', 1:100, @isnumeric);
+addParameter(p, 'padding', [60 60], @(x) isnumeric(x) && numel(x) == 2);
+addParameter(p, 'datapath', pwd, @ischar);
+
+parse(p, pat, seizures, varargin{:});
+struct2var(p.Results)
 
 
 %% Get metadata and seizures
-patPath = genpath(fullfile(DATAPATH, pat));
+patPath = genpath(fullfile(datapath, pat));
 addpath(patPath);
 
 metadata = jsondecode(fileread([pat '_metadata.json']));
@@ -53,11 +42,11 @@ for s = seizures  % which seizures
     
     nsx.RawFile = seizure.ictal_micros;
 	outMat = sprintf('%s_Seizure%d_Neuroport_%d_%d.mat', ...
-		fullfile(DATAPATH, pat, pat), seizure.number, PADDING);
+		fullfile(datapath, pat, pat), seizure.number, padding);
     nsx.Map = metadata.electrodemap;
     nsx.StartTime = seizure.onset;
     nsx.EndTime = seizure.offset;
-    nsx.Padding = PADDING;  
+    nsx.Padding = padding;  
     nsx.SamplingRate = nsx.MetaTags.SamplingFreq;
 	if isfield(seizure, 'exclude')
 		nsx.BadChannels = seizure.exclude;
