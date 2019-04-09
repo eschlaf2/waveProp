@@ -79,16 +79,15 @@ Time = Time();
 % Load method specific variables
 switch dataToFit
 	case 'maxdescent'
-		[waveTimes, mea] = get_waveTimes(mea);
+		[computeTimes, mea] = get_waveTimes(mea);
 		[lfp, skipfactor, mea] = get_lfp(mea);
 		TimeMs = downsample(Time, skipfactor) * 1e3;
 	case 'events'
-		[waveTimes, mea] = get_waveTimes(mea);
+		[computeTimes, mea] = get_waveTimes(mea);
 		if ~any(strcmpi(properties(mea), 'event_inds'))
 			[~, ~, mea] = mua_events(mea);
 		end
-		% Create an array of spike times
-% 		spike_times = nan(size(mea.mua), 'single');
+		% Create a sparse array of spike times
 		[nT, nCh] = size(mea.mua);
 		spike_times = sparse(nT, nCh);
 		spike_times(mea.event_inds) = 1;
@@ -101,23 +100,24 @@ switch dataToFit
 		Time = downsample(Time, skipfactor);
 		TimeMs = Time * 1e3;
 		[params, compute_inds] = set_coherence_params(mea, Time, T);
-		Name = strrep(mea.Name, '_', ' ');
-		waveTimes = TimeMs(compute_inds);
+		plotTitles = strrep(mea.Name, '_', ' ');
+		computeTimes = TimeMs(compute_inds);
 		samplingRate = mea.SamplingRate / skipfactor;
 		[~, center] = min(sum((position - mean(position)).^2, 2));        % find the most central electrode
 end
 		
 % Sizing variables
 numCh = length(position);
-numWaves = numel(waveTimes);
+numWaves = numel(computeTimes);
 pos_inds = 1:numCh;
 
 assignin('base', 'mea', mea);
 %% Open a video file if PLOT is set to true
 
+Name = sprintf('%s_wave_prop_%s', mea.Name, dataToFit);
 if showPlots
-	v = VideoWriter(sprintf('%s_wave_prop_%s', mea.Name, dataToFit));
-	Name = strrep(mea.Name, '_', ' ');
+	v = VideoWriter(plotTitles);
+	plotTitles = [strrep(mea.Name, '_', ' ') ' (' dataToFit ')'];
 % 	v.FrameRate = 30;
 	open(v); 
 	h = figure; fullwidth(true);
@@ -134,7 +134,7 @@ V = nan(2, numWaves);     % wave velocity (psuedo-inverse of beta)
 p = nan(1, numWaves);     % certainty
 
 for i = 1:numWaves  % estimate wave velocity for each discharge
-	t = waveTimes(i);
+	t = computeTimes(i);
 	switch dataToFit
 		case 'events'
 			
@@ -175,7 +175,7 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 	if showPlots
 		figure(h);
 		[p1, p2] = plot_wave_fit(position, data, beta(:, i));
-		title(p1, sprintf('%s\n %0.3f s', Name, t / 1e3));
+		title(p1, sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
 		title(p2, sprintf('p=%.2g', p(i)))
 		
 % 		figure(h(2));
@@ -189,7 +189,7 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 		subplot(2,3,4:5);
 		plot_details(temp, pos_inds, cmap, cInds, dataToFit); 
 		axis tight; grid on;
-		title(sprintf('%s\n %0.3f s', Name, t / 1e3));
+		title(sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
 		if strcmpi(dataToFit, 'maxdescent')
 			hold on; plot(dataToPlot, temp(sub2ind(size(temp), dataToPlot', 1:numCh)), 'r*'); hold off
 		end
@@ -213,6 +213,8 @@ wave_fit.V = V;
 wave_fit.p = p;
 wave_fit.Z = Z;
 wave_fit.Zu = Zu;
+wave_fit.computeTimes = computeTimes;
+wave_fit.Name = Name;
 
 try
 	mea.wave_fit = wave_fit;
@@ -397,13 +399,6 @@ end
 end
 
 function [beta, V, p] = fit_wave_bos(data, position, dataToFit)
-% 	if strcmpi(dataToFit, 'events')
-% % 		data(isnan(data)) = 0;
-% % 		data = sparse(double(data));
-% % 		[~, position_ind, data] = find(data);
-% % 		data = event; 
-% 		position = position(position_ind, :);
-% 	end
 	[beta, ~, ~, ~, ~, p] = estimate_wave(data, position);
 	beta = circshift(beta, -1);
 	V = pinv(beta(1:2));
