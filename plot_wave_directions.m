@@ -1,6 +1,5 @@
 function output = plot_wave_directions(mea, waveFit, sig)
-% Make a summary plot of wave directions computed according to method (NYC
-% or BOS).
+% Make a summary plot of wave directions 
 
 % Figure subplot dimensions
 rows = 2;
@@ -25,7 +24,6 @@ computeTimes = waveFit.computeTimes / 1e3;
 output(1) = figure(); clf; fullwidth(true)
 p(1) = subplot(rows, cols, 1:7);  % Left plot
 p(2) = subplot(rows, cols, 9:10); % right plot (compass)
-% 	p(2).NextPlot = 'replacechildren';
 title(p(1), plotTitle)
 xlabel(p(1), 'Time (s)')
 
@@ -105,7 +103,6 @@ colorbar(p(2), 'southoutside', 'Ticks', [computeTimes(1) computeTimes(end)], ...
 
 %% Plot direction and speed as a function of time
 p(3) = subplot(rows, cols, 11:17);
-% yyaxis(p(3), 'left')
 speed = sqrt(sum(V.^2));
 stem(p(3), computeTimes, log(speed), 'linewidth', 2);
 hold on
@@ -113,19 +110,10 @@ scatter(p(3), computeTimes, log(speed), 40, waveFit.Z, 'filled');
 ylabel('Wave speed (log)')
 colormap(p(3), cmapDir);
 xlabel(p(3), 'Time (s)')
-
-% yyaxis(p(3), 'right')
-% scatter(p(3), computeTimes, Z, 30, log(speed), 'filled');
-% xlim([TimeMs(1), TimeMs(end)]);
-% colorbar(p(3))
-% xlabel('Time (s)'); 
-% ylabel('Direction');
-
 grid on
 
 %% Create histograms of directions in first and last n seconds
 n = 20;
-% first_wave = find(computeTimes > 0, 1);
 firstInds = logical((computeTimes >= 0) .* (computeTimes <= n));
 te = Time(end) - mea.Padding(2);
 lastInds = logical((computeTimes >= te - n) .* (computeTimes <= te));
@@ -140,7 +128,8 @@ hroseR = rose(waveFit.Z(lastInds));
 hroseR.Color = tempc(end, :); 
 hroseR.LineWidth = 2; 
 axis(p(4), 'tight')
-% title('Last 20 discharges')
+
+% Fix positioning
 drawnow();
 p(3).Position([1 3 4]) = p(1).Position([1 3 4]);
 p(3).XLim = p(1).XLim;
