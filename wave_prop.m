@@ -31,10 +31,10 @@ end
 %% Assign wave fitting method
 switch lower(fitMethod)
 	case 'bos'
-		fit_wave = @(data, position) fit_wave_bos(data, position, showPlots);
+		fit_wave = @(data, position) fit_wave_bos(data, position, dataToFit);
 	case 'nyc'
-		fit_wave = @(data, position) SpatialLinearRegression(data, position, ...
-			'Lossfun', 'L2', 'switch_plot', showPlots);
+		fit_wave = @(data, position) ...
+			fit_wave_nyc(data, position, dataToFit);
 end
 
 %% Compute fits
@@ -55,6 +55,7 @@ function [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, dataToFit, T,
 
 %% Pull variables from mea
 position = mea.Position;
+
 try
 	position(mea.BadChannels, :) = [];
 catch ME
@@ -77,10 +78,13 @@ switch dataToFit
 			[~, ~, mea] = mua_events(mea);
 		end
 		% Create an array of spike times
-		spike_times = nan(size(mea.mua), 'single');
+% 		spike_times = nan(size(mea.mua), 'single');
+		[nT, nCh] = size(mea.mua);
+		spike_times = sparse(nT, nCh);
 		spike_times(mea.event_inds) = 1;
 		TimeMs = Time * 1000;  % Convert times to ms
 		spike_times = TimeMs' .* spike_times;
+		pos = mea.Position;
 	case 'delays'
 		
 		[lfp, skipfactor, mea] = get_lfp(mea);
@@ -96,6 +100,7 @@ end
 % Sizing variables
 numCh = length(position);
 numWaves = numel(waveTimes);
+pos_inds = 1:numCh;
 
 assignin('base', 'mea', mea);
 %% Open a video file if PLOT is set to true
@@ -105,8 +110,8 @@ if showPlots
 	Name = strrep(mea.Name, '_', ' ');
 % 	v.FrameRate = 30;
 	open(v); 
-	h(1) = figure; fullwidth();
-	h(2) = figure; fullwidth();
+	h(1) = figure; fullwidth(true);
+% 	h(2) = figure; fullwidth();
 	
 	img = nan(10);
 	addy = sub2ind([10 10], position(:, 1), position(:, 2));
@@ -123,70 +128,68 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 	t = waveTimes(i);
 	switch dataToFit
 		case 'events'
-			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
-			events = spike_times(inds, :)';
-			events = mat2cell(events, ones(size(events, 1), 1), size(events, 2));
-			for ch = 1:numCh
-				temp = events{ch};
-				temp(isnan(temp)) = [];
-				events{ch} = temp;
-			end
-			data = events;
-			temp = spike_times(inds, :);
-		case 'maxdescent'
-			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
-			temp = lfp(inds, :);                                           % Pull out window around wave
-			[~, data] = min(diff(temp, 1, 1));                             % Find time of maximal descent
-			data = num2cell(data);                                         % Convert to cell for SLR
-		case 'delays'
 			
+			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
+			dataToPlot = nan(nCh, 1);
+			temp = mean(spike_times(inds, :));
+			[~, ch, temp] = find(temp);
+% 			[~, so] = sort(ch);
+			dataToPlot(ch) = temp;
+			[~, pos_inds, data] = find(spike_times(inds, :));
+			temp = data(:)';
+			position = pos(pos_inds, :);
+			
+		case 'maxdescent'
+			
+			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
+			temp = smoothdata(lfp(inds, :), 'movmedian', 10);                                           % Pull out window around wave
+			[~, data] = min(diff(temp, 1, 1));                             % Find time of maximal descent
+			data = data(:);
+% 			temp = diff(temp, 1, 1);
+			dataToPlot = data;
+
+
+		case 'delays'
+
 			inds = compute_inds(i) : (compute_inds(i) + T * samplingRate - 1);
 			fprintf('Estimating waves at time %d/%d\n', i, numWaves)
+			temp = lfp(inds, :);
 			[coh, phi, freq, coh_conf] = ...
-				compute_coherence(lfp(inds, :), params, 'pairs', center);  % compute the coherence over the selected interval
+				compute_coherence(temp, params, 'pairs', center);  % compute the coherence over the selected interval
 			[delay, ~, ~] = compute_delay(coh, coh_conf, phi, freq);       % compute delays on each electrode based on coherence
-			delay = delay(center,:);                                       % we use delays relative to the center
-			data = num2cell(delay');                                       % Convert to cell for SLR
-
-			if showPlots
-				phi(coh < coh_conf) = NaN;
-% 				phis{i} = squeeze(phi(center, :, :));
-				temp = squeeze(phi(center, :, :))';
-				temp = unwrap(temp);
-			end
+			data = delay(center,:)';                                       % we use delays relative to the center
+			dataToPlot = data;
 	end
-	
-	if showPlots, figure(h(1)); end  % create a figure for the wave fit
-	
+		
 	[beta(:, i), V(:, i), p(i)] = fit_wave(data, position);
 	
 	if showPlots
-		title(h(1).Children(1), sprintf('%s\n %0.3f s', Name, t / 1e3));
-		title(h(1).Children(2), sprintf('p=%.2g', p(i)))
-		frame1 = getframe(h(1));
+		figure(h(1));
+		[p1, p2] = plot_wave_fit(position, data, beta(:, i));
+		title(p1, sprintf('%s\n %0.3f s', Name, t / 1e3));
+		title(p2, sprintf('p=%.2g', p(i)))
 		
-		figure(h(2));
-		data = cellfun(@(x) mean(x), data);
-		img(addy) = data;
-		subplot(122); imagesc(img); axis xy
+% 		figure(h(2));
+		img(addy) = dataToPlot;
+		subplot(236); 
+		p3 = imagesc(img); axis xy
 		colorbar();
-% 		cmap = parula(range([data{:}]) + 1);
-		cmap = h(2).Colormap;
-		cInds = round((data - min(data))/range(data) * (length(cmap) - 1)) + 1;
-		nanmask = isnan(cInds);
-		cInds(nanmask) = [];
-		subplot(121);
-		plot_details(temp(:, ~nanmask), cmap, cInds, dataToFit); 
+		cmap = h(1).Colormap;
+		cInds = round((dataToPlot - min(dataToPlot))/range(dataToPlot) * (length(cmap) - 1)) + 1;
+		if strcmpi(dataToFit, 'events'), cInds = cInds(pos_inds); end
+		subplot(2,3,4:5);
+		plot_details(temp, pos_inds, cmap, cInds, dataToFit); 
 		axis tight; grid on;
 		title(sprintf('%s\n %0.3f s', Name, t / 1e3));
 		if strcmpi(dataToFit, 'maxdescent')
-			hold on; plot([data{:}]', temp(sub2ind(size(temp), [data{:}], 1:numCh))', '*'); hold off
+			hold on; plot(dataToPlot, temp(sub2ind(size(temp), dataToPlot', 1:numCh)), 'r*'); hold off
 		end
-		frame2 = getframe(h(2));
+		frame1 = getframe(h(1));
+% 		frame2 = getframe(h(2));
 		
-		frame.cdata = [frame1.cdata; frame2.cdata];
-		frame.colormap = [];
-		writeVideo(v, frame)
+% 		frame.cdata = [frame1.cdata; frame2.cdata];
+% 		frame.colormap = [];
+		writeVideo(v, frame1)
 		
 	end
 	
@@ -201,8 +204,9 @@ wave_fit.V = V;
 wave_fit.p = p;
 wave_fit.Z = Z;
 wave_fit.Zu = Zu;
+
 try
-	mea.wave_fit_nyc = wave_fit;
+	mea.wave_fit = wave_fit;
 catch ME
 	disp(ME)
 	disp('Fit not saved.')
@@ -383,10 +387,38 @@ if PLOT
 end
 end
 
-function [beta, V, p] = fit_wave_bos(delay, position, PLOT)
-	[beta, ~, ~, ~, ~, p] = estimate_wave(delay, position, PLOT);
+function [beta, V, p] = fit_wave_bos(data, position, dataToFit)
+% 	if strcmpi(dataToFit, 'events')
+% % 		data(isnan(data)) = 0;
+% % 		data = sparse(double(data));
+% % 		[~, position_ind, data] = find(data);
+% % 		data = event; 
+% 		position = position(position_ind, :);
+% 	end
+	[beta, ~, ~, ~, ~, p] = estimate_wave(data, position);
 	beta = circshift(beta, -1);
 	V = pinv(beta(1:2));
+end
+
+function [] = fit_wave_nyc(data, position, dataToFit, showPlots)
+
+% Convert to cell for SLR
+	switch dataToFit
+		case 'maxdescent'
+			data = num2cell(data);
+		case 'events'
+			numCh = size(data, 2);
+			data = mat2cell(data', ones(size(data, 1), 1), numCh);
+			for ch = 1:numCh
+				temp = data{ch};
+				temp(isnan(temp)) = [];
+				data{ch} = temp;
+			end
+		case 'delays'
+			data = num2cell(data');
+	end
+	SpatialLinearRegression(data, position, ...
+			'Lossfun', 'L2', 'switch_plot', showPlots);
 end
 
 function [waveTimes, mea] = get_waveTimes(mea)
@@ -462,18 +494,55 @@ function [params, compute_inds] = set_coherence_params(mea, Time, T)
 		
 end
 
-function [] = plot_details(data, cmap, cInds, dataToFit)
+function [] = plot_details(data, position, cmap, cInds, dataToFit)
 	
 	switch dataToFit
 		case 'events'
 			[cInds, so] = sort(cInds);
 			set(gca, 'ColorOrder', cmap(cInds, :), 'NextPlot', 'replacechildren'); 
-			[nT, nCh] = size(data);
-			for ii = 1:nCh
-				plot(data(:, so(ii)), ii*ones(nT, 1), '*'); hold on;
+			for ii = 1:numel(data)
+				plot(data(so(ii)), position(ii), '*'); hold on;
 			end
 		otherwise
+			nanmask = isnan(cInds);
+			cInds(nanmask) = [];
+			data = data(:, ~nanmask);
 			set(gca, 'ColorOrder', cmap(cInds, :), 'NextPlot', 'replacechildren'); 
-			plot(data(:, ~nanmask))
+			plot(data)
 	end
 end
+
+function [p1, p2] = plot_wave_fit(position, data, beta)
+
+	X = position(:, 1);
+	Y = position(:, 2);
+	beta = beta(:);
+	
+
+	p1 = subplot(2,3,1:2);
+	scatter3(p1, X, Y, data, 200, data, 'filled');hold on;        
+
+	[XX, YY] = meshgrid(sort(unique(X)),sort(unique(Y)));
+	Z = double(position * beta(1:2) + beta(end));
+	f = scatteredInterpolant(X, Y, Z);
+	ZZ = f(XX,YY);
+	mesh(p1, XX, YY, ZZ, ...
+		'FaceColor', 'interp', 'FaceAlpha', 0.8, 'LineStyle', 'none') %interpolated
+
+	legend(p1, 'Data','Regression fit');
+	xlabel('cm');ylabel('cm');zlabel('Second');
+	
+	hold off;
+	% Plot the projection along the velocity axis
+	p2 = subplot(233);
+	P_v_axis = position * beta(1:2) / norm(beta(1:2));
+	plot(p2, P_v_axis, data, '.');
+	hold on;
+	plot(p2, P_v_axis, Z);
+	title('Projection along the velocity vector');
+	xlabel('cm');
+	ylabel('Second'); colormap(p2, 'hot')
+	hold off;
+	
+
+end 
