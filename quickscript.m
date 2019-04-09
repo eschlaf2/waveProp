@@ -16,26 +16,14 @@ if ~exist([fname '.mat'], 'file')
 		fname = [fname '_10_10.mat'];
 	end
 end
-mea = matfile(fname, 'writable', true);
-% try
-% 	mea = matfile(sprintf('%s_Seizure%d_Neuroport', pat, seizure), ...
-% 		'writable', true);
-% catch ME
-% 	m = matfile(sprintf('%s_Seizure%d', pat, seizure), ...
-% 		'writable', true);
-% 	mea = m.Neuroport;
-% 	
-% end
-% disp('Computing event times ...')
-% mua_events(mea);
-% disp('Computing firing rate ...')
-% mua_firing_rate(mea);
-% mea = test_for_recruitment(mea, 'fano');
-disp('Computing NYC wave directions ...')
-wave_prop(mea, 'nyc', true);
-disp('Computing BOS wave directions ...')
+mea = matfile(fname);
+[~, name, ~] = fileparts(mea.Properties.Source);
+
+disp('Computing wave directions from delays...')
+[delays, mea] = wave_prop(mea, 'delays');
+plot_wave_directions(mea, 
 wave_prop(mea, 'bos', true);
-% figs_nyc = plot_wave_directions(mea, 'nyc');
+save([name '_wave_prop'], 'delays')
 disp('Done.')
 
 % disp('Saving figures...')
