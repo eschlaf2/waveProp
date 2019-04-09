@@ -1,5 +1,15 @@
-function [wave_fit, mea] = wave_prop(mea, varargin)
-% dataToFit, fitMethod, show_plots, 
+function [wave_fit, mea] = wave_prop(mea, dataToFit, varargin)
+% Inputs: 
+%	dataToFit:  which type of data to fit the plane to (delays, maxdescent, events) 
+%	fitMethod:  use 'bos' or 'nyc' method of fitting a plane to the data
+%					(default: 'bos')
+%   showPlots:  display detailed plots of data
+% 
+% Name-value parameter pairs:
+%   T:          Time window to use for computing coherence in 'delays'
+%					data. (default: 10) [s]
+%   halfWin:	Time window surrounding firing discharges for computing
+%					'maxdescent' and 'events'. (default: 50) [ms]
 
 %% Parse inputs
 p = inputParser;
@@ -10,13 +20,13 @@ allFitMethods = {'nyc', 'bos'};
 validate = @(x, all) any(validatestring(x, all));
 
 addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile'));
-addOptional(p, 'dataToFit', 'maxdescent', @(x) validate(x, allDataToFit));
-addOptional(p, 'fitMethod', 'nyc', @(x) validate(x, allFitMethods));
+addRequired(p, 'dataToFit', @(x) validate(x, allDataToFit));
+addOptional(p, 'fitMethod', 'bos', @(x) validate(x, allFitMethods));
 addOptional(p, 'showPlots', true, @islogical);
 addParameter(p, 'T', 10, @isnumeric);
 addParameter(p, 'halfWin', 50, @isnumeric);
 
-parse(p, mea, varargin{:})
+parse(p, mea, dataToFit, varargin{:})
 struct2var(p.Results)
 
 %% Convert mea to struct if it is not writable
@@ -110,8 +120,7 @@ if showPlots
 	Name = strrep(mea.Name, '_', ' ');
 % 	v.FrameRate = 30;
 	open(v); 
-	h(1) = figure; fullwidth(true);
-% 	h(2) = figure; fullwidth();
+	h = figure; fullwidth(true);
 	
 	img = nan(10);
 	addy = sub2ind([10 10], position(:, 1), position(:, 2));
@@ -164,7 +173,7 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 	[beta(:, i), V(:, i), p(i)] = fit_wave(data, position);
 	
 	if showPlots
-		figure(h(1));
+		figure(h);
 		[p1, p2] = plot_wave_fit(position, data, beta(:, i));
 		title(p1, sprintf('%s\n %0.3f s', Name, t / 1e3));
 		title(p2, sprintf('p=%.2g', p(i)))
@@ -174,7 +183,7 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 		subplot(236); 
 		p3 = imagesc(img); axis xy
 		colorbar();
-		cmap = h(1).Colormap;
+		cmap = h.Colormap;
 		cInds = round((dataToPlot - min(dataToPlot))/range(dataToPlot) * (length(cmap) - 1)) + 1;
 		if strcmpi(dataToFit, 'events'), cInds = cInds(pos_inds); end
 		subplot(2,3,4:5);
@@ -184,7 +193,7 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 		if strcmpi(dataToFit, 'maxdescent')
 			hold on; plot(dataToPlot, temp(sub2ind(size(temp), dataToPlot', 1:numCh)), 'r*'); hold off
 		end
-		frame1 = getframe(h(1));
+		frame1 = getframe(h);
 % 		frame2 = getframe(h(2));
 		
 % 		frame.cdata = [frame1.cdata; frame2.cdata];
