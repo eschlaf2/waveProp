@@ -35,6 +35,7 @@ if ~isstruct(mea)
 		error('File not found');
 	elseif ~mea.Properties.Writable
 		mea = load(mea.Properties.Source);
+		mea.Time = mea.Time();
 	end
 end
 
@@ -74,7 +75,6 @@ catch ME
 end
 
 Time = mea.Time;
-Time = Time();
 
 % Load method specific variables
 switch dataToFit
@@ -116,7 +116,7 @@ assignin('base', 'mea', mea);
 
 Name = sprintf('%s_wave_prop_%s', mea.Name, dataToFit);
 if showPlots
-	v = VideoWriter(plotTitles);
+	v = VideoWriter(Name);
 	plotTitles = [strrep(mea.Name, '_', ' ') ' (' dataToFit ')'];
 % 	v.FrameRate = 30;
 	open(v); 

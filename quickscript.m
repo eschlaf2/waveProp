@@ -19,19 +19,22 @@ end
 mea = matfile(fname);
 [~, name, ~] = fileparts(mea.Properties.Source);
 
-disp('Computing wave directions from delays...')
+disp('Computing wave directions from delays ...')
 [delays, mea] = wave_prop(mea, 'delays');
-plot_wave_directions(mea, 
-wave_prop(mea, 'bos', true);
-save([name '_wave_prop'], 'delays')
+plot_wave_directions(mea, delays);
+print(gcf, delays.Name, '-dpng')
+
+disp('Computing wave directions from events ...')
+[events, mea] = wave_prop(mea, 'events');
+plot_wave_directions(mea, events);
+print(gcf, events.Name, '-dpng');
+
+disp('Computing wave directions from maxdescent ...')
+[maxdescent, mea] = wave_prop(mea, 'maxdescent');
+plot_wave_directions(mea, maxdescent);
+print(gcf, maxdescent.Name, '-dpng');
+
+save([name '_wave_prop'], 'delays', 'events', 'maxdescent')
 disp('Done.')
-
-% disp('Saving figures...')
-% nn = strrep(mea.Name, 'Seizure', '');
-% print(2, nn, '-dpng')
-% print(3, [nn '_FF'], '-dpng')
-
-% disp('ALL DONE! GO HOME!!!')
-% print(4, [nn, '_coh'], '-dpng')
 
 rmpath(patpath);

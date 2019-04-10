@@ -104,7 +104,7 @@ colorbar(p(2), 'southoutside', 'Ticks', [computeTimes(1) computeTimes(end)], ...
 %% Plot direction and speed as a function of time
 p(3) = subplot(rows, cols, 11:17);
 speed = sqrt(sum(V.^2));
-stem(p(3), computeTimes, log(speed), 'linewidth', 2);
+stem(p(3), computeTimes, log(speed), 'linewidth', 1);
 hold on
 scatter(p(3), computeTimes, log(speed), 40, waveFit.Z, 'filled');
 ylabel('Wave speed (log)')
@@ -118,16 +118,17 @@ firstInds = logical((computeTimes >= 0) .* (computeTimes <= n));
 te = Time(end) - mea.Padding(2);
 lastInds = logical((computeTimes >= te - n) .* (computeTimes <= te));
 p(4) = subplot(rows, cols, 19:20);
-hrose = rose(waveFit.Z(firstInds)); 
-hrose.Color = tempc(1, :); 
-hrose.LineWidth = 2; 
-title(sprintf('Discharges in the first and last %d seconds\n', n))
+r1 = rose(waveFit.Z(firstInds)); 
+r1.Color = tempc(1, :); 
+r1.LineWidth = 2; 
 
 hold(p(4), 'on');
-hroseR = rose(waveFit.Z(lastInds)); 
-hroseR.Color = tempc(end, :); 
-hroseR.LineWidth = 2; 
+r2 = rose(waveFit.Z(lastInds)); 
+r2.Color = tempc(end, :); 
+r2.LineWidth = 2; 
 axis(p(4), 'tight')
+title(sprintf('Discharges in the first and last %d seconds\n', n))
+
 
 % Fix positioning
 drawnow();
