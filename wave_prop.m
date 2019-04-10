@@ -142,7 +142,7 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 		case 'events'
 			
 			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
-			dataToPlot = nan(nCh, 1);
+			dataToPlot = nan(numCh, 1);
 			temp = mean(spike_times(inds, :));
 			[~, ch, temp] = find(temp);
 % 			[~, so] = sort(ch);
@@ -182,7 +182,7 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 		title(p2, sprintf('p=%.2g', p(i)))
 		
 % 		figure(h(2));
-		img(addy(pos_inds)) = dataToPlot;
+		img(addy) = dataToPlot;
 		subplot(236); 
 		p3 = imagesc(img); axis xy
 		colorbar();
