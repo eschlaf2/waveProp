@@ -24,7 +24,7 @@ validate = @(x, all) any(validatestring(x, all));
 
 addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile'));
 addRequired(p, 'dataToFit', @(x) validate(x, allDataToFit));
-addParameter(p, 'fitMethod', 'bos', validate(x, allFitMethods));
+addParameter(p, 'fitMethod', 'bos', @(x) validate(x, allFitMethods));
 addParameter(p, 'showPlots', true, @islogical);
 addParameter(p, 'T', 10, @isnumeric);
 addParameter(p, 'halfWin', 50, @isnumeric);
