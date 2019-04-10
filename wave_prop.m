@@ -78,6 +78,7 @@ catch ME
 end
 
 Time = mea.Time;
+POS = position;
 
 % Load method specific variables
 switch dataToFit
@@ -96,7 +97,6 @@ switch dataToFit
 		spike_times(mea.event_inds) = 1;
 		TimeMs = Time * 1000;  % Convert times to ms
 		spike_times = TimeMs' .* spike_times;
-		pos = mea.Position;
 	case 'delays'
 		
 		[lfp, skipfactor, mea] = get_lfp(mea);
@@ -112,7 +112,6 @@ end
 % Sizing variables
 numCh = length(position);
 numWaves = numel(computeTimes);
-pos_inds = 1:numCh;
 
 assignin('base', 'mea', mea);
 %% Open a video file if PLOT is set to true
@@ -125,7 +124,6 @@ if showPlots
 	open(v); 
 	h = figure; fullwidth(true);
 	
-	img = nan(10);
 	addy = sub2ind([10 10], position(:, 1), position(:, 2));
 end
 
@@ -138,6 +136,7 @@ p = nan(1, numWaves);     % certainty
 
 for i = 1:numWaves  % estimate wave velocity for each discharge
 	t = computeTimes(i);
+	if showPlots, img = nan(10); end
 	switch dataToFit
 		case 'events'
 			
@@ -149,7 +148,7 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 			dataToPlot(ch) = temp;
 			[~, pos_inds, data] = find(spike_times(inds, :));
 			temp = data(:)';
-			position = pos(pos_inds, :);
+			position = POS(pos_inds, :);
 			
 		case 'maxdescent'
 			
@@ -159,6 +158,7 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 			data = data(:);
 % 			temp = diff(temp, 1, 1);
 			dataToPlot = data;
+			pos_inds = 1:numCh;
 
 
 		case 'delays'
@@ -171,6 +171,8 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 			[delay, ~, ~] = compute_delay(coh, coh_conf, phi, freq);       % compute delays on each electrode based on coherence
 			data = delay(center,:)';                                       % we use delays relative to the center
 			dataToPlot = data;
+			pos_inds = 1:numCh;
+
 	end
 		
 	[beta(:, i), V(:, i), p(i)] = fit_wave(data, position);
