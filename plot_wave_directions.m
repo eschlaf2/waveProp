@@ -13,8 +13,7 @@ end
 plotTitle = strrep(waveFit.Name, '_', ' ');
 Z = waveFit.Z;  
 V = waveFit.V;
-if ~any(fieldnames(mea), 'firingRate'), [fr, mea] = mua_firing_rate(mea); 
-else, fr = mea.firingRate; end
+try fr = mea.firingRate; catch; [fr, mea] = mua_firing_rate(mea); end
 meanFr = mean(fr, 2, 'omitnan');
 Time = mea.Time;
 Time = Time();
