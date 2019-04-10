@@ -19,10 +19,10 @@ end
 mea = matfile(fname);
 [~, name, ~] = fileparts(mea.Properties.Source);
 
-disp('Computing wave directions from delays ...')
-[delays, mea] = wave_prop(mea, 'delays');
-plot_wave_directions(mea, delays);
-print(gcf, delays.Name, '-dpng')
+% disp('Computing wave directions from delays ...')
+% [delays, mea] = wave_prop(mea, 'delays');
+% plot_wave_directions(mea, delays);
+% print(gcf, delays.Name, '-dpng')
 
 disp('Computing wave directions from events ...')
 [events, mea] = wave_prop(mea, 'events');
