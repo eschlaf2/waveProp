@@ -91,8 +91,8 @@ switch dataToFit
 			[~, ~, mea] = mua_events(mea);
 		end
 		% Create a sparse array of spike times
-		[nT, nCh] = size(mea.mua);
-		spike_times = sparse(nT, nCh);
+		[nT, numCh] = size(mea.mua);
+		spike_times = sparse(nT, numCh);
 		spike_times(mea.event_inds) = 1;
 		TimeMs = Time * 1000;  % Convert times to ms
 		spike_times = TimeMs' .* spike_times;
