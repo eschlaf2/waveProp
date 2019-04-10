@@ -1,15 +1,18 @@
 function [wave_fit, mea] = wave_prop(mea, dataToFit, varargin)
 % Inputs: 
+%	mea:		Matfile or struct with seizure epoch
 %	dataToFit:  which type of data to fit the plane to (delays, maxdescent, events) 
-%	fitMethod:  use 'bos' or 'nyc' method of fitting a plane to the data
-%					(default: 'bos')
-%   showPlots:  display detailed plots of data
 % 
 % Name-value parameter pairs:
+%	fitMethod:  use 'bos' or 'nyc' method of fitting a plane to the data
+%					(default: 'bos')
+%	showPlots:  display detailed plots of data
 %   T:          Time window to use for computing coherence in 'delays'
-%					data. (default: 10) [s]
+%					data. 
+%					(default: 10) [s]
 %   halfWin:	Time window surrounding firing discharges for computing
-%					'maxdescent' and 'events'. (default: 50) [ms]
+%					'maxdescent' and 'events'. 
+%					(default: 50) [ms]
 
 %% Parse inputs
 p = inputParser;
@@ -21,8 +24,8 @@ validate = @(x, all) any(validatestring(x, all));
 
 addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile'));
 addRequired(p, 'dataToFit', @(x) validate(x, allDataToFit));
-addOptional(p, 'fitMethod', 'bos', @(x) validate(x, allFitMethods));
-addOptional(p, 'showPlots', true, @islogical);
+addParameter(p, 'fitMethod', 'bos', validate(x, allFitMethods));
+addParameter(p, 'showPlots', true, @islogical);
 addParameter(p, 'T', 10, @isnumeric);
 addParameter(p, 'halfWin', 50, @isnumeric);
 
