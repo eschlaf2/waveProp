@@ -109,6 +109,7 @@ hold on
 scatter(p(3), computeTimes, log(speed), 40, waveFit.Z, 'filled');
 ylabel('Wave speed (log)')
 colormap(p(3), cmapDir);
+p(3).CLim = [-pi pi];
 xlabel(p(3), 'Time (s)')
 grid on
 
