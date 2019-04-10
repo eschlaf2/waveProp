@@ -182,7 +182,7 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 		title(p2, sprintf('p=%.2g', p(i)))
 		
 % 		figure(h(2));
-		img(addy) = dataToPlot;
+		img(addy(pos_inds)) = dataToPlot;
 		subplot(236); 
 		p3 = imagesc(img); axis xy
 		colorbar();
