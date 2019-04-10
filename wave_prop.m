@@ -134,8 +134,8 @@ beta = nan(3, numWaves);  % fit parameters
 V = nan(2, numWaves);     % wave velocity (psuedo-inverse of beta)
 p = nan(1, numWaves);     % certainty
 
-for i = 1:numWaves  % estimate wave velocity for each discharge
-	t = computeTimes(i);
+for ii = 1:numWaves  % estimate wave velocity for each discharge
+	t = computeTimes(ii);
 	if showPlots, img = nan(10); end
 	switch dataToFit
 		case 'events'
@@ -163,8 +163,8 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 
 		case 'delays'
 
-			inds = compute_inds(i) : (compute_inds(i) + T * samplingRate - 1);
-			fprintf('Estimating waves at time %d/%d\n', i, numWaves)
+			inds = compute_inds(ii) : (compute_inds(ii) + T * samplingRate - 1);
+			fprintf('Estimating waves at time %d/%d\n', ii, numWaves)
 			temp = lfp(inds, :);
 			[coh, phi, freq, coh_conf] = ...
 				compute_coherence(temp, params, 'pairs', center);  % compute the coherence over the selected interval
@@ -175,13 +175,13 @@ for i = 1:numWaves  % estimate wave velocity for each discharge
 
 	end
 		
-	[beta(:, i), V(:, i), p(i)] = fit_wave(data, position);
+	[beta(:, ii), V(:, ii), p(ii)] = fit_wave(data, position);
 	
 	if showPlots
 		figure(h);
-		[p1, p2] = plot_wave_fit(position, data, beta(:, i));
+		[p1, p2] = plot_wave_fit(position, data, beta(:, ii));
 		title(p1, sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
-		title(p2, sprintf('p=%.2g', p(i)))
+		title(p2, sprintf('p=%.2g', p(ii)))
 		
 % 		figure(h(2));
 		img(addy) = dataToPlot;
