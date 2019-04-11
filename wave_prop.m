@@ -134,7 +134,8 @@ beta = nan(3, numWaves);  % fit parameters
 V = nan(2, numWaves);     % wave velocity (psuedo-inverse of beta)
 p = nan(1, numWaves);     % certainty
 
-for ii = 1:numWaves  % estimate wave velocity for each discharge
+parfor ii = 1:numWaves  % estimate wave velocity for each discharge
+	position = POS;
 	t = computeTimes(ii);
 	if showPlots, img = nan(10); end
 	switch dataToFit
@@ -148,7 +149,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			dataToPlot(ch) = temp;
 			[~, pos_inds, data] = find(spike_times(inds, :));
 			temp = data(:)';
-			position = POS(pos_inds, :);
+			position = position(pos_inds, :);
 			
 		case 'maxdescent'
 			
