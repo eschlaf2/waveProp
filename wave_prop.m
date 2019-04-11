@@ -134,7 +134,7 @@ beta = nan(3, numWaves);  % fit parameters
 V = nan(2, numWaves);     % wave velocity (psuedo-inverse of beta)
 p = nan(1, numWaves);     % certainty
 
-parfor ii = 1:numWaves  % estimate wave velocity for each discharge
+for ii = 1:numWaves  % estimate wave velocity for each discharge
 	position = POS;
 	t = computeTimes(ii);
 	if showPlots, img = nan(10); end
