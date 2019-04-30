@@ -103,10 +103,11 @@ colorbar(p(2), 'southoutside', 'Ticks', [computeTimes(1) computeTimes(end)], ...
 
 %% Plot direction and speed as a function of time
 p(3) = subplot(rows, cols, 11:17);
-speed = sqrt(sum(V.^2));
-stem(p(3), computeTimes, log(speed), 'linewidth', 1);
+speed = ((log(sqrt(sum(V.^2)))));
+zscore = @(x) (x - mean(x, 'omitnan')) / std(x, 'omitnan');
+stem(p(3), computeTimes, zscore(speed), 'linewidth', 1);
 hold on
-scatter(p(3), computeTimes, log(speed), 40, waveFit.Z, 'filled');
+scatter(p(3), computeTimes, zscore(speed), 40, waveFit.Z, 'filled');
 ylabel('Wave speed (log)')
 colormap(p(3), cmapDir);
 p(3).CLim = [-pi pi];
@@ -118,16 +119,19 @@ n = 20;
 firstInds = logical((computeTimes >= 0) .* (computeTimes <= n));
 te = Time(end) - mea.Padding(2);
 lastInds = logical((computeTimes >= te - n) .* (computeTimes <= te));
-p(4) = subplot(rows, cols, 19:20);
-r1 = rose(waveFit.Z(firstInds)); 
-r1.Color = tempc(1, :); 
+edges = linspace(-pi, pi, 13);
+p(4) = subplot(rows, cols, 19:20, 'replace');
+p(4) = polarhistogram(waveFit.Z(logical(firstInds + lastInds)), edges, ...
+	'FaceColor', 'none', 'LineStyle', 'none'); 
+hold on;
+r1 = polarhistogram(waveFit.Z(firstInds), edges); 
+r1.FaceColor = cmap(1, :); 
 r1.LineWidth = 2; 
 
-hold(p(4), 'on');
-r2 = rose(waveFit.Z(lastInds)); 
-r2.Color = tempc(end, :); 
+r2 = polarhistogram(waveFit.Z(lastInds), edges); 
+r2.FaceColor = cmap(end, :); 
 r2.LineWidth = 2; 
-axis(p(4), 'tight')
+% axis(p(4), 'tight')
 title(sprintf('Discharges in the first and last %d seconds\n', n))
 
 
