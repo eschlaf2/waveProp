@@ -27,17 +27,17 @@ plot_wave_directions(mea, delays);
 print(gcf, delays.Name, '-dpng')
 outfile.delays = delays;
 
-% disp('Computing wave directions from events ...')
-% [events, mea] = wave_prop(mea, 'events');
-% plot_wave_directions(mea, events);
-% print(gcf, events.Name, '-dpng');
-% outfile.events = events;
-% 
-% disp('Computing wave directions from maxdescent ...')
-% [maxdescent, mea] = wave_prop(mea, 'maxdescent');
-% plot_wave_directions(mea, maxdescent);
-% print(gcf, maxdescent.Name, '-dpng');
-% outfile.maxdescent = maxdescent;
+disp('Computing wave directions from events ...')
+[events, mea] = wave_prop(mea, 'events');
+plot_wave_directions(mea, events);
+print(gcf, events.Name, '-dpng');
+outfile.events = events;
+
+disp('Computing wave directions from maxdescent ...')
+[maxdescent, mea] = wave_prop(mea, 'maxdescent');
+plot_wave_directions(mea, maxdescent);
+print(gcf, maxdescent.Name, '-dpng');
+outfile.maxdescent = maxdescent;
 
 disp('Done.')
 
