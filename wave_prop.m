@@ -97,7 +97,7 @@ switch metric
 		[nT, numCh] = size(mea.mua);
 		spike_times = sparse(nT, numCh);
 		spike_times(mea.event_inds) = 1;
-% 		TimeMs = Time * 1000;  % Convert times to ms
+		TimeMs = Time * 1000;  % Convert times to ms
 % 		spike_times = TimeMs' .* spike_times;
 	case 'delays'
 		
