@@ -34,7 +34,7 @@ if any(strcmpi(bands, 'lfp'))
 	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
 		'CutoffFrequency1',2,'CutoffFrequency2',50, ...
 		'SampleRate', SamplingRate);
-	skipfactor = round(SamplingRate / 1e3);
+	skipfactor = max(round(SamplingRate / 1e3), 1);
 	temp = single(filtfilt(bpFilt, double(data)));
 	temp(:, BadChannels) = [];
 	temp = downsample(temp, skipfactor);

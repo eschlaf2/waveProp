@@ -1,4 +1,4 @@
-function [wave_fit, mea] = wave_prop(mea, dataToFit, varargin)
+function [wave_fit, mea] = wave_prop(mea, metric, varargin)
 % Inputs: 
 %	mea:		Matfile or struct with seizure epoch
 %	dataToFit:  which type of data to fit the plane to (delays, maxdescent, events) 
@@ -17,19 +17,19 @@ function [wave_fit, mea] = wave_prop(mea, dataToFit, varargin)
 %% Parse inputs
 p = inputParser;
 
-allDataToFit = {'delays', 'maxdescent', 'events'};
+allMetrics = {'delays', 'maxdescent', 'events'};
 allFitMethods = {'nyc', 'bos'};
 
 validate = @(x, all) any(validatestring(x, all));
 
 addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile'));
-addRequired(p, 'dataToFit', @(x) validate(x, allDataToFit));
+addRequired(p, 'metric', @(x) validate(x, allMetrics));
 addParameter(p, 'fitMethod', 'bos', @(x) validate(x, allFitMethods));
 addParameter(p, 'showPlots', true, @islogical);
 addParameter(p, 'T', 10, @isnumeric);
 addParameter(p, 'halfWin', 50, @isnumeric);
 
-parse(p, mea, dataToFit, varargin{:})
+parse(p, mea, metric, varargin{:})
 struct2var(p.Results)
 
 %% Convert mea to struct if it is not writable
@@ -45,19 +45,19 @@ end
 %% Assign wave fitting method
 switch lower(fitMethod)
 	case 'bos'
-		fit_wave = @(data, position) fit_wave_bos(data, position, dataToFit);
+		fit_wave = @(data, position) fit_wave_bos(data, position, metric);
 	case 'nyc'
 		fit_wave = @(data, position) ...
-			fit_wave_nyc(data, position, dataToFit);
+			fit_wave_nyc(data, position, metric);
 end
 
 %% Compute fits
-[wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, dataToFit, ...
+[wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, ...
 	T, halfWin);
 
 end
 
-function [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, dataToFit, T, halfWin)
+function [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, T, halfWin)
 %% Compute wave propagation at each discharge time as described in 
 % Liou, Jyun You, et al. ?Multivariate Regression Methods for Estimating
 % Velocity of Ictal Discharges from Human Microelectrode Recordings.?
@@ -78,10 +78,12 @@ catch ME
 end
 
 Time = mea.Time;
-POS = position;
+posX = interp1(unique(position(:, 1)), 1:numel(unique(position(:,1))), position(:, 1));
+posY = interp1(unique(position(:, 2)), 1:numel(unique(position(:,2))), position(:, 2));
+POS = [posX(:) posY(:)];
 
 % Load method specific variables
-switch dataToFit
+switch metric
 	case 'maxdescent'
 		[computeTimes, mea] = get_waveTimes(mea);
 		[lfp, skipfactor, mea] = get_lfp(mea);
@@ -116,15 +118,15 @@ numWaves = numel(computeTimes);
 assignin('base', 'mea', mea);
 %% Open a video file if PLOT is set to true
 
-Name = sprintf('%s_wave_prop_%s', mea.Name, dataToFit);
+Name = sprintf('%s_wave_prop_%s', mea.Name, metric);
 if showPlots
 	v = VideoWriter(Name);
-	plotTitles = [strrep(mea.Name, '_', ' ') ' (' dataToFit ')'];
+	plotTitles = [strrep(mea.Name, '_', ' ') ' (' metric ')'];
 % 	v.FrameRate = 30;
 	open(v); 
 	h = figure; fullwidth(true);
 	
-	addy = sub2ind([10 10], position(:, 1), position(:, 2));
+	addy = sub2ind(max(POS), POS(:, 1), POS(:, 2));
 end
 
 %% Estimate wave direction at each discharge time
@@ -137,8 +139,8 @@ p = nan(1, numWaves);     % certainty
 for ii = 1:numWaves  % estimate wave velocity for each discharge
 	position = POS;
 	t = computeTimes(ii);
-	if showPlots, img = nan(10); end
-	switch dataToFit
+	if showPlots, img = nan(max(POS)); end
+	switch metric
 		case 'events'
 			
 			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
@@ -169,15 +171,18 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			temp = lfp(inds, :);
 			[coh, phi, freq, coh_conf] = ...
 				compute_coherence(temp, params, 'pairs', center);  % compute the coherence over the selected interval
-			[delay, ~, ~] = compute_delay(coh, coh_conf, phi, freq);       % compute delays on each electrode based on coherence
+			[delay, ~, ~] = compute_delay(coh, coh_conf, -phi, freq);       % compute delays on each electrode based on coherence
 			data = delay(center,:)';                                       % we use delays relative to the center
 			dataToPlot = data;
 			pos_inds = 1:numCh;
 
 	end
-		
+	try	
 	[beta(:, ii), V(:, ii), p(ii)] = fit_wave(data, position);
-	
+	catch ME
+		disp(ME)
+		continue
+	end
 	if showPlots
 		figure(h);
 		[p1, p2] = plot_wave_fit(position, data, beta(:, ii));
@@ -191,12 +196,12 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		colorbar();
 		cmap = h.Colormap;
 		cInds = round((dataToPlot - min(dataToPlot))/range(dataToPlot) * (length(cmap) - 1)) + 1;
-		if strcmpi(dataToFit, 'events'), cInds = cInds(pos_inds); end
+		if strcmpi(metric, 'events'), cInds = cInds(pos_inds); end
 		subplot(2,3,4:5);
-		plot_details(temp, pos_inds, cmap, cInds, dataToFit); 
+		plot_details(temp, pos_inds, cmap, cInds, metric); 
 		axis tight; grid on;
 		title(sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
-		if strcmpi(dataToFit, 'maxdescent')
+		if strcmpi(metric, 'maxdescent')
 			hold on; plot(dataToPlot, temp(sub2ind(size(temp), dataToPlot', 1:numCh)), 'r*'); hold off
 		end
 		frame1 = getframe(h);
@@ -404,7 +409,7 @@ if PLOT
 end
 end
 
-function [beta, V, p] = fit_wave_bos(data, position, dataToFit)
+function [beta, V, p] = fit_wave_bos(data, position, metric)
 	[beta, ~, ~, ~, ~, p] = estimate_wave(data, position);
 	beta = circshift(beta, -1);
 	V = pinv(beta(1:2));
@@ -491,7 +496,7 @@ function [params, compute_inds] = set_coherence_params(mea, Time, T)
 % 	padding = mea.Padding;
 	nsamp = numel(Time);                                % Total number of samples
 	step = OVERLAP_COMPLEMENT * samplingRate;           % Compute coherence every OVERLAP_COMPLEMENT
-	lastSamplePoint = nsamp - T * samplingRate;         % Leave a long enough window at the end to calculate coherence
+	lastSamplePoint = nsamp - ceil(T * samplingRate) + 1;     % Leave a long enough window at the end to calculate coherence
 	compute_inds = round(1 : step : lastSamplePoint);    
 
 % 	ts = find(Time(compute_inds) > 0, 1);
