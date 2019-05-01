@@ -78,6 +78,7 @@ catch ME
 end
 
 Time = mea.Time;
+Time = Time();
 posX = interp1(unique(position(:, 1)), 1:numel(unique(position(:,1))), position(:, 1));
 posY = interp1(unique(position(:, 2)), 1:numel(unique(position(:,2))), position(:, 2));
 POS = [posX(:) posY(:)];
@@ -89,16 +90,14 @@ switch metric
 		[lfp, skipfactor, mea] = get_lfp(mea);
 		TimeMs = downsample(Time, skipfactor) * 1e3;
 	case 'events'
-		[computeTimes, mea] = get_waveTimes(mea);
-		if ~any(strcmpi(properties(mea), 'event_inds'))
-			[~, ~, mea] = mua_events(mea);
+		[computeTimes, mea] = get_waveTimes(mea);                          % Get discharge times
+		if ~any(strcmpi(properties(mea), 'event_inds'))                    % If event times aren't already computed
+			[~, ~, mea] = mua_events(mea);                                 % ... compute them
 		end
-		% Create a sparse array of spike times
 		[nT, numCh] = size(mea.mua);
-		spike_times = sparse(nT, numCh);
-		spike_times(mea.event_inds) = 1;
-		TimeMs = Time * 1000;  % Convert times to ms
-% 		spike_times = TimeMs' .* spike_times;
+		[timeInds, chInds] = ind2sub([nT, numCh], mea.event_inds);         % Get the indices and channels of each spike
+		TimeMs = Time * 1000;                                              % Convert times to ms
+		spike_times = TimeMs(timeInds);                                    % Get the spike times in ms
 	case 'delays'
 		
 		[lfp, skipfactor, mea] = get_lfp(mea);
@@ -108,7 +107,7 @@ switch metric
 		plotTitles = strrep(mea.Name, '_', ' ');
 		computeTimes = TimeMs(compute_inds);
 		samplingRate = mea.SamplingRate / skipfactor;
-		[~, center] = min(sum((position - mean(position)).^2, 2));        % find the most central electrode
+		[~, center] = min(sum((position - mean(position)).^2, 2));         % find the most central electrode
 end
 		
 % Sizing variables
@@ -143,13 +142,17 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 	switch metric
 		case 'events'
 			
-			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
+% 			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
+			inds = logical((spike_times >= t - halfWin) .* ...            % Get spike times within halfWin ms
+				(spike_times <= t + halfWin));                            % ... of discharge at time t
 			dataToPlot = nan(numCh, 1);
-			temp = mean(spike_times(inds, :));
-			[~, ch, temp] = find(temp);
+			pos_inds = chInds(inds);
+			temp = mean(sparse(timeInds(inds), pos_inds, spike_times(inds)));   % Find the mean spike time on each channel
+			[~, chMean, temp] = find(temp);                                   % ... and extract from sparse array
 % 			[~, so] = sort(ch);
-			dataToPlot(ch) = temp;
-			[~, pos_inds, data] = find(spike_times(inds, :));
+			dataToPlot(chMean) = temp;                                         % imagesc mean spike time on each channel
+% 			[~, pos_inds, data] = find(spike_times(inds, :));              % 
+			data = spike_times(inds);
 			temp = data(:)';
 			position = position(pos_inds, :);
 			
