@@ -173,9 +173,9 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			fprintf('Estimating waves at time %d/%d\n', ii, numWaves)
 			temp = lfp(inds, :);
 			[coh, phi, freq, coh_conf] = ...
-				compute_coherence(temp, params, 'pairs', center);  % compute the coherence over the selected interval
-			[delay, ~, ~] = compute_delay(coh, coh_conf, -phi, freq);       % compute delays on each electrode based on coherence
-			data = delay(center,:)';                                       % we use delays relative to the center
+				compute_coherence(temp, params, 'pairs', center);          % compute the coherence over the selected interval
+			[delay, ~, ~] = compute_delay(coh, coh_conf, -phi, freq);      % compute delays on each electrode based on coherence
+			data = 1e3 * delay(center,:)';                                 % we use delays relative to the center (converted to ms)
 			dataToPlot = data;
 			pos_inds = 1:numCh;
 
@@ -196,6 +196,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		img(addy) = dataToPlot;
 		subplot(236); 
 		p3 = imagesc(img); axis xy
+		xlabel('X'); ylabel('Y');
 		colorbar();
 		cmap = h.Colormap;
 		cInds = round((dataToPlot - min(dataToPlot))/range(dataToPlot) * (length(cmap) - 1)) + 1;
@@ -208,10 +209,6 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			hold on; plot(dataToPlot, temp(sub2ind(size(temp), dataToPlot', 1:numCh)), 'r*'); hold off
 		end
 		frame1 = getframe(h);
-% 		frame2 = getframe(h(2));
-		
-% 		frame.cdata = [frame1.cdata; frame2.cdata];
-% 		frame.colormap = [];
 		writeVideo(v, frame1)
 		
 	end
@@ -496,19 +493,10 @@ function [params, compute_inds] = set_coherence_params(mea, Time, T)
 	params.err = [1 0.05];          % ... theoretical error bars, p=0.05.
 	params.T = T;
 	
-% 	padding = mea.Padding;
 	nsamp = numel(Time);                                % Total number of samples
 	step = OVERLAP_COMPLEMENT * samplingRate;           % Compute coherence every OVERLAP_COMPLEMENT
 	lastSamplePoint = nsamp - ceil(T * samplingRate) + 1;     % Leave a long enough window at the end to calculate coherence
 	compute_inds = round(1 : step : lastSamplePoint);    
-
-% 	ts = find(Time(compute_inds) > 0, 1);
-% 	te = find(Time(compute_inds) > (Time(end) - max(padding(2), T)), 1) - 1;
-% 	if isempty(te)
-% 		te = numel(compute_inds);
-% 	end
-% 
-% 	compute_inds = compute_inds(ts : te);  % only compute while in seizure
 		
 end
 
@@ -548,7 +536,7 @@ function [p1, p2] = plot_wave_fit(position, data, beta)
 		'FaceColor', 'interp', 'FaceAlpha', 0.8, 'LineStyle', 'none') %interpolated
 
 	legend(p1, 'Data','Regression fit');
-	xlabel('cm');ylabel('cm');zlabel('Second');
+	xlabel('X (electrode)');ylabel('Y (electrode)');zlabel('Time (ms)');
 	
 	hold off;
 	% Plot the projection along the velocity axis
@@ -559,7 +547,7 @@ function [p1, p2] = plot_wave_fit(position, data, beta)
 	plot(p2, P_v_axis, Z);
 	title('Projection along the velocity vector');
 	xlabel('cm');
-	ylabel('Second'); colormap(p2, 'hot')
+	ylabel('Time (ms)'); colormap(p2, 'hot')
 	hold off;
 	
 
