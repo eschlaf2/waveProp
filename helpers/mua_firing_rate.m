@@ -16,10 +16,9 @@ end
 samplingRate = mea.SamplingRate;
 Time = mea.Time;
 T = numel(Time());
+NCh = size(mea.Data, 2);
 if any(strcmpi(fieldnames(mea), 'badchannels'))
-	NCh = mea.NChannels - numel(mea.BadChannels);
-else
-	NCh = mea.NChannels;
+	NCh = NCh - numel(mea.BadChannels);
 end
 dims = [T, NCh];
 
