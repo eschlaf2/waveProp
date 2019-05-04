@@ -51,9 +51,33 @@ switch lower(fitMethod)
 			fit_wave_nyc(data, position, metric);
 end
 
+mea = exclude_channels(mea);
+
 %% Compute fits
 [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, ...
 	T, halfWin);
+
+end
+
+function mea = exclude_channels(mea)
+
+	[firingRate, mea] = mua_firing_rate(mea);
+	skipfactor = round(mea.SamplingRate / 100);  % downsample to ~100 Hz
+	fr = smoothdata(downsample(firingRate, skipfactor), 1, 'movmean', 1e3);  % smooth over 10 s windows
+	time = downsample(mea.Time(), skipfactor);
+
+	mn = mean(fr(time < 0, :));  % get mean firing rate at baseline
+	sd = std(fr);  % ... and standard deviation over full recording
+	fr = (fr - mn) ./ sd;  % normalize smoothed firing rate
+
+	halfWay = (time - mea.Padding(2)) / 2;
+	exclude_channels = ...  % Find channels that don't have significant increases in firing rate during the first half of the seizure
+	    arrayfun(@(ii) find(max(fr(time < halfWay, ii)) < 2, 1), 1:size(fr, 2));
+
+	% Add the channels to the list of bad channels
+	ch = 1:size(mea.Data, 2)';
+	ch(mea.BadChannels) = [];
+	mea.BadChannels = sort([mea.BadChannels; ch(exclude_channels)]);
 
 end
 
