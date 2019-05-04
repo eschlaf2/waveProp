@@ -62,6 +62,7 @@ end
 function mea = exclude_channels(mea)
 
 	[firingRate, mea] = mua_firing_rate(mea);
+	exclude_channels = find(mean(firingRate) < 6);  % Only use channels with mean firing rate at least 6 spikes per second
 	skipfactor = round(mea.SamplingRate / 100);  % downsample to ~100 Hz
 	fr = smoothdata(downsample(firingRate, skipfactor), 1, 'movmean', 1e3);  % smooth over 10 s windows
 	time = downsample(mea.Time(), skipfactor);
@@ -72,7 +73,7 @@ function mea = exclude_channels(mea)
 
 	% Find channels that don't have significant increases in firing rate during the first half of the seizure
 	halfWay = (time - mea.Padding(2)) / 2;
-	exclude_channels = find(max(fr(time < halfWay, :)) < 2, 1);
+	exclude_channels = unique([exclude_channels find(max(fr(time < halfWay, :)) < 2, 1)]);
 
 	% Add the channels to the list of bad channels
 	ch = 1:size(mea.Data, 2)';
