@@ -2,8 +2,7 @@ function [frSm, ch, mea] = recruitment_wave(mea)
 % Look at whether units get recruited to the seizure by a slowly moving
 % wavefront.
 
-time = mea.Time; time = time();  
-[frSm, ch, mea] = smooth_firingRate(mea);                                  % Smooth the firing rate and limit to active channels
+[frSm, time, ch, mea] = smooth_firingRate(mea);                                  % Smooth the firing rate and limit to active channels
 recruitmentInd = arrayfun(@(ii) find(frSm(:, ii) > 2, 1), 1:numel(ch));    % Find time points where the firing rate is 2sd above base
 [recIndsSorted, so] = sort(recruitmentInd);                                % Get the order in which channels were recruited to seizure
 position = get_position(mea, ch(so));                                      % Transform the position into coordinates
@@ -93,7 +92,7 @@ Ps = P(ch, :);  % Limit to only coordinates of interest
 position = (Ps - min(Ps)) ./ min(diff(unique(Ps))) + 1;  % Reassign coordinates
 end
 
-function [frSm, ch, mea] = smooth_firingRate(mea)
+function [frSm, time, ch, mea] = smooth_firingRate(mea)
 % Smooth the firing rate to highlight broad, slow changes in firing.
 %     Downsample to 100 Hz
 %     Limit to channels with mean firing rate at least 6 spikes per sec
