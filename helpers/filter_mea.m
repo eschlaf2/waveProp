@@ -34,7 +34,7 @@ if any(strcmpi(bands, 'lfp'))
 	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
 		'CutoffFrequency1',2,'CutoffFrequency2',50, ...
 		'SampleRate', SamplingRate);
-	skipfactor = round(SamplingRate / 1e3);
+	skipfactor = max(round(SamplingRate / 1e3), 1);
 	temp = single(filtfilt(bpFilt, double(data)));
 	temp(:, BadChannels) = [];
 	temp = downsample(temp, skipfactor);
@@ -49,8 +49,10 @@ end
 
 if any(strcmpi(bands, 'mua'))
 	disp('Filtering mua band...')
+	hipass = min(round(SamplingRate / 2 - 1), 3e3);
+	if hipass < 3e3, warning('Setting CutoffFrequency2 to %f', hipass), end
 	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
-		'CutoffFrequency1',3e2,'CutoffFrequency2',3e3, ...
+		'CutoffFrequency1',3e2,'CutoffFrequency2',hipass, ...
 		'SampleRate',SamplingRate);
 	temp = single(filtfilt(bpFilt, double(data)));
 	temp(:, BadChannels) = [];
