@@ -33,7 +33,11 @@ plot_wave_directions(mea, events);
 print(gcf, events.Name, '-dpng');
 outfile.events = events;
 
-% /escent;
+disp('Computing wave directions from maxdescent ...')
+[maxdescent, mea] = wave_prop(mea, 'maxdescent');
+plot_wave_directions(mea, maxdescent);
+print(gcf, maxdescent.Name, '-dpng');
+outfile.maxdescent = maxdescent;
 
 disp('Done.')
 
