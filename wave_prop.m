@@ -60,15 +60,15 @@ mea = exclude_channels(mea);
 end
 
 function mea = exclude_channels(mea)
-	% Exclude channels with mean firing rate less than 6 spikes per second during seizure
+	% Exclude channels with mean firing rate less than 6 spikes per second during seizure or that do not show significant increases in firing rate during the first half of the seizure
 
 	[firingRate, mea] = mua_firing_rate(mea);
 	time = mea.Time();
-	seizure_inds = logical((time > 0) .* (time < time(end) - mea.Padding(2)))
+	seizure_inds = logical((time > 0) .* (time < time(end) - mea.Padding(2)))  % Indicate when seizure is occurring
 	exclude_channels = find(mean(firingRate(seizure_inds, :)) < 6);  % Only use channels with mean firing rate at least 6 spikes per second
 	skipfactor = round(mea.SamplingRate / 100);  % downsample to ~100 Hz
 	fr = smoothdata(downsample(firingRate, skipfactor), 1, 'movmean', 1e3);  % smooth over 10 s windows
-	time = downsample(mea.Time(), skipfactor);
+	time = downsample(time, skipfactor);  % downsample time to match fr
 
 	mn = mean(fr(time < 0, :));  % get mean firing rate at baseline
 	sd = std(fr);  % ... and standard deviation over full recording
