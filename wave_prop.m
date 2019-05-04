@@ -72,7 +72,7 @@ function mea = exclude_channels(mea)
 
 	% Find channels that don't have significant increases in firing rate during the first half of the seizure
 	halfWay = (time - mea.Padding(2)) / 2;
-	exclude_channels = find(max(fr(time < halfWay, :)) < 2, 1));
+	exclude_channels = find(max(fr(time < halfWay, :)) < 2, 1);
 
 	% Add the channels to the list of bad channels
 	ch = 1:size(mea.Data, 2)';
