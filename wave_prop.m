@@ -82,9 +82,9 @@ function mea = exclude_channels(mea)
 	exclude_channels = unique([exclude_channels find(max(fr(time < halfWay, :)) < 2, 1)])';
 
 	% Add the channels to the list of bad channels
-	ch = 1:size(mea.Data, 2)';                                           % All channels
+	ch = 1:size(mea.Data, 2);                                            % All channels
 	ch(mea.BadChannels) = [];                                            % ... minus those already excluded
-	mea.BadChannels = sort([mea.BadChannels; ch(exclude_channels)]);  % ... gives all bad channels
+	mea.BadChannels = sort([mea.BadChannels; ch(exclude_channels)']);  % ... gives all bad channels
 	disp('Channels excluded from analysis:')
 	disp(ch(exclude_channels));
 
