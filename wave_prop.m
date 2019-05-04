@@ -70,14 +70,17 @@ function mea = exclude_channels(mea)
 	sd = std(fr);  % ... and standard deviation over full recording
 	fr = (fr - mn) ./ sd;  % normalize smoothed firing rate
 
+	% Find channels that don't have significant increases in firing rate during the first half of the seizure
 	halfWay = (time - mea.Padding(2)) / 2;
-	exclude_channels = ...  % Find channels that don't have significant increases in firing rate during the first half of the seizure
-	    arrayfun(@(ii) find(max(fr(time < halfWay, ii)) < 2, 1), 1:size(fr, 2));
+	exclude_channels = find(max(fr(time < halfWay, :)) < 2, 1));
 
 	% Add the channels to the list of bad channels
 	ch = 1:size(mea.Data, 2)';
 	ch(mea.BadChannels) = [];
 	mea.BadChannels = sort([mea.BadChannels; ch(exclude_channels)]);
+	disp('Channels excluded from analysis:')
+	sprintf('    %d', ch(exclude_channels));
+	disp('');
 
 end
 
