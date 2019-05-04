@@ -81,7 +81,7 @@ function mea = exclude_channels(mea)
 	% Add the channels to the list of bad channels
 	ch = 1:size(mea.Data, 2)';
 	ch(mea.BadChannels) = [];
-	mea.BadChannels = sort([mea.BadChannels; ch(exclude_channels)]);
+	mea.BadChannels = sort([mea.BadChannels(:); ch(exclude_channels)]);
 	disp('Channels excluded from analysis:')
 	sprintf('    %d', ch(exclude_channels));
 	disp('');
