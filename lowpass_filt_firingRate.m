@@ -1,5 +1,5 @@
 function [output, Time] = lowpass_filt_firingRate(mea, downsample)
-% Tihs file is used to filter the firing rate of MEA data in preparations
+% This file is used to filter the firing rate of MEA data in preparation
 % to make a video showing ictal wavefront spread. Data are downsampled to
 % approximately 30 Hz and then low-pass filtered at 1 Hz. Finally, data are
 % normalized to range [0, 1]. Only the ictal period of the data are
