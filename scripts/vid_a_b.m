@@ -1,5 +1,5 @@
 % Creates a video of the electrode array for the matfile variable mea,
-% which should be in the workspace already.
+% which should be in the workspace already. Limits video to seconds a to b
 % Example:
 %     mea = matfile('c5/c5_Seizure1_Neuroport.mat');
 %     electrode_vid_full;
@@ -31,9 +31,9 @@ Time = Time();  % ... (and convert from function to array if necessary)
 te = Time(end) - mea.Padding(1, 2);  % Find when seizure ends (so that video is labeled properly)
 
 [fr, time] = lowpass_filt_firingRate(mea, 1000);  % show the recruitment wave downsampled to ~100 Hz
-inds_50_60 = logical( (time > 50) .* (time < 60) );  % ... only from 50-60 s
-fr = fr(inds_50_60, :);  % ... resize to only this period
-time = time(inds_50_60);  % ... same
+inds_a_b = logical( (time > a) .* (time < b) );  % ... only from a-b s
+fr = fr(inds_a_b, :);  % ... resize to only this period
+time = time(inds_a_b);  % ... same
 
 [~, mea] = filter_mea(mea, [], {'lfp'; 'mua'});  % filter the raw data
 event_inds = mua_events(mea);  % compute event times
@@ -54,4 +54,4 @@ close all;
 framerate = 100;
 electrode_vid({fr; fr_high(inds_fr, :); mea.lfp(inds_lfp, :)}, ...
 	P(:, 1), P(:, 2), time, time(end), framerate, ...
-	[mea.Name '_50_60'], true)
+	sprintf('%s_%d_%d', mea.Name, a, b), true)
