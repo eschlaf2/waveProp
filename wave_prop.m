@@ -64,7 +64,7 @@ function mea = exclude_channels(mea)
 	% during seizure or that do not show significant increases in firing rate 
 	% during the first half of the seizure
 
-	[firingRate, mea] = mua_firing_rate(mea);
+	try firingRate = mea.firingRate; catch, [firingRate, mea] = mua_firing_rate(mea); end
 	time = mea.Time();
 	seizure_inds = logical((time > 0) .* (time < time(end) - mea.Padding(2))); % Indicate when seizure is occurring
 	exclude_channels = find(mean(firingRate(seizure_inds, :)) < 6);            % Only use channels with mean firing rate at least 6 spikes per second
