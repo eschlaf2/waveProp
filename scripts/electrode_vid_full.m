@@ -8,7 +8,7 @@ mea = exclude_channels(mea);  % Exclude channels based on activity
 
 dsRate = 100;  % Set the desired downsampling rate for the video (frameRate is half of this... below)
 [~, mea] = filter_mea(mea, {'lfp'; 'mua'});  % filter the raw data
-[fr, time] = lowpass_filt_firingRate(mea);  % create the data for the left plot
+[fr, time] = lowpass_filt_firingRate(mea, dsRate);  % create the data for the left plot
 
 Time = mea.Time;  % Get relevant time points
 Time = Time();
