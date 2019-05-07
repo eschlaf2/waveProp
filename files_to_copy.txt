@@ -1,9 +1,0 @@
-MG49/*Seizure43.mat
-MG49/*Seizure36.mat
-MG49/*Seizure45.mat
-MG63/*Seizure3.mat
-MG63/*Seizure4.mat
-MG63/*Seizure5.mat
-BW09/Seizure1.mat
-BW09/Seizure2.mat
-BW09/Seizure3.mat
