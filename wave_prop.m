@@ -276,7 +276,7 @@ try
 		skipfactor = 1;
 	end
 catch ME
-	lfp = filter_mea(mea, [], 'lfp');
+	lfp = filter_mea(mea, 'lfp');
 	skipfactor = lfp.skipfactor;
 	lfp = lfp.lfp;
 	
@@ -462,7 +462,7 @@ function [lfp, skipfactor, mea] = get_lfp(mea)
 
 	catch ME
 		disp(ME);
-		lfp = filter_mea(mea, [], {'lfp'});
+		lfp = filter_mea(mea, {'lfp'});
 		skipfactor = lfp.skipfactor;
 		lfp = lfp.lfp;
 	end

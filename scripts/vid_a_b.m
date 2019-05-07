@@ -35,7 +35,7 @@ inds_a_b = logical( (time > a) .* (time < b) );  % ... only from a-b s
 fr = fr(inds_a_b, :);  % ... resize to only this period
 time = time(inds_a_b);  % ... same
 
-[~, mea] = filter_mea(mea, [], {'lfp'; 'mua'});  % filter the raw data
+[~, mea] = filter_mea(mea, {'lfp'; 'mua'});  % filter the raw data
 event_inds = mua_events(mea);  % compute event times
 
 [nT, nCh] = size(mea.mua);

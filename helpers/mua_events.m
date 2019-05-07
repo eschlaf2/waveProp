@@ -12,7 +12,7 @@ if (isfield(mea, 'mua') || isprop(mea, 'mua'))
 	data = mea.mua;
 else
 	if ~isstruct(mea), mea = load(mea.Properties.Source); end
-	mua = filter_mea(mea, [], 'mua');
+	mua = filter_mea(mea, 'mua');
 	data = mua.mua;
 	mea.mua = data;
 end

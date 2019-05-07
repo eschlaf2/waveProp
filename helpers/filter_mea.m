@@ -1,4 +1,4 @@
-function [output, mea] = filter_mea(mea, ~, bands)
+function [output, mea] = filter_mea(mea, bands)
 
 if ~isstruct(mea)
 	if ~mea.Properties.Writable
