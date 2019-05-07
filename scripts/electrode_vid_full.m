@@ -4,6 +4,8 @@
 %     mea = matfile('c5/c5_Seizure1_Neuroport.mat');
 %     electrode_vid_full;
 
+mea = exclude_channels(mea);
+
 dsRate = 100;
 [fr, time] = lowpass_filt_firingRate(mea);
 try
