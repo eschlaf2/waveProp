@@ -51,7 +51,7 @@ switch lower(fitMethod)
 			fit_wave_nyc(data, position, metric);
 end
 
-mea = exclude_channels(mea);
+% mea = exclude_channels(mea);
 
 %% Compute fits
 [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, ...
@@ -161,13 +161,22 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		case 'maxdescent'
 			
 			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
-			temp = smoothdata(lfp(inds, :), 'movmedian', 10);                                           % Pull out window around wave
-			[~, data] = min(diff(temp, 1, 1));                             % Find time of maximal descent
+			temp = smoothdata(lfp(inds, :), 'movmean', 5);                                           % Pull out window around wave
+			data = arrayfun(@(ii) find([abs(zscore(temp(:, ii))); 2] - 2 >= 0, 1), 1:size(temp, 2));
+			data(data > size(temp, 1)) = nan;
+% 			[~, data] = min(diff(temp, 1, 1));                             % Find time of maximal descent
+% 			[~, data] = max(temp);
 			data = data(:);
 % 			temp = diff(temp, 1, 1);
 			dataToPlot = data;
 			pos_inds = 1:numCh;
-
+			
+% 			temp = smoothdata(lfp(inds, :), 'movmean', 5);
+% 			acf = conv2(temp, median(temp, 2), 'same');
+% 			[~, data] = max(abs(acf));
+% 			data = data(:);
+% 			dataToPlot = data;
+			
 
 		case 'delays'
 
@@ -208,7 +217,8 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		axis tight; grid on;
 		title(sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
 		if strcmpi(metric, 'maxdescent')
-			hold on; plot(dataToPlot, temp(sub2ind(size(temp), dataToPlot', 1:numCh)), 'r*'); hold off
+			valid = ~isnan(dataToPlot);
+			hold on; plot(dataToPlot(valid), temp(sub2ind(size(temp), dataToPlot(valid)', pos_inds(valid))), 'r*'); hold off
 		end
 		frame1 = getframe(h);
 		writeVideo(v, frame1)
