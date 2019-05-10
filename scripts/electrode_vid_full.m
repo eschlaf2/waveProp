@@ -4,10 +4,10 @@
 %     mea = matfile('c5/c5_Seizure1_Neuroport.mat');
 %     electrode_vid_full;
 
-mea = load('/Users/emilyschlafly/Desktop/temp/c5_Seizure2_Neuroport_10_10.mat');
-mea_exc = exclude_channels(mea);  % Exclude channels based on activity
+% mea = load('/Users/emilyschlafly/Desktop/temp/c5_Seizure2_Neuroport_10_10.mat');
+% mea_exc = exclude_channels(mea);  % Exclude channels based on activity
 
-dsRate = 100;  % Set the desired downsampled collection rate for the video (frameRate is half of this... below)
+dsRate = 1000;  % Set the desired downsampled collection rate for the video (frameRate is half of this... below)
 [~, mea] = filter_mea(mea, {'lfp'; 'mua'});  % filter the raw data
 
 % [fr, time] = lowpass_filt_firingRate(mea, dsRate);  % create the data for the left plot
@@ -66,8 +66,8 @@ P(4:5) = {pos; pos};
 
 data = data([2, 3, 4]); P = P([2,3,4]);
 close all;
-electrode_vid(data, ...
-	P, time, te, 100, [mea.Name '_surf'], true);
+electrode_vid(data, P, time, te, 100, [mea.Name '_flat'], true);
+surf_vid(data, P, time, te, 100, [mea.Name '_surf'], true);
 
 % electrode_vid({fr; fr_high(inds, :); mea.lfp(round(inds/mea.skipfactor) + 1, :)}, ...
 % 	P(:, 1), P(:, 2), time, time(end), dsRate / 2, ...
