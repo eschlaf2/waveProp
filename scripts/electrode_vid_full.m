@@ -30,6 +30,7 @@ try
 	[~, mea_exc] = filter_mea(mea_exc, {'lfp'; 'mua'});
 	P_exc = mea.Position;
 	P_exc(mea_exc.BadChannels, :) = [];
+	data{5} = downsample(mea_exc.lfp, skiplfp); P{5} = P_exc;
 catch ME
 	if ~strcmp(ME.message, "Undefined function or variable 'mea_exc'.")
 		rethrow(ME)
@@ -61,8 +62,8 @@ P{2} = pos;
 % ds = inds(2) - inds(1);
 % fr_high = smoothdata(fr_high, 1, 'movmean', ds) * ds;
 % data = {fr_high(inds, :), mea.lfp(round(inds / mea.skipfactor) + 1, :)};
-data(4:5) = {downsample(mea.lfp, skiplfp); downsample(mea_exc.lfp, skiplfp)};
-P(4:5) = {pos; pos};
+data{4} = downsample(mea.lfp, skiplfp);
+P{4} = pos;
 
 data = data([2, 3, 4]); P = P([2,3,4]);
 close all;
