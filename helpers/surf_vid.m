@@ -83,7 +83,7 @@ for p = 1:numPlots
 	
 end
 %%
-for t = 3001:length(Time)
+for t = 1:length(Time)
 	
 	if Time(t) < 0
 		desc = 'preictal';
