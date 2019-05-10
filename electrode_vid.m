@@ -1,4 +1,4 @@
-function [v] = electrode_vid(data, X, Y, Time, endTime, FrameRate, outfile, visible)
+function [v] = electrode_vid(data, position, Time, endTime, FrameRate, outfile, visible)
 
 CREATEVID = true;
 if ~exist('outfile', 'var') || isempty(outfile)
@@ -16,6 +16,12 @@ end
 if ~iscell(data)
 	data = {data};
 end
+
+if ~iscell(position)
+	temp = cell(size(data)); 
+	[temp{:}] = deal(position); 
+	position = temp;
+end
 numPlots = numel(data);
 rows = floor(sqrt(numPlots));
 cols = ceil(numPlots / rows);
@@ -32,7 +38,8 @@ if CREATEVID
 	open(v);
 end
 
-map = make_diverging_colormap('cool', 1);
+map = make_diverging_colormap('cool', .25);
+% map = make_diverging_colormap(1 - parula, 1);
 
 figure(1); clf;
 if ~visible, set(1, 'visible', 'off'); end
@@ -54,11 +61,11 @@ for p = 1:numPlots
 	end
 
 	
-	scatter(X, Y, 150, data{p}(1, :), 's', 'filled')
+	scatter(position{p}(:, 1), position{p}(:, 2), 150, data{p}(1, :), 's', 'filled')
 	set(gca, 'clim', [mNP MNP], 'Color', .15*[1 1 1]);
 	axis image
-	xlim([0 max(X)+1])
-	ylim([0 max(Y)+1])
+	xlim([0 max(position{p}(:, 1))+1])
+	ylim([0 max(position{p}(:, 2))+1])
 	% 	imagesc(squeeze(dataE(t, :, :)), [mE ME]);
 	colorbar
 	set(gca,'nextplot','replacechildren');
@@ -75,7 +82,7 @@ for t = 1:length(Time)
 	end
 	
 	for p = 1:numPlots
-		scatter(h(p), X, Y, 150, data{p}(t, :), 's', 'filled')
+		scatter(h(p), position{p}(:, 1), position{p}(:, 2), 150, data{p}(t, :), 's', 'filled')
 		title(h(p), sprintf('T = %0.2f (%s)', Time(t), desc))
 	end
 	drawnow();
