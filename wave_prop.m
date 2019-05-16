@@ -17,7 +17,7 @@ function [wave_fit, mea] = wave_prop(mea, metric, varargin)
 %% Parse inputs
 p = inputParser;
 
-allMetrics = {'delays', 'maxdescent', 'events'};
+allMetrics = {'delays', 'maxdescent', 'events', 'deviance'};
 allFitMethods = {'nyc', 'bos'};
 
 validate = @(x, all) any(validatestring(x, all));
@@ -75,8 +75,12 @@ position = mea.Position;
 try
 	position(mea.BadChannels, :) = [];
 catch ME
-	disp(ME)
-	disp('No bad channels found.')
+	switch ME.message
+		case 'Reference to non-existent field ''BadChannels''.'
+			disp('No bad channels found.')
+		otherwise
+			rethrow(ME)
+	end
 end
 
 Time = mea.Time;
@@ -87,10 +91,17 @@ POS = [posX(:) posY(:)];
 
 % Load method specific variables
 switch metric
+	case 'deviance'
+		[computeTimes, mea] = get_waveTimes(mea);
+		[lfp, skipfactor, mea] = get_lfp(mea);
+		TimeMs = downsample(Time, skipfactor) * 1e3;
+% 		lfp = (lfp - median(lfp, 2));
+		lfp = lfp ./ std(lfp(TimeMs < 0, :));
 	case 'maxdescent'
 		[computeTimes, mea] = get_waveTimes(mea);
 		[lfp, skipfactor, mea] = get_lfp(mea);
 		TimeMs = downsample(Time, skipfactor) * 1e3;
+% 		lfp = (lfp - mean(lfp, 2));
 	case 'events'
 		[computeTimes, mea] = get_waveTimes(mea);                          % Get discharge times
 		if ~any(strcmpi(properties(mea), 'event_inds'))                    % If event times aren't already computed
@@ -157,15 +168,26 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			data = spike_times(inds);
 			temp = data(:)';
 			position = position(pos_inds, :);
+		
+		case 'deviance'
+			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));  % Select the window around the event time
+			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
+			temp = (temp - temp(1, :));  % Set initial value as baseline
+			data = arrayfun(@(ii) ...  % Find where each channel deviates 2sd from baseline
+				find([-(temp(:, ii)); 2] - 2 >= 0, 1), 1:size(temp, 2));
+			data(data > size(temp, 1)) = nan;
+			data = data(:);
+% 			temp = diff(temp, 1, 1);
+			dataToPlot = data;
+			pos_inds = 1:numCh;
 			
 		case 'maxdescent'
 			
-			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
-			temp = smoothdata(lfp(inds, :), 'movmean', 5);                                           % Pull out window around wave
-			data = arrayfun(@(ii) find([abs(zscore(temp(:, ii))); 2] - 2 >= 0, 1), 1:size(temp, 2));
-			data(data > size(temp, 1)) = nan;
-% 			[~, data] = min(diff(temp, 1, 1));                             % Find time of maximal descent
-% 			[~, data] = max(temp);
+			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));  % Select the window around the event time
+			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
+			temp = temp - temp(1, :);  % set first time point as baseline (for visualization early)
+			
+			[~, data] = min(diff(temp, 1, 1));                             % Find time of maximal descent
 			data = data(:);
 % 			temp = diff(temp, 1, 1);
 			dataToPlot = data;
@@ -191,12 +213,9 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			pos_inds = 1:numCh;
 
 	end
-	try	
+	
 	[beta(:, ii), V(:, ii), p(ii)] = fit_wave(data, position);
-	catch ME
-		disp(ME)
-		continue
-	end
+	
 	if showPlots
 		figure(h);
 		[p1, p2] = plot_wave_fit(position, data, beta(:, ii));
@@ -216,7 +235,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		plot_details(temp, pos_inds, cmap, cInds, metric); 
 		axis tight; grid on;
 		title(sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
-		if strcmpi(metric, 'maxdescent')
+		if any(strcmpi(metric, {'maxdescent', 'deviance'}))
 			valid = ~isnan(dataToPlot);
 			hold on; plot(dataToPlot(valid), temp(sub2ind(size(temp), dataToPlot(valid)', pos_inds(valid))), 'r*'); hold off
 		end
@@ -242,8 +261,12 @@ wave_fit.Name = Name;
 try
 	mea.wave_fit = wave_fit;
 catch ME
-	disp(ME)
-	disp('Fit not saved.')
+	switch ME.message
+		case 'Cannot change ''wave_fit'' because Properties.Writable is false.  To modify ''wave_fit'', set Properties.Writable to true.'
+			disp('Fit not saved.')
+		otherwise
+			rethrow(ME)
+	end
 end
 
 end
@@ -423,6 +446,10 @@ end
 
 function [beta, V, p] = fit_wave_bos(data, position, metric)
 	[beta, ~, ~, ~, ~, p] = estimate_wave(data, position);
+	if isnan(beta)
+		V = nan;
+		return
+	end
 	beta = circshift(beta, -1);
 	V = pinv(beta(1:2));
 end
@@ -524,9 +551,10 @@ function [] = plot_details(data, position, cmap, cInds, dataToFit)
 		otherwise
 			nanmask = isnan(cInds);
 			cInds(nanmask) = [];
-			data = data(:, ~nanmask);
 			set(gca, 'ColorOrder', cmap(cInds, :), 'NextPlot', 'replacechildren'); 
-			plot(data)
+			plot([1 size(data, 1)], [0 0], 'r'); hold on;
+			data = data(:, ~nanmask);
+			plot(data); hold off;
 	end
 end
 
