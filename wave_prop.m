@@ -85,9 +85,10 @@ end
 
 Time = mea.Time;
 Time = Time();
-posX = interp1(unique(position(:, 1)), 1:numel(unique(position(:,1))), position(:, 1));
-posY = interp1(unique(position(:, 2)), 1:numel(unique(position(:,2))), position(:, 2));
-POS = [posX(:) posY(:)];
+POS = (position - min(position) + 1) ./ min(diff(unique(position)));  % set to integers 1 .. n
+% posX = interp1(unique(position(:, 1)), 1:numel(unique(position(:,1))), position(:, 1));
+% posY = interp1(unique(position(:, 2)), 1:numel(unique(position(:,2))), position(:, 2));
+% POS = [posX(:) posY(:)];
 
 % Load method specific variables
 switch metric
@@ -95,13 +96,11 @@ switch metric
 		[computeTimes, mea] = get_waveTimes(mea);
 		[lfp, skipfactor, mea] = get_lfp(mea);
 		TimeMs = downsample(Time, skipfactor) * 1e3;
-% 		lfp = (lfp - median(lfp, 2));
 		lfp = lfp ./ std(lfp(TimeMs < 0, :));
 	case 'maxdescent'
 		[computeTimes, mea] = get_waveTimes(mea);
 		[lfp, skipfactor, mea] = get_lfp(mea);
 		TimeMs = downsample(Time, skipfactor) * 1e3;
-% 		lfp = (lfp - mean(lfp, 2));
 	case 'events'
 		[computeTimes, mea] = get_waveTimes(mea);                          % Get discharge times
 		if ~any(strcmpi(properties(mea), 'event_inds'))                    % If event times aren't already computed
@@ -134,7 +133,7 @@ Name = sprintf('%s_wave_prop_%s', mea.Name, metric);
 if showPlots
 	v = VideoWriter(Name);
 	plotTitles = [strrep(mea.Name, '_', ' ') ' (' metric ')'];
-% 	v.FrameRate = 30;
+% 	v.FrameRate = 50;
 	open(v); 
 	h = figure; fullwidth(true);
 	
@@ -217,7 +216,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 	[beta(:, ii), V(:, ii), p(ii)] = fit_wave(data, position);
 	
 	if showPlots
-		figure(h);
+		figure(h); clf
 		[p1, p2] = plot_wave_fit(position, data, beta(:, ii));
 		title(p1, sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
 		title(p2, sprintf('p=%.2g', p(ii)))
@@ -225,12 +224,13 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 % 		figure(h(2));
 		img(addy) = dataToPlot;
 		subplot(236); 
-		p3 = imagesc(img); axis xy
+		p3 = imagesc(img, [0 sum(inds)]); axis xy
 		xlabel('X'); ylabel('Y');
 		colorbar();
 		cmap = h.Colormap;
 		cInds = round((dataToPlot - min(dataToPlot))/range(dataToPlot) * (length(cmap) - 1)) + 1;
 		if strcmpi(metric, 'events'), cInds = cInds(pos_inds); end
+		
 		subplot(2,3,4:5);
 		plot_details(temp, pos_inds, cmap, cInds, metric); 
 		axis tight; grid on;
@@ -239,6 +239,11 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			valid = ~isnan(dataToPlot);
 			hold on; plot(dataToPlot(valid), temp(sub2ind(size(temp), dataToPlot(valid)', pos_inds(valid))), 'r*'); hold off
 		end
+		
+		ax = axes(h, 'position', [.51 .45 .15 .18]);
+		title(ax, sprintf('Wave %d', ii))  % ... and label
+		plot_window(mea.lfp(inds, :), position, ax)
+		
 		frame1 = getframe(h);
 		writeVideo(v, frame1)
 		
@@ -258,16 +263,7 @@ wave_fit.Zu = Zu;
 wave_fit.computeTimes = computeTimes;
 wave_fit.Name = Name;
 
-try
-	mea.wave_fit = wave_fit;
-catch ME
-	switch ME.message
-		case 'Cannot change ''wave_fit'' because Properties.Writable is false.  To modify ''wave_fit'', set Properties.Writable to true.'
-			disp('Fit not saved.')
-		otherwise
-			rethrow(ME)
-	end
-end
+mea.wave_fit = wave_fit;
 
 end
 
@@ -404,6 +400,7 @@ for i = 1:N  % For each interval during the seizure
 		estimate_wave(delay, position, PLOT);
 	
 	catch ME
+		rethrow(ME);
 		disp(ME)
 		disp(i)
 		continue
@@ -430,14 +427,8 @@ wave_fit = struct('Z', src_dir, 'V', V, 'sp', speed, ...
 if PLOT
 	wave_fit.phis = phis;
 end
-try
-	mea.(sprintf('wave_fit_bos_T%d', T)) = wave_fit;
-catch ME
-	disp(ME);
-	disp('Fit not saved to matfile!')
-	[~, fn, ~] = fileparts(mea.Properties.Source);
-	save([fn '_wave_fit'], wave_fit, '-v7.3');
-end
+
+mea.(sprintf('wave_fit_bos_T%d', T)) = wave_fit;
 
 if PLOT
 	png2avi(img_dir);
@@ -479,7 +470,9 @@ function [waveTimes, mea] = get_waveTimes(mea)
 	try % Find discharge times
 		waveTimes = mea.waveTimes; 
 	catch ME
-		disp(ME);
+		if ~strcmp(ME.identifier, 'MATLAB:nonExistentField')
+			rethrow(ME);
+		end
 		disp('Computing wave times.');
 		[waveTimes, mea] = get_discharge_times(mea);
 	end
@@ -498,7 +491,9 @@ function [lfp, skipfactor, mea] = get_lfp(mea)
 		end
 
 	catch ME
-		disp(ME);
+		if ~strcmp(ME.identifier, 'MATLAB:nonExistentField')
+			rethrow(ME)
+		end
 		lfp = filter_mea(mea, {'lfp'});
 		skipfactor = lfp.skipfactor;
 		lfp = lfp.lfp;
