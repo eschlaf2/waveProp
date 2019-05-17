@@ -7,7 +7,9 @@ function [fr, mea] = mua_firing_rate(mea)
 try
 	event_inds = mea.event_inds;
 catch ME
-	disp(ME);
+	if ~strcmp(ME.identifier, 'MATLAB:nonExistentField')
+		rethrow(ME)
+	end
 	disp('Computing event times.')
 	if ~isstruct(mea), mea = load(mea.Properties.Source); end
 	event_inds = mua_events(mea);
@@ -33,9 +35,4 @@ window = windMs * samplingRateMs;  % number of samples to use in the window
 fr = smoothdata(events, 1, 'movmean', window) * ...
 	samplingRate;  % convert to spikes per second 
 
-try
-	mea.firingRate = fr;
-catch ME
-	disp(ME)
-	disp('Firing rate not save to matfile.')
-end
+mea.firingRate = fr;

@@ -85,10 +85,8 @@ end
 
 Time = mea.Time;
 Time = Time();
-POS = (position - min(position) + 1) ./ min(diff(unique(position)));  % set to integers 1 .. n
-% posX = interp1(unique(position(:, 1)), 1:numel(unique(position(:,1))), position(:, 1));
-% posY = interp1(unique(position(:, 2)), 1:numel(unique(position(:,2))), position(:, 2));
-% POS = [posX(:) posY(:)];
+POS = (position - min(position)) ./ ... 
+	arrayfun(@(ii) min(diff(unique(position(:, ii)))), [1 2]) + 1;% set to integers 1 .. n
 
 % Load method specific variables
 switch metric
@@ -222,9 +220,9 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		title(p2, sprintf('p=%.2g', p(ii)))
 		
 % 		figure(h(2));
-		img(addy) = dataToPlot;
+		img(addy) = dataToPlot - min(dataToPlot) + 1;
 		subplot(236); 
-		p3 = imagesc(img, [0 sum(inds)]); axis xy
+		p3 = imagesc(img', [0 2*halfWin]); axis xy
 		xlabel('X'); ylabel('Y');
 		colorbar();
 		cmap = h.Colormap;
@@ -239,10 +237,6 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			valid = ~isnan(dataToPlot);
 			hold on; plot(dataToPlot(valid), temp(sub2ind(size(temp), dataToPlot(valid)', pos_inds(valid))), 'r*'); hold off
 		end
-		
-		ax = axes(h, 'position', [.51 .45 .15 .18]);
-		title(ax, sprintf('Wave %d', ii))  % ... and label
-		plot_window(mea.lfp(inds, :), position, ax)
 		
 		frame1 = getframe(h);
 		writeVideo(v, frame1)

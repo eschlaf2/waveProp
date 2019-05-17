@@ -14,6 +14,7 @@ plotTitle = strrep(waveFit.Name, '_', ' ');
 Z = waveFit.Z;  
 V = waveFit.V;
 try fr = mea.firingRate; catch; [fr, mea] = mua_firing_rate(mea); end
+assignin('base', 'mea', mea);
 meanFr = mean(fr, 2, 'omitnan');
 Time = mea.Time;
 Time = Time();
