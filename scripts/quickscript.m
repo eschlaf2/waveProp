@@ -40,6 +40,12 @@ plot_wave_directions(mea, maxdescent);
 print(gcf, maxdescent.Name, '-dpng');
 outfile.maxdescent = maxdescent;
 
+disp('Computing wave directions from deviance ...')
+[dev, mea] = wave_prop(mea, 'deviance');
+plot_wave_directions(mea, dev);
+print(gcf, dev.Name, '-dpng');
+outfile.dev = dev;
+
 disp('Done.')
 
 rmpath(patpath);
