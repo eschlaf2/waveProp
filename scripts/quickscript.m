@@ -20,6 +20,7 @@
 % [~, name, ~] = fileparts(mea.Properties.Source);
 
 mea = load('SIM/seizing_cortical_field_sim.mat');
+name = mea.Name;
 outfile = matfile([name '_wave_prop'], 'writable', true);
 
 disp('Computing wave directions from delays ...')
