@@ -93,6 +93,7 @@ switch metric
 	case 'deviance'
 		[computeTimes, mea] = get_waveTimes(mea);
 		[lfp, skipfactor, mea] = get_lfp(mea);
+% 		lfp = lfp - mean(lfp, 2);
 		TimeMs = downsample(Time, skipfactor) * 1e3;
 		lfp = lfp ./ std(lfp(TimeMs < 0, :));
 	case 'maxdescent'

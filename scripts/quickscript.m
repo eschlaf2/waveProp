@@ -19,7 +19,7 @@ end
 mea = matfile(fname);
 [~, name, ~] = fileparts(mea.Properties.Source);
 
-outfile = matfile([name ' wave_prop'], 'writable', true);
+outfile = matfile([name '_wave_prop'], 'writable', true);
 
 disp('Computing wave directions from delays ...')
 [delays, mea] = wave_prop(mea, 'delays');
