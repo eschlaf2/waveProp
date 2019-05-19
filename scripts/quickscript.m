@@ -23,11 +23,11 @@ mea = load('SIM/seizing_cortical_field_sim.mat');
 name = mea.Name;
 outfile = matfile([name '_wave_prop'], 'writable', true);
 
-disp('Computing wave directions from delays ...')
-[delays, mea] = wave_prop(mea, 'delays');
-plot_wave_directions(mea, delays);
-print(gcf, delays.Name, '-dpng')
-outfile.delays = delays;
+% disp('Computing wave directions from delays ...')
+% [delays, mea] = wave_prop(mea, 'delays');
+% plot_wave_directions(mea, delays);
+% print(gcf, delays.Name, '-dpng')
+% outfile.delays = delays;
 
 disp('Computing wave directions from events ...')
 [events, mea] = wave_prop(mea, 'events');
