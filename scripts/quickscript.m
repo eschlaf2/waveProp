@@ -1,8 +1,10 @@
 % filename = m.Name;
 % mea = m.Neuroport;
 % pat = 'c5'; seizure = 3;
-patpath = genpath(pat);
-addpath(patpath);
+datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
+addpath(datapath);  % ... add the original data path first
+patpath = genpath(pat);  % ... and then add the local patient path on top 
+addpath(patpath);  % ... so that it is searched first
 
 fname = sprintf('%s_Seizure%d_Neuroport', pat, seizure);
 if ~exist([fname '.mat'], 'file')
