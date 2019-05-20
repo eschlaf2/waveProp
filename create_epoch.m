@@ -99,4 +99,3 @@ for s = seizures  % which seizures
     clear nsx
     
 end
-rmpath(patPath)
