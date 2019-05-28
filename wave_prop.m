@@ -117,7 +117,8 @@ switch metric
 		[lfp, skipfactor, mea] = get_lfp(mea);
 		Time = downsample(Time, skipfactor);
 		TimeMs = Time * 1e3;
-		[params, compute_inds] = set_coherence_params(mea, Time, T);
+		compute_inds = arrayfun(@(t) find(t == TimeMs, 1), computeTimes);
+		[params, ~] = set_coherence_params(mea, Time, T);
 		plotTitles = strrep(mea.Name, '_', ' ');
 % 		computeTimes = TimeMs(compute_inds);
 		samplingRate = mea.SamplingRate / skipfactor;
