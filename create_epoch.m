@@ -21,10 +21,10 @@ metadata = jsondecode(fileread([pat '_metadata.json']));
 num_seizures = numel(metadata.seizures);
 
 if ~exist('seizures', 'var') || isempty(seizures)
-	seizures = 1:num_seizures;
+	seizures = [metadata.seizures.number];
 else
-	seizures(seizures > num_seizures) = [];
-	seizures(seizures < 1) = [];
+	mask = arrayfun(@(s) any(s == [metadata.seizures.number]), seizures);
+	seizures = seizures(mask);
 end
 
 %% Extract each seizure
