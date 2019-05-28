@@ -18,21 +18,22 @@ patPath = genpath(fullfile(datapath, pat));
 addpath(patPath);
 
 metadata = jsondecode(fileread([pat '_metadata.json']));
+if isstruct(metadata.seizures)
+	temp = arrayfun(@(ii) metadata.seizures(ii), ...
+		1:size(metadata.seizures, 1), 'uni', 0);
+	metadata.seizures = temp(:);
+end
 
 if ~exist('seizures', 'var') || isempty(seizures)
-	seizures = [metadata.seizures.number];
+	seizures = cellfun(@(s) s.number, metadata.seizures);
 else
-	mask = arrayfun(@(s) any(s == [metadata.seizures.number]), seizures);
-	seizures = seizures(mask);
+	seizures = cellfun(@(s) any(s.number == seizures) * s.number, metadata.seizures);
+	seizures = seizures(seizures > 0);
 end
 
 %% Extract each seizure
 for s = 1:length(seizures)  % which seizures
-    try 
-        seizure = metadata.seizures{s}; 
-    catch ME
-        seizure = metadata.seizures(s); 
-    end
+	seizure = metadata.seizures{s}; 
     rawFile = seizure.ictal_micros;
     
     nsx = openNSx(rawFile, 'read');
