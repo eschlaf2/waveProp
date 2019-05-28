@@ -5,7 +5,7 @@ function [] = create_epoch(pat, seizures, varargin)
 p = inputParser;
 
 addRequired(p, 'pat', @ischar);
-addOptional(p, 'seizures', 1:100, @isnumeric);
+addOptional(p, 'seizures', [], @isnumeric);
 addParameter(p, 'padding', [60 60], @(x) isnumeric(x) && numel(x) == 2);
 addParameter(p, 'datapath', pwd, @ischar);
 
