@@ -13,6 +13,10 @@ if ~exist(fname, 'file')
 end
 
 mea = load(fname);
+if ~isfield(mea, 'BadChannels')
+	mea.BadChannels = [];
+	save(which(fname), '-v7.3', '-struct', 'mea');
+end
 [~, name, ~] = fileparts(fname);
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
