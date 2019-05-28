@@ -26,13 +26,11 @@ end
 
 if ~exist('seizures', 'var') || isempty(seizures)
 	seizures = cellfun(@(s) s.number, metadata.seizures);
-else
-	seizures = cellfun(@(s) any(s.number == seizures) * s.number, metadata.seizures);
-	seizures = seizures(seizures > 0);
 end
+seizures = find(cellfun(@(s) any(s.number == seizures), metadata.seizures));
 
 %% Extract each seizure
-for s = 1:length(seizures)  % which seizures
+for s = seizures(:)'  % which seizures
 	seizure = metadata.seizures{s}; 
     rawFile = seizure.ictal_micros;
     
