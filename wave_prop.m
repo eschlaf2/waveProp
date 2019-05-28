@@ -113,13 +113,13 @@ switch metric
 		TimeMs = Time * 1000;                                              % Convert times to ms
 		spike_times = TimeMs(timeInds);                                    % Get the spike times in ms
 	case 'delays'
-		
+		[computeTimes, mea] = get_waveTimes(mea);                          % Get discharge times
 		[lfp, skipfactor, mea] = get_lfp(mea);
 		Time = downsample(Time, skipfactor);
 		TimeMs = Time * 1e3;
 		[params, compute_inds] = set_coherence_params(mea, Time, T);
 		plotTitles = strrep(mea.Name, '_', ' ');
-		computeTimes = TimeMs(compute_inds);
+% 		computeTimes = TimeMs(compute_inds);
 		samplingRate = mea.SamplingRate / skipfactor;
 		[~, center] = min(sum((position - mean(position)).^2, 2));         % find the most central electrode
 end
