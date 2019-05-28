@@ -6,17 +6,10 @@ addpath(datapath);  % ... add the original data path first
 patpath = genpath(pat);  % ... and then add the local patient path on top 
 addpath(patpath);  % ... so that it is searched first
 
-fname = sprintf('%s_Seizure%d_Neuroport', pat, seizure);
+fname = sprintf('%s_Seizure%d_Neuroport_10_10', pat, seizure);
 if ~exist([fname '.mat'], 'file')
-	if exist([fname '_10_10.mat'], 'file')
-		fname = [fname '_10_10.mat'];
-		fprintf('Using %s\n', fname);
-	elseif exist(sprintf('%s_Seizure%d.mat', pat, seizure), 'file')
-		disp('Creating epoch file ...')
-		create_epoch(pat, seizure, 'padding', [10 10]);
-		fprintf('Using %s\n', fname);
-		fname = [fname '_10_10.mat'];
-	end
+	disp('Creating epoch file ...')
+	create_epoch(pat, seizure, 'padding', [10 10]);
 end
 
 mea = load(fname);
