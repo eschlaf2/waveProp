@@ -1,5 +1,3 @@
-% filename = m.Name;
-% mea = m.Neuroport;
 % pat = 'c5'; seizure = 3;
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
 addpath(datapath);  % ... add the original data path first
