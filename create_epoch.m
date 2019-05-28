@@ -50,6 +50,8 @@ for s = seizures  % which seizures
     nsx.SamplingRate = nsx.MetaTags.SamplingFreq;
 	if isfield(seizure, 'exclude')
 		nsx.BadChannels = seizure.exclude;
+	else
+		nsx.BadChannels = [];
 	end
 %   m = matfile(outMat, 'writable', true);
     
