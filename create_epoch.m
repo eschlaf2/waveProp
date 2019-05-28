@@ -18,7 +18,6 @@ patPath = genpath(fullfile(datapath, pat));
 addpath(patPath);
 
 metadata = jsondecode(fileread([pat '_metadata.json']));
-num_seizures = numel(metadata.seizures);
 
 if ~exist('seizures', 'var') || isempty(seizures)
 	seizures = [metadata.seizures.number];
@@ -28,7 +27,7 @@ else
 end
 
 %% Extract each seizure
-for s = seizures  % which seizures
+for s = 1:length(seizures)  % which seizures
     try 
         seizure = metadata.seizures{s}; 
     catch ME
