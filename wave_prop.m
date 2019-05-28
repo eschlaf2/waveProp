@@ -28,6 +28,7 @@ addParameter(p, 'fitMethod', 'bos', @(x) validate(x, allFitMethods));
 addParameter(p, 'showPlots', true, @islogical);
 addParameter(p, 'T', 10, @isnumeric);
 addParameter(p, 'halfWin', 50, @isnumeric);
+addParameter(p, 'exclude', true, @isnumeric);
 
 parse(p, mea, metric, varargin{:})
 struct2var(p.Results)
@@ -42,6 +43,10 @@ if ~isstruct(mea)
 	end
 end
 
+if exclude  % exclude non-spiking channels
+	mea = exclude_channels(mea);
+end
+
 %% Assign wave fitting method
 switch lower(fitMethod)
 	case 'bos'
@@ -50,8 +55,6 @@ switch lower(fitMethod)
 		fit_wave = @(data, position) ...
 			fit_wave_nyc(data, position, metric);
 end
-
-% mea = exclude_channels(mea);
 
 %% Compute fits
 [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, ...
