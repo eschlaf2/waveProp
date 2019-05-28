@@ -18,6 +18,7 @@ if ~exist([fname '.mat'], 'file')
 		fname = [fname '_10_10.mat'];
 	end
 end
+
 mea = load(fname);
 [~, name, ~] = fileparts(fname);
 
@@ -51,4 +52,3 @@ outfile.dev = dev;
 
 disp('Done.')
 
-rmpath(patpath);
