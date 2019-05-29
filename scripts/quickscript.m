@@ -11,6 +11,10 @@ if ~exist(fname, 'file')
 end
 
 mea = load(fname);
+if ~isfield(mea, 'Path')
+	mea.Path = which(fname);
+	save(mea.Path, '-v7.3', '-struct', 'mea')
+end
 if ~isfield(mea, 'BadChannels')
 	mea.BadChannels = [];
 	save(which(fname), '-v7.3', '-struct', 'mea');
