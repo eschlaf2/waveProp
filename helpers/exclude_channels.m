@@ -2,7 +2,7 @@ function mea = exclude_channels(mea)
 	% Exclude channels with mean firing rate less than 6 spikes per second 
 	% during seizure or that do not show significant increases in firing rate 
 	% during the first half of the seizure
-
+	
 	try firingRate = mea.firingRate; catch, firingRate = mua_firing_rate(mea); end
 	time = mea.Time();
 	seizure_inds = logical((time > 0) .* (time < time(end) - mea.Padding(2))); % Indicate when seizure is occurring
@@ -23,7 +23,7 @@ function mea = exclude_channels(mea)
 	% Add the channels to the list of bad channels
 	ch = 1:size(mea.Data, 2);                                            % All channels
 	ch(mea.BadChannels) = [];                                            % ... minus those already excluded
-	mea.BadChannels = sort([mea.BadChannels; ch(exclude_channels)']);  % ... gives all bad channels
+	mea.BadChannels = sort([mea.BadChannels(:); ch(exclude_channels)']);  % ... gives all bad channels
 	disp('Channels excluded from analysis:')
 	disp(ch(exclude_channels));
 
