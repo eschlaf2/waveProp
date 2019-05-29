@@ -205,6 +205,9 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		case 'delays'
 
 			inds = compute_inds(ii) : (compute_inds(ii) + T * samplingRate - 1);
+			if inds(end) > size(lfp, 1)
+				break;
+			end
 			fprintf('Estimating waves at time %d/%d\n', ii, numWaves)
 			temp = lfp(inds, :);
 			[coh, phi, freq, coh_conf] = ...
