@@ -23,14 +23,22 @@ xlabel('Channel'); ylabel('STD');
 
 %% Preprocessing
 % Use PCA to separate neural signal from electrode drift(?) 
-hiVar = find(abs(zscore(std(data))) > 2);  % Channels with high variance may be dominated by electrode errors which will drown out neural signal
-singleCh = find(any(abs(coeff) ./ sum(abs(coeff)) > .6));  % Find PCs that describe the activity of a single channel
-[~, mCh] = max(abs(coeff(:, singleCh)));  % See which channel corresponds to the single channel PCs
-badPCs = singleCh(any(hiVar' == mCh));  % Filter to channels with high variance and big PC contributions (large changes in electrode reading that are probably not biological)
+hiVar = find(abs(zscore(std(data))) > 1);  % Channels with high variance drown out neural signal
+[mCh, singleCh] = find(abs(coeff) > .6);  % Find PCs that describe the activity of a single channel
+badPCs = singleCh(any(hiVar' == mCh'));  % Filter to channels with high variance and big PC contributions (large changes in electrode reading that are probably not biological)
 badPCs = union(badPCs, find(explained > 60));
 PCs = 1:nCh; PCs(badPCs) = [];  % Exclude these PCs
 data = score(:, PCs) * coeff(:, PCs)';  % ... and rebuild the data
 
+%% Figure 13: Scores
+figure(13); clf; fullwidth(true)
+cmap = lines;
+goodPCs = 1:nCh; goodPCs(badPCs) = [];
+plot(zscore(score(:, goodPCs))/10 + goodPCs, 'color', cmap(1, :)); hold on;
+plot(zscore(score(:, badPCs))/10 + badPCs', 'color', cmap(2, :)); hold off;
+ylim([0 nCh+1])
+
+%% Rerun PCA
 [coeff, score, latent, ~, explained, ~] = pca(data);  % Rerun PCA
 
 %% Figure 11: PCs of preprocessed data
@@ -52,7 +60,6 @@ annotation(figure(11),'textbox',...
     'FontSize',18,...
 	'HorizontalAlignment', 'center', ...
     'FitBoxToText','on');
-print(11, [mea.Name '_PCs_final'], '-dpng');
 
 %% Figure 10: Raw v. pre-processed (cont)
 figure(10);
@@ -72,7 +79,8 @@ xlabel('Channel'); ylabel('STD');
 %% Figure 12: Remove channels with extreme deviations
 figure(12); clf; fullwidth(true)
 cmap = lines;
-badCh = find(abs(zscore(std(data))) > 2);  % Channels with extremely high or low variance should be excluded
+badCh = union(find(abs(zscore(std(data))) > 2), ...  % Channels with extreme variance should be excluded
+	find(std(data) < 1));  % ... as well as inactive channels
 goodCh = 1:nCh; goodCh(badCh) = [];
 plot(zscore(data(:, goodCh))/10 + goodCh, 'Color', cmap(1, :)); hold on;  % Plot good channels
 plot(zscore(data(:, badCh))/10 + badCh, 'Color', cmap(2, :)); hold off  % ... and bad channels
@@ -85,8 +93,9 @@ mea.BadChannels = badCh(:);
 save(mea.Path, '-v7.3', '-struct', 'mea')
 
 print(10, [mea.Name '_raw_v_preproc'], '-dpng')
-print(11, [mea.Name '_PCs'], '-dpng')
+print(11, [mea.Name '_PCs_final'], '-dpng')
 print(12, [mea.Name '_preproc'], '-dpng')
+print(13, [mea.Name '_scores'], '-dpng')
 
 
 
