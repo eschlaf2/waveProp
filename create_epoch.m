@@ -94,7 +94,8 @@ for s = seizures(:)'  % which seizures
 	catch ME
 		nsx = rmfield(nsx, {'MetaTags', 'RawData'});
 	end
-
+	
+	nsx.Path = outMat;
     save(outMat, '-v7.3', '-struct', 'nsx');
     clear nsx
     
