@@ -81,7 +81,7 @@ axis('tight')
 ylim([0 nCh+1])
 
 %% Save results
-mea.BadChannels = badCh;
+mea.BadChannels = badCh(:);
 save(mea.Path, '-v7.3', '-struct', 'mea')
 
 print(10, [mea.Name '_raw_v_preproc'], '-dpng')
