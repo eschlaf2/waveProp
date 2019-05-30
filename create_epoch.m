@@ -6,7 +6,7 @@ p = inputParser;
 
 addRequired(p, 'pat', @ischar);
 addOptional(p, 'seizures', [], @isnumeric);
-addParameter(p, 'padding', [60 60], @(x) isnumeric(x) && numel(x) == 2);
+addParameter(p, 'padding', [10 10], @(x) isnumeric(x) && numel(x) == 2);
 addParameter(p, 'datapath', pwd, @ischar);
 
 parse(p, pat, seizures, varargin{:});
