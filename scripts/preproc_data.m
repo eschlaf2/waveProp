@@ -2,7 +2,7 @@
 
 raw = double(mea.Data);
 [nT, nCh] = size(raw);
-badCh = find(arrayfun(@(ii) numel(unique(raw(:, ii))), 1:nCh) < nT * 1e-3);  % if the number of unique readings is less than 0.1% of the total number of readings, exclude the channel
+badCh = find(arrayfun(@(ii) numel(unique(raw(:, ii))), 1:nCh) < 164);  % Values are in range +/- 8192; 164 ~ 1% of range
 goodCh = 1:nCh; goodCh(badCh) = [];
 [coeff, score, ~, ~, explained, ~] = pca(raw(:, goodCh));
 nPCs = size(coeff, 2);
@@ -42,8 +42,7 @@ data(:, goodCh) = score(:, PCs) * coeff(:, PCs)';  % ... and rebuild the data
 %% Figure 13: Scores
 figure(13); clf; fullwidth(true)
 cmap = lines;
-goodPCs = 1:nPCs; goodPCs(badPCs) = [];
-plot(zscore(score(:, goodPCs))/10 + goodPCs, 'color', cmap(1, :)); hold on;
+plot(zscore(score(:, PCs))/10 + PCs, 'color', cmap(1, :)); hold on;
 plot(zscore(score(:, badPCs))/10 + badPCs', 'color', cmap(2, :)); hold off;
 ylim([0 nCh+1])
 
@@ -98,7 +97,7 @@ cmap = lines;
 badCh = union(goodCh(zscore(std(data(:, goodCh))) < -2.5), badCh);  % Channels with low variance should be excluded
 goodCh = 1:nCh; goodCh(badCh) = [];
 plot(zscore(raw(:, goodCh)) ./ 10 + goodCh, 'Color', cmap(1, :)); hold on;  % Plot raw data
-plot(zscore(data(:, goodCh))/10 + goodCh, 'Color', cmap(3, :)); hold on;  % ... and good channels
+plot(zscore(data(:, goodCh))/10 + goodCh, 'Color', cmap(4, :)); hold on;  % ... and good channels
 plot(zscore(data(:, badCh))/10 + badCh, 'Color', cmap(2, :)); hold off  % ... and bad channels
 title({'Bad Channels:'; num2str(badCh)})
 axis('tight')
