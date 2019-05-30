@@ -25,7 +25,7 @@ plot(zscore(score(:, badPCs))/10 + badPCs', 'color', cmap(2, :)); hold off;
 axis tight;
 xlabel('Time (samples)'); ylabel('PC');
 ylim([0 nCh+1])
-title({[mea.Name ' Bad PCs:']; num2str(badPCs)})
+title({[strrep(mea.Name, '_', ' ') ' Bad PCs:']; num2str(badPCs)})
 
 %% Figure 11: Show first 20 PCs
 figure(11); clf; fullwidth(1);
@@ -110,7 +110,7 @@ ylim([0 nCh+1])
 % mea.BadChannels = badCh(:);
 % save(mea.Path, '-v7.3', '-struct', 'mea')
 
-fprintf('%d, ', badCh); fprintf('\b\b\n')
+sprintf('%d, ', badCh); sprintf('\b\b\n')
 
 print(10, [mea.Name '_raw_v_preproc'], '-dpng')
 print(11, [mea.Name '_PCs_final'], '-dpng')
