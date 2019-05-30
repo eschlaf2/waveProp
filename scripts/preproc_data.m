@@ -33,7 +33,7 @@ xlabel('Channel');
 % Use PCA to separate neural signal from electrode drift(?) 
 hiVar = find(abs(zscore(std(raw))) > 1);  % Channels with high variance drown out neural signal
 [mCh, singleCh] = find(abs(coeff) > .6);  % Find PCs that describe the activity of a single channel
-badPCs = singleCh(any(hiVar' == mCh'));  % Filter to channels with high variance and big PC contributions (large changes in electrode reading that are probably not biological)
+badPCs = singleCh(any(hiVar' == goodCh(mCh)));  % Filter to channels with high variance and big PC contributions (large changes in electrode reading that are probably not biological)
 % badPCs = union(badPCs, find(explained > 60));
 PCs = 1:nPCs; PCs(badPCs) = [];  % Exclude these PCs
 data = raw;
