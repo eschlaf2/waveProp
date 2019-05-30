@@ -20,9 +20,14 @@ title('Variance explained (Raw)')
 xlabel('Component'); ylabel('Percent explained')
 
 subplot(r, c, 2)  % Standard deviation of raw traces
+yyaxis left
 stem(std(raw(:, goodCh)))
+ylabel('STD');
+yyaxis right
+stem(zscore(std(raw(:, goodCh))));
+ylabel('STD (normed)')
 title('Standard deviation (Raw)')
-xlabel('Channel'); ylabel('STD');
+xlabel('Channel'); 
 
 %% Preprocessing
 % Use PCA to separate neural signal from electrode drift(?) 
@@ -78,7 +83,12 @@ title('Variance explained (Preproc)')
 xlabel('Component'); ylabel('Percent explained')
 
 subplot(r, c, 4)  % STD on each channel (preproc'd data)
+yyaxis left
 stem(std(data(:, goodCh)))
+ylabel('STD');
+yyaxis right
+stem(zscore(std(data(:, goodCh))));
+ylabel('STD (normed)')
 title('Standard deviation (Preproc)')
 xlabel('Channel'); ylabel('STD');
 
@@ -103,5 +113,6 @@ print(11, [mea.Name '_PCs_final'], '-dpng')
 print(12, [mea.Name '_preproc'], '-dpng')
 print(13, [mea.Name '_scores'], '-dpng')
 
+clear raw
 
 
