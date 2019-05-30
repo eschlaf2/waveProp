@@ -110,7 +110,7 @@ ylim([0 nCh+1])
 % mea.BadChannels = badCh(:);
 % save(mea.Path, '-v7.3', '-struct', 'mea')
 
-sprintf('%d, ', badCh); sprintf('\b\b\n')
+fprintf('%d, ', badCh); fprintf('\b\b\n')
 
 print(10, [mea.Name '_raw_v_preproc'], '-dpng')
 print(11, [mea.Name '_PCs_final'], '-dpng')
