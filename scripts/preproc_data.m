@@ -117,6 +117,6 @@ print(11, [mea.Name '_PCs_final'], '-dpng')
 print(12, [mea.Name '_preproc'], '-dpng')
 print(13, [mea.Name '_scores'], '-dpng')
 
-clear raw
-
-
+Name = mea.Name;
+clear raw mea
+save([Name '_preproc'])
