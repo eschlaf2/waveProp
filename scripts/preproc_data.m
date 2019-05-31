@@ -116,7 +116,7 @@ ylim([0 nCh+1])
 % mea.BadChannels = badCh(:);
 % save(mea.Path, '-v7.3', '-struct', 'mea')
 disp('Saving results ...')
-
+data = int16((data - min(data(:))) / range(data(:)) * 2 * 8192 - 8192);  % convert to int16
 fprintf('%d, ', badCh); fprintf('\b\b\n')
 
 print(10, [mea.Name '_raw_v_preproc'], '-dpng')
