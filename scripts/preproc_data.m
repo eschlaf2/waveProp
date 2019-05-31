@@ -1,5 +1,6 @@
 % function preproc_data(mea)
 
+disp('In preproc_data. Computing PCs ...')
 raw = double(mea.Data);
 [nT, nCh] = size(raw);
 badCh = find(arrayfun(@(ii) numel(unique(raw(:, ii))), 1:nCh) < 164);  % Values are in range +/- 8192; 164 ~ 1% of range
@@ -18,6 +19,8 @@ data = raw;
 data(:, goodCh) = score(:, PCs) * coeff(:, PCs)';  % ... and rebuild the data
 
 %% Figure 13: Scores
+disp('Making scores fig (13) ...')
+
 figure(13); clf; fullwidth(true)
 cmap = lines;
 plot(zscore(score(:, PCs))/10 + PCs, 'color', cmap(1, :)); hold on;
@@ -28,6 +31,7 @@ ylim([0 nCh+1])
 title({[strrep(mea.Name, '_', ' ') ' Bad PCs:']; num2str(badPCs)})
 
 %% Figure 11: Show first 20 PCs
+disp('Making PCs fig (11) ...')
 figure(11); clf; fullwidth(1);
 for ii = 1:19
 	subplot(4, 5, ii)
@@ -53,6 +57,7 @@ explainedPreproc = explained(PCs);
 explainedPreproc = explainedPreproc / sum(explainedPreproc);
 
 %% Figure 10: Raw v. preprocessed
+disp('Making raw v. preproc fig (10) ...')
 
 figure(10); clf; fullwidth(1)
 [r, c] = deal(2);
@@ -95,6 +100,7 @@ title('Standard deviation (Preproc)')
 xlabel('Channel'); ylabel('STD');
 
 %% Figure 12: Remove channels with extreme deviations
+disp('Making channels fig (12) ...')
 figure(12); clf; fullwidth(true)
 cmap = lines;
 badCh = union(goodCh(zscore(std(data(:, goodCh))) < -2), badCh);  % Channels with low variance should be excluded
@@ -109,6 +115,7 @@ ylim([0 nCh+1])
 %% Save results
 % mea.BadChannels = badCh(:);
 % save(mea.Path, '-v7.3', '-struct', 'mea')
+disp('Saving results ...')
 
 fprintf('%d, ', badCh); fprintf('\b\b\n')
 
@@ -120,3 +127,5 @@ print(13, [mea.Name '_scores'], '-dpng')
 Name = mea.Name;
 clear raw mea
 save([Name '_preproc'])
+
+disp('Done')
