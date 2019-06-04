@@ -180,7 +180,9 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			data(data > size(temp, 1)) = nan;
 			data = data(:);
 			tt = TimeMs(inds);
-			dataToPlot = tt(data) - (t - halfWin);  % Convert to time (ms)
+            dataToPlot = data;
+			dataToPlot(~isnan(data)) = ...
+                tt(data(~isnan(data))) - (t - halfWin);  % Convert to time (ms)
 			pos_inds = 1:numCh;
 			
 		case 'maxdescent'
