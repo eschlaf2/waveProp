@@ -164,10 +164,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 % 			dataToPlot = nan(numCh, 1);
 			pos_inds = chInds(inds);
             st = spike_times(inds);
-            temp = arrayfun(@(ii) mean(st(pos_inds == ii)), 1:numCh);
-% 			temp = mean(sparse(timeInds(inds), pos_inds, double(spike_times(inds))));   % Find the mean spike time on each channel
-% 			[~, chMean, temp] = find(temp);                                   % ... and extract from sparse array
-% 			[~, so] = sort(ch);
+            temp = arrayfun(@(ii) mean(st(pos_inds == ii)), 1:numCh);  % Find the mean spike time on each channel
 			dataToPlot = temp - (t - halfWin) + 1;  % imagesc mean spike time on each channel
 % 			[~, pos_inds, data] = find(spike_times(inds, :));              % 
 			data = spike_times(inds);
@@ -182,8 +179,8 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 				find([-(temp(:, ii)); 2] - 2 >= 0, 1), 1:size(temp, 2));
 			data(data > size(temp, 1)) = nan;
 			data = data(:);
-% 			temp = diff(temp, 1, 1);
-			dataToPlot = data;
+			tt = TimeMs(inds);
+			dataToPlot = tt(data) - (t - halfWin);  % Convert to time (ms)
 			pos_inds = 1:numCh;
 			
 		case 'maxdescent'
@@ -192,10 +189,10 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
 			temp = temp - temp(1, :);  % set first time point as baseline (for visualization early)
 			
-			[~, data] = min(diff(temp, 1, 1));                             % Find time of maximal descent
+			[~, data] = min(diff(temp, 1, 1));  % Find time of maximal descent
 			data = data(:);
-% 			temp = diff(temp, 1, 1);
-			dataToPlot = data;
+            tt = TimeMs(inds);
+			dataToPlot = tt(data) - (t - halfWin);
 			pos_inds = 1:numCh;
 			
 % 			temp = smoothdata(lfp(inds, :), 'movmean', 5);
@@ -217,7 +214,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 				compute_coherence(temp, params, 'pairs', center);          % compute the coherence over the selected interval
 			[delay, ~, ~] = compute_delay(coh, coh_conf, -phi, freq);      % compute delays on each electrode based on coherence
 			data = 1e3 * delay(center,:)';                                 % we use delays relative to the center (converted to ms)
-			dataToPlot = data;
+			dataToPlot = data - halfWin;
 			pos_inds = 1:numCh;
 
 	end
@@ -233,11 +230,12 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 % 		figure(h(2));
 		img(addy) = dataToPlot;
 		subplot(236); 
-		p3 = imagesc(img', [0 2*halfWin]); axis xy
+		p3 = imagesc(img', [-1 2*halfWin]); axis xy
+        colormap(h, 1 - parula(2 * halfWin + 2));
 		xlabel('X'); ylabel('Y');
 		colorbar();
 		cmap = h.Colormap;
-		cInds = round((dataToPlot - min(dataToPlot))/range(dataToPlot) * (length(cmap) - 1)) + 1;
+		cInds = round(dataToPlot) + 1;
 		if strcmpi(metric, 'events'), cInds = cInds(pos_inds); end
 		
 		subplot(2,3,4:5);
@@ -246,7 +244,9 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		title(sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
 		if any(strcmpi(metric, {'maxdescent', 'deviance'}))
 			valid = ~isnan(dataToPlot);
-			hold on; plot(dataToPlot(valid), temp(sub2ind(size(temp), dataToPlot(valid)', pos_inds(valid))), 'r*'); hold off
+			hold on; plot(data(valid), ...
+                temp(sub2ind(size(temp), ...
+                data(valid)', pos_inds(valid))), 'r*'); hold off
 		end
 		
 		frame1 = getframe(h);
