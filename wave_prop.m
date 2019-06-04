@@ -216,7 +216,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 				compute_coherence(temp, params, 'pairs', center);          % compute the coherence over the selected interval
 			[delay, ~, ~] = compute_delay(coh, coh_conf, -phi, freq);      % compute delays on each electrode based on coherence
 			data = 1e3 * delay(center,:)';                                 % we use delays relative to the center (converted to ms)
-			dataToPlot = data - halfWin;
+			dataToPlot = data + halfWin;
 			pos_inds = 1:numCh;
 
 	end
