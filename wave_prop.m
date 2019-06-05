@@ -28,7 +28,7 @@ addParameter(p, 'fitMethod', 'bos', @(x) validate(x, allFitMethods));
 addParameter(p, 'showPlots', true, @islogical);
 addParameter(p, 'T', 10, @isnumeric);
 addParameter(p, 'halfWin', 50, @isnumeric);
-addParameter(p, 'exclude', true, @isnumeric);
+addParameter(p, 'exclude', true, @islogical);
 
 parse(p, mea, metric, varargin{:})
 struct2var(p.Results)
@@ -112,6 +112,7 @@ switch metric
 		[timeInds, chInds] = ind2sub([nT, numCh], mea.event_inds);         % Get the indices and channels of each spike
 		TimeMs = Time * 1000;                                              % Convert times to ms
 		spike_times = TimeMs(timeInds);                                    % Get the spike times in ms
+        warning off MATLAB:scatteredInterpolant:DupPtsAvValuesWarnId
 	case 'delays'
 		[computeTimes, mea] = get_waveTimes(mea);                          % Get discharge times
 		[lfp, skipfactor, mea] = get_lfp(mea);
@@ -160,12 +161,11 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 % 			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
 			inds = logical((spike_times >= t - halfWin) .* ...            % Get spike times within halfWin ms
 				(spike_times <= t + halfWin));                            % ... of discharge at time t
-			dataToPlot = nan(numCh, 1);
+% 			dataToPlot = nan(numCh, 1);
 			pos_inds = chInds(inds);
-			temp = mean(sparse(timeInds(inds), pos_inds, double(spike_times(inds))));   % Find the mean spike time on each channel
-			[~, chMean, temp] = find(temp);                                   % ... and extract from sparse array
-% 			[~, so] = sort(ch);
-			dataToPlot(chMean) = temp;                                         % imagesc mean spike time on each channel
+            st = spike_times(inds);
+            temp = arrayfun(@(ii) mean(st(pos_inds == ii)), 1:numCh);  % Find the mean spike time on each channel
+			dataToPlot = temp - (t - halfWin) + 1;  % imagesc mean spike time on each channel
 % 			[~, pos_inds, data] = find(spike_times(inds, :));              % 
 			data = spike_times(inds);
 			temp = data(:)';
@@ -179,8 +179,10 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 				find([-(temp(:, ii)); 2] - 2 >= 0, 1), 1:size(temp, 2));
 			data(data > size(temp, 1)) = nan;
 			data = data(:);
-% 			temp = diff(temp, 1, 1);
-			dataToPlot = data;
+			tt = TimeMs(inds);
+            dataToPlot = data;
+			dataToPlot(~isnan(data)) = ...
+                tt(data(~isnan(data))) - (t - halfWin);  % Convert to time (ms)
 			pos_inds = 1:numCh;
 			
 		case 'maxdescent'
@@ -189,10 +191,10 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
 			temp = temp - temp(1, :);  % set first time point as baseline (for visualization early)
 			
-			[~, data] = min(diff(temp, 1, 1));                             % Find time of maximal descent
+			[~, data] = min(diff(temp, 1, 1));  % Find time of maximal descent
 			data = data(:);
-% 			temp = diff(temp, 1, 1);
-			dataToPlot = data;
+            tt = TimeMs(inds);
+			dataToPlot = tt(data) - (t - halfWin);
 			pos_inds = 1:numCh;
 			
 % 			temp = smoothdata(lfp(inds, :), 'movmean', 5);
@@ -217,7 +219,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 				compute_coherence(temp, params, 'pairs', center);          % compute the coherence over the selected interval
 			[delay, ~, ~] = compute_delay(coh, coh_conf, -phi, freq);      % compute delays on each electrode based on coherence
 			data = 1e3 * delay(center,:)';                                 % we use delays relative to the center (converted to ms)
-			dataToPlot = data;
+			dataToPlot = data + halfWin;
 			pos_inds = 1:numCh;
 
 	end
@@ -231,13 +233,14 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		title(p2, sprintf('p=%.2g', p(ii)))
 		
 % 		figure(h(2));
-		img(addy) = dataToPlot - min(dataToPlot) + 1;
+		img(addy) = dataToPlot;
 		subplot(236); 
-		p3 = imagesc(img', [0 2*halfWin]); axis xy
+		p3 = imagesc(img', [-1 2*halfWin]); axis xy
+        colormap(h, 1 - parula(2 * halfWin + 2));
 		xlabel('X'); ylabel('Y');
 		colorbar();
 		cmap = h.Colormap;
-		cInds = round((dataToPlot - min(dataToPlot))/range(dataToPlot) * (length(cmap) - 1)) + 1;
+		cInds = round(dataToPlot) + 1;
 		if strcmpi(metric, 'events'), cInds = cInds(pos_inds); end
 		
 		subplot(2,3,4:5);
@@ -246,7 +249,9 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		title(sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
 		if any(strcmpi(metric, {'maxdescent', 'deviance'}))
 			valid = ~isnan(dataToPlot);
-			hold on; plot(dataToPlot(valid), temp(sub2ind(size(temp), dataToPlot(valid)', pos_inds(valid))), 'r*'); hold off
+			hold on; plot(data(valid), ...
+                temp(sub2ind(size(temp), ...
+                data(valid)', pos_inds(valid))), 'r*'); hold off
 		end
 		
 		frame1 = getframe(h);
@@ -539,14 +544,15 @@ function [params, compute_inds] = set_coherence_params(mea, Time, T)
 		
 end
 
-function [] = plot_details(data, position, cmap, cInds, dataToFit)
+function [] = plot_details(data, position, cmap, cInds, metric)
 	
-	switch dataToFit
+	switch metric
 		case 'events'
 			[cInds, so] = sort(cInds);
-			set(gca, 'ColorOrder', cmap(cInds, :), 'NextPlot', 'replacechildren'); 
+			set(gca, 'ColorOrder', cmap(cInds, :), ...
+                'NextPlot', 'replacechildren'); 
 			for ii = 1:numel(data)
-				plot(data(so(ii)), position(ii), '*'); hold on;
+				plot(data(so(ii)), position(so(ii)), '*'); hold on;
 			end
 		otherwise
 			nanmask = isnan(cInds);
@@ -559,28 +565,35 @@ function [] = plot_details(data, position, cmap, cInds, dataToFit)
 end
 
 function [p1, p2] = plot_wave_fit(position, data, beta)
-
+    
+	p1 = subplot(2,3,1:2);
+    p2 = subplot(233);
+    
 	X = position(:, 1);
 	Y = position(:, 2);
 	beta = beta(:);
 	
 
-	p1 = subplot(2,3,1:2);
-	scatter3(p1, X, Y, data, 200, data, 'filled');hold on;        
+	scatter3(p1, X, Y, data, 200, data, 'filled'); hold(p1, 'on');        
 
-	[XX, YY] = meshgrid(sort(unique(X)),sort(unique(Y)));
-	Z = double(position * beta(1:2) + beta(end));
-	f = scatteredInterpolant(X, Y, Z);
-	ZZ = f(XX,YY);
-	mesh(p1, XX, YY, ZZ, ...
-		'FaceColor', 'interp', 'FaceAlpha', 0.8, 'LineStyle', 'none') %interpolated
+    [XX, YY] = meshgrid(sort(unique(X)),sort(unique(Y)));
+    Z = double(position * beta(1:2) + beta(end));
+    if all(size(XX) > 2)
+        f = scatteredInterpolant(X, Y, Z);
+        ZZ = f(XX,YY);
+        mesh(p1, XX, YY, ZZ, ...
+            'FaceColor', 'interp', 'FaceAlpha', 0.8, ...
+            'LineStyle', 'none') %interpolated
 
-	legend(p1, 'Data','Regression fit');
+        legend(p1, 'Data','Regression fit');
+    else
+        legend(p1, 'Data')
+    end
 	xlabel('X (electrode)');ylabel('Y (electrode)');zlabel('Time (ms)');
 	
 	hold off;
-	% Plot the projection along the velocity axis
-	p2 = subplot(233);
+	
+    % Plot the projection along the velocity axis
 	P_v_axis = position * beta(1:2) / norm(beta(1:2));
 	plot(p2, P_v_axis, data, '.');
 	hold on;

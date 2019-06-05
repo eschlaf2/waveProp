@@ -133,3 +133,17 @@ clear raw mea
 save([Name '_preproc'])
 
 disp('Done')
+
+%% Look through data
+% savemea = @(mea) save(mea.Path, '-v7.3', '-struct', 'mea');
+% data2int16 = @(data) int16((data - min(data(:))) / range(data(:)) * 2 * 8192 - 8192);
+% 
+% mea = load(sprintf('%s/%s_Seizure%d_Neuroport_10_10.mat', pat, pat, sz));
+% preproc = load(sprintf('%s_Seizure%d_preproc.mat', pat, sz));
+% 
+% mea.Data = preproc.data;  % mea.Data = data2int16(preproc.data);
+% 
+% mea.BadChannels = preproc.badCh;
+% mea.Path = [pwd filesep sprintf('%s/%s_Seizure%d_Neuroport_10_10.mat', pat, pat, sz)];
+% savemea(mea);
+
