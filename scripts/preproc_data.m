@@ -1,7 +1,7 @@
 % function preproc_data(mea)
 
 disp('In preproc_data. Computing PCs ...')
-raw = double(mea.Data);
+raw = double(mea.Data); clear mea;
 [nT, nCh] = size(raw);
 badCh = find(arrayfun(@(ii) numel(unique(raw(:, ii))), 1:nCh) < 164);  % Values are in range +/- 8192; 164 ~ 1% of range
 goodCh = 1:nCh; goodCh(badCh) = [];
@@ -17,6 +17,16 @@ badPCs = singleCh(any(hiVar' == goodCh(mCh)));  % Filter to channels with high v
 PCs = 1:nPCs; PCs(badPCs) = [];  % Exclude these PCs
 data = raw;
 data(:, goodCh) = score(:, PCs) * coeff(:, PCs)';  % ... and rebuild the data
+
+%% Rerun PCA
+% [coeff, score, latent, ~, explained, ~] = pca(data(:, goodCh));  % Rerun PCA
+explainedPreproc = explained(PCs);
+explainedPreproc = explainedPreproc / sum(explainedPreproc);
+
+%% Remove channels with low deviations
+badCh = union(goodCh(zscore(std(data(:, goodCh))) < -2), badCh);  % Channels with low variance should be excluded
+goodCh = 1:nCh; goodCh(badCh) = [];
+fprintf('%d, ', badCh); fprintf('\b\b\n')
 
 %% Figure 13: Scores
 disp('Making scores fig (13) ...')
@@ -51,10 +61,6 @@ annotation(figure(11),'textbox',...
 	'HorizontalAlignment', 'center', ...
     'FitBoxToText','on');
 
-%% Rerun PCA
-% [coeff, score, latent, ~, explained, ~] = pca(data(:, goodCh));  % Rerun PCA
-explainedPreproc = explained(PCs);
-explainedPreproc = explainedPreproc / sum(explainedPreproc);
 
 %% Figure 10: Raw v. preprocessed
 disp('Making raw v. preproc fig (10) ...')
@@ -99,12 +105,10 @@ ylabel('STD (normed)')
 title('Standard deviation (Preproc)')
 xlabel('Channel'); ylabel('STD');
 
-%% Figure 12: Remove channels with extreme deviations
+%% Figure 12: Show raw v. processed data and channels to remove
 disp('Making channels fig (12) ...')
 figure(12); clf; fullwidth(true)
 cmap = lines;
-badCh = union(goodCh(zscore(std(data(:, goodCh))) < -2), badCh);  % Channels with low variance should be excluded
-goodCh = 1:nCh; goodCh(badCh) = [];
 plot(zscore(double(mea.Data(:, goodCh))) ./ 10 + goodCh, 'Color', cmap(1, :)); hold on;  % Plot raw data
 plot(zscore(data(:, goodCh))/10 + goodCh, 'Color', cmap(4, :)); hold on;  % ... and good channels
 plot(zscore(data(:, badCh))/10 + badCh, 'Color', cmap(2, :)); hold off  % ... and bad channels
@@ -116,13 +120,13 @@ ylim([0 nCh+1])
 % mea.BadChannels = badCh(:);
 % save(mea.Path, '-v7.3', '-struct', 'mea')
 disp('Saving results ...')
-data = int16((data - min(data(:))) / range(data(:)) * 2 * 8192 - 8192);  % convert to int16
-fprintf('%d, ', badCh); fprintf('\b\b\n')
 
 print(10, [mea.Name '_raw_v_preproc'], '-dpng')
 print(11, [mea.Name '_PCs_final'], '-dpng')
 print(12, [mea.Name '_preproc'], '-dpng')
 print(13, [mea.Name '_scores'], '-dpng')
+
+data = int16((data - min(data(:))) / range(data(:)) * 2 * 8192 - 8192);  % convert to int16
 
 Name = mea.Name;
 clear raw mea
