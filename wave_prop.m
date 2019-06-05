@@ -204,7 +204,10 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 
 		case 'delays'
 
-			inds = compute_inds(ii) : (compute_inds(ii) + T * samplingRate - 1);
+			inds = and((TimeMs >= t -  T / 2 * 1e3), ...
+				(TimeMs <= t + T / 2 * 1e3));  % Select the window around the event time
+			params.T = range(TimeMs(inds)) / 1e3;
+% 			inds = compute_inds(ii) : (compute_inds(ii) + T * samplingRate - 1);
 			if inds(end) > size(lfp, 1)
 				break;
 			end
