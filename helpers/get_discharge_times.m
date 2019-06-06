@@ -12,7 +12,7 @@ struct2var(p.Results)
 if ~isstruct(mea)
 	if ~exist(mea.Properties.Source, 'file')
 		error('File not found')
-	elseif ~mea.Properties.Writable
+	else
 		mea = load(mea.Properties.Source); 
 	end
 end
@@ -20,9 +20,7 @@ end
 try
 	fr = mea.firingRate;
 catch ME
-	if verbose
-		disp(ME)
-	end
+	if ~strcmp(ME.identifier, 'MATLAB:nonExistentField'), rethrow(ME); end
 	disp('Computing firing rate.')
 	[fr, mea] = mua_firing_rate(mea);
 end
@@ -33,7 +31,7 @@ meanFr = mean(fr(:, mask), 2);
 [~, waveTimes] = findpeaks(meanFr, ...  % find peaks in mean firing rate
 	mea.SamplingRate / 1e3, ...  % ... in ms 
 	'minpeakprom', 100 * std(diff(meanFr)), ...  % ... use discrete peaks
-	'minpeakdistance', 100);  % ... peaks should be at least 100 ms apart
+	'minpeakdistance', 100);  % ... that are at least 100 ms apart
 
 padding = mea.Padding;
 waveTimes = waveTimes - padding(1) * 1e3;  % Account for padding (in ms)
