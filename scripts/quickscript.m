@@ -43,11 +43,11 @@ plot_wave_directions(mea, dev);
 print(gcf, dev.Name, '-dpng');
 outfile.dev = dev;
 
-disp('Computing wave directions from delays ...')
-[delays, mea] = wave_prop(mea, 'delays');
-plot_wave_directions(mea, delays);
-print(gcf, delays.Name, '-dpng')
-outfile.delays = delays;
+% disp('Computing wave directions from delays ...')
+% [delays, mea] = wave_prop(mea, 'delays');
+% plot_wave_directions(mea, delays);
+% print(gcf, delays.Name, '-dpng')
+% outfile.delays = delays;
 
 disp('Done.')
 
