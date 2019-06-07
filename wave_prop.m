@@ -219,7 +219,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			pos_inds = 1:numCh;
     end
     
-    dataS = sort(data);
+    dataS = sort(data(:));
     diffdata = diff(dataS);  % calculate gaps between data points
     gaps = [1; find(diffdata > max(2*std(diffdata, 'omitnan'), 4)); numel(data)];  % find large gaps between datapoints
     [~, cM] = max(diff(gaps));  % find the largest group without a gap
