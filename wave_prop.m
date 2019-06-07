@@ -93,12 +93,13 @@ POS = (position - min(position)) ./ ...
 
 % Load method specific variables
 switch metric
-	case 'deviance'
+	case {'rising'; 'falling'; 'deviance'}
 		[computeTimes, mea] = get_waveTimes(mea);
 		[lfp, skipfactor, mea] = get_lfp(mea);
 % 		lfp = lfp - mean(lfp, 2);
 		TimeMs = downsample(Time, skipfactor) * 1e3;
 		lfp = lfp ./ std(lfp(TimeMs < 0, :));
+        dir = 1 - 2*strcmpi(metric, 'falling');
 	case 'maxdescent'
 		[computeTimes, mea] = get_waveTimes(mea);
 		[lfp, skipfactor, mea] = get_lfp(mea);
@@ -150,6 +151,7 @@ end
 beta = nan(3, numWaves);  % fit parameters
 V = nan(2, numWaves);     % wave velocity (psuedo-inverse of beta)
 p = nan(1, numWaves);     % certainty
+dataout = nan(numCh, numWaves);  % wave passage times
 
 for ii = 1:numWaves  % estimate wave velocity for each discharge
 	position = POS;
@@ -171,12 +173,12 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			temp = data(:)';
 			position = position(pos_inds, :);
 		
-		case 'deviance'
+		case {'rising'; 'falling'; 'deviance'}
 			inds = (TimeMs >= t - halfWin) & (TimeMs <= t + halfWin);  % Select the window around the event time
 			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
 			temp = (temp - temp(1, :));  % Set initial value as baseline
 			data = arrayfun(@(ii) ...  % Find where each channel deviates 2sd from baseline
-				find([-(temp(:, ii)); 2] - 2 >= 0, 1), 1:size(temp, 2));
+				find([dir * (temp(:, ii)); 2] - 2 >= 0, 1), 1:size(temp, 2));
 			data(data > size(temp, 1)) = nan;
 			data = data(:);
 			tt = TimeMs(inds);
@@ -197,12 +199,6 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			dataToPlot = tt(data) - (t - halfWin);
 			pos_inds = 1:numCh;
 			
-% 			temp = smoothdata(lfp(inds, :), 'movmean', 5);
-% 			acf = conv2(temp, median(temp, 2), 'same');
-% 			[~, data] = max(abs(acf));
-% 			data = data(:);
-% 			dataToPlot = data;
-			
 
 		case 'delays'
 
@@ -221,7 +217,6 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			data = 1e3 * delay(center,:)';                                 % we use delays relative to the center (converted to ms)
 			dataToPlot = data + halfWin;
 			pos_inds = 1:numCh;
-
     end
     
     dataS = sort(data);
@@ -231,6 +226,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
     bounds = dataS(gaps(cM:cM+1));
     data(data < bounds(1) | data > bounds(2)) = nan;
     
+    dataout(:, ii) = data;
 	[beta(:, ii), V(:, ii), p(ii)] = fit_wave(data, position);
 	
 	if showPlots
@@ -280,6 +276,7 @@ wave_fit.Z = Z;
 wave_fit.Zu = Zu;
 wave_fit.computeTimes = computeTimes;
 wave_fit.Name = Name;
+wave_fit.data = dataout;
 
 mea.wave_fit = wave_fit;
 
