@@ -251,7 +251,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		plot_details(temp, pos_inds, cmap, cInds, metric); 
 		axis tight; grid on;
 		title(sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
-		if any(strcmpi(metric, {'maxdescent', 'deviance'}))
+		if any(strcmpi(metric, {'maxdescent', 'deviance', 'rising', 'falling'}))
 			valid = ~isnan(data);
 			hold on; plot(dataToPlot(valid), ...
                 temp(sub2ind(size(temp), ...
