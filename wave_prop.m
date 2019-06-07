@@ -17,7 +17,7 @@ function [wave_fit, mea] = wave_prop(mea, metric, varargin)
 %% Parse inputs
 p = inputParser;
 
-allMetrics = {'delays', 'maxdescent', 'events', 'deviance'};
+allMetrics = {'delays', 'maxdescent', 'events', 'deviance', 'rising', 'falling'};
 allFitMethods = {'nyc', 'bos'};
 
 validate = @(x, all) any(validatestring(x, all));
