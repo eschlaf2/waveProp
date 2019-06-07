@@ -172,7 +172,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			position = position(pos_inds, :);
 		
 		case 'deviance'
-			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));  % Select the window around the event time
+			inds = (TimeMs >= t - halfWin) & (TimeMs <= t + halfWin);  % Select the window around the event time
 			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
 			temp = (temp - temp(1, :));  % Set initial value as baseline
 			data = arrayfun(@(ii) ...  % Find where each channel deviates 2sd from baseline
@@ -222,8 +222,14 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			dataToPlot = data + halfWin;
 			pos_inds = 1:numCh;
 
-	end
-	
+    end
+    dataS = sort(data);
+    diffdata = diff(dataS);  % calculate gaps between data points
+    gaps = [1; find(diffdata > max(2*std(diffdata, 'omitnan'), 4)); numel(data)];  % find large gaps between datapoints
+    [~, cM] = max(diff(gaps));  % find the largest group without a gap
+    bounds = dataS(gaps(cM:cM+1));
+    data(data < bounds(1) | data > bounds(2)) = nan;
+    
 	[beta(:, ii), V(:, ii), p(ii)] = fit_wave(data, position);
 	
 	if showPlots
