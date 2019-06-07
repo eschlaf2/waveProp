@@ -1,4 +1,4 @@
-pat = 'MG49';
+pat = 'c5';
 files = dir(['~/Desktop/temp/' pat '_Seizure*wave_prop.mat']);
 nF = numel(files);
 
