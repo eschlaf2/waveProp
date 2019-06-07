@@ -253,9 +253,9 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		title(sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
 		if any(strcmpi(metric, {'maxdescent', 'deviance'}))
 			valid = ~isnan(data);
-			hold on; plot(data(valid), ...
+			hold on; plot(dataToPlot(valid), ...
                 temp(sub2ind(size(temp), ...
-                data(valid)', pos_inds(valid))), 'r*'); hold off
+                dataToPlot(valid)', pos_inds(valid))), 'r*'); hold off
 		end
 		
 		frame1 = getframe(h);
