@@ -151,7 +151,7 @@ end
 beta = nan(3, numWaves);  % fit parameters
 V = nan(2, numWaves);     % wave velocity (psuedo-inverse of beta)
 p = nan(1, numWaves);     % certainty
-dataout = nan(numCh, numWaves);  % wave passage times
+dataout = cell(numWaves, 1);  % wave passage times
 
 for ii = 1:numWaves  % estimate wave velocity for each discharge
 	position = POS;
@@ -226,7 +226,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
     bounds = dataS(gaps(cM:cM+1) + [1; 0]);
     data(data < bounds(1) | data > bounds(2)) = nan;
     
-    dataout(:, ii) = data;
+    dataout{ii} = data;
 	[beta(:, ii), V(:, ii), p(ii)] = fit_wave(data, position);
 	
 	if showPlots
