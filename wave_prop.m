@@ -223,6 +223,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			pos_inds = 1:numCh;
 
     end
+    
     dataS = sort(data);
     diffdata = diff(dataS);  % calculate gaps between data points
     gaps = [1; find(diffdata > max(2*std(diffdata, 'omitnan'), 4)); numel(data)];  % find large gaps between datapoints
@@ -255,7 +256,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		axis tight; grid on;
 		title(sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
 		if any(strcmpi(metric, {'maxdescent', 'deviance'}))
-			valid = ~isnan(dataToPlot);
+			valid = ~isnan(data);
 			hold on; plot(data(valid), ...
                 temp(sub2ind(size(temp), ...
                 data(valid)', pos_inds(valid))), 'r*'); hold off
