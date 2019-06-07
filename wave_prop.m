@@ -255,7 +255,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			valid = ~isnan(data);
 			hold on; plot(dataToPlot(valid), ...
                 temp(sub2ind(size(temp), ...
-                dataToPlot(valid)', pos_inds(valid))), 'r*'); hold off
+                data(valid)', pos_inds(valid))), 'r*'); hold off
 		end
 		
 		frame1 = getframe(h);
