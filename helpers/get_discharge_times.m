@@ -5,7 +5,7 @@ p = inputParser;
 
 addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile'));
 addParameter(p, 'verbose', true, @islogical);
-addParameter(p, 'method', 2, @(x) any(x == [1 2]));
+addParameter(p, 'method', 1, @(x) any(x == [1 2]));
 
 parse(p, mea, varargin{:})
 struct2var(p.Results)
