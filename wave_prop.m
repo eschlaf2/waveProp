@@ -99,7 +99,13 @@ switch metric
 % 		lfp = lfp - mean(lfp, 2);
 		TimeMs = downsample(Time, skipfactor) * 1e3;
 		lfp = lfp ./ std(lfp(TimeMs < 0, :));
-        dir = 1 - 2*strcmpi(metric, 'falling');
+        if strcmpi(metric, 'rising')
+            dir = 1;
+            thresh = 10;
+        else
+            dir = -1;
+            thresh = 20;
+        end
 	case 'maxdescent'
 		[computeTimes, mea] = get_waveTimes(mea);
 		[lfp, skipfactor, mea] = get_lfp(mea);
@@ -178,7 +184,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
 			temp = (temp - temp(1, :));  % Set initial value as baseline
 			data = arrayfun(@(ii) ...  % Find where each channel deviates 2sd from baseline
-				find([dir * (temp(:, ii)); 2] - 2 >= 0, 1), 1:size(temp, 2));
+				find([dir * (temp(:, ii)); thresh] - thresh >= 0, 1), 1:size(temp, 2));
 			data(data > size(temp, 1)) = nan;
 			data = data(:);
 			tt = TimeMs(inds);
