@@ -43,11 +43,11 @@ plot_wave_directions(mea, rising);
 print(gcf, rising.Name, '-dpng');
 outfile.rising = rising;
 
-% disp('Computing wave directions from falling deviance ...')
-% [falling, mea] = wave_prop(mea, 'falling');
-% plot_wave_directions(mea, falling);
-% print(gcf, falling.Name, '-dpng');
-% outfile.falling = falling;
+disp('Computing wave directions from falling deviance ...')
+[falling, mea] = wave_prop(mea, 'falling');
+plot_wave_directions(mea, falling);
+print(gcf, falling.Name, '-dpng');
+outfile.falling = falling;
 
 % disp('Computing wave directions from delays ...')
 % [delays, mea] = wave_prop(mea, 'delays');
