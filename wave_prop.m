@@ -159,7 +159,7 @@ end
 beta = nan(3, numWaves);  % fit parameters
 V = nan(2, numWaves);     % wave velocity (psuedo-inverse of beta)
 p = nan(1, numWaves);     % certainty
-dataout = cell(numWaves, 1);  % wave passage times
+[dataout, positionout] = deal(cell(numWaves, 1));  % wave passage times
 
 for ii = 1:numWaves  % estimate wave velocity for each discharge
 	position = POS;
@@ -237,6 +237,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
     data(data < bounds(1) | data > bounds(2)) = nan;
     
     dataout{ii} = data;
+    positionout{ii} = position;
 	[beta(:, ii), V(:, ii), p(ii)] = fit_wave(data, position);
 	
 	if showPlots
@@ -287,6 +288,8 @@ wave_fit.Zu = Zu;
 wave_fit.computeTimes = computeTimes;
 wave_fit.Name = Name;
 wave_fit.data = dataout;
+wave_fit.position = positionout;
+
 
 mea.wave_fit = wave_fit;
 
