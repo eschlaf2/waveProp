@@ -23,7 +23,7 @@ end
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
-outfile = matfile([name '_wave_prop'], 'writable', true);
+outfile = matfile([name '_wave_prop_all_waves'], 'writable', true);
 
 % disp('Computing wave directions from events ...')
 % [events, mea] = wave_prop(mea, 'events');
@@ -37,14 +37,16 @@ outfile = matfile([name '_wave_prop'], 'writable', true);
 % print(gcf, maxdescent.Name, '-dpng');
 % outfile.maxdescent = maxdescent;
 
-disp('Computing wave directions from rising deviance ...')
-[rising, mea] = wave_prop(mea, 'rising');
-plot_wave_directions(mea, rising);
-print(gcf, rising.Name, '-dpng');
-outfile.rising = rising;
+% disp('Computing wave directions from rising deviance ...')
+% [rising, mea] = wave_prop(mea, 'rising');
+% plot_wave_directions(mea, rising);
+% print(gcf, rising.Name, '-dpng');
+% outfile.rising = rising;
 
 disp('Computing wave directions from falling deviance ...')
-[falling, mea] = wave_prop(mea, 'falling');
+mea = exclude_channels(mea);
+[~, mea] = get_discharge_times(mea, 'method', 2);
+[falling, mea] = wave_prop(mea, 'falling', 'thresh', -Inf, 'exclude', false);
 plot_wave_directions(mea, falling);
 print(gcf, falling.Name, '-dpng');
 outfile.falling = falling;
