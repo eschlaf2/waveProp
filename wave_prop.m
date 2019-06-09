@@ -103,10 +103,10 @@ switch metric
 		lfp = lfp ./ std(lfp(TimeMs < 0, :));
         if strcmpi(metric, 'rising')
             dir = 1;
-            if isinf(thresh), thresh = 10; end
+            if thresh == Inf, thresh = 10; end
         else
             dir = -1;
-            if isinf(thresh), thresh = 20; end
+            if thresh == Inf, thresh = 20; end
         end
 	case 'maxdescent'
 		[computeTimes, mea] = get_waveTimes(mea);
@@ -186,7 +186,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
 			temp = (temp - temp(1, :));  % Set initial value as baseline
             if thresh == -Inf, threshI = max(min(temp)) / 2; 
-            else threshI = thresh; end
+            else, threshI = thresh; end
 			data = arrayfun(@(ii) ...  % Find where each channel deviates 2sd from baseline
 				find([dir * (temp(:, ii)); threshI] - threshI >= 0, 1), 1:size(temp, 2));
 			data(data > size(temp, 1)) = nan;
