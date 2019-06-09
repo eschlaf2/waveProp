@@ -185,7 +185,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			inds = (TimeMs >= t - halfWin) & (TimeMs <= t + halfWin);  % Select the window around the event time
 			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
 			temp = (temp - temp(1, :));  % Set initial value as baseline
-            if thresh == -Inf, threshI = max(min(temp)) / 2; 
+            if thresh == -Inf, threshI = min(max(dir*temp)) / 2; 
             else, threshI = thresh; end
 			data = arrayfun(@(ii) ...  % Find where each channel deviates 2sd from baseline
 				find([dir * (temp(:, ii)); threshI] - threshI >= 0, 1), 1:size(temp, 2));
