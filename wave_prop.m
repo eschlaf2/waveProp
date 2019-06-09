@@ -63,7 +63,8 @@ end
 
 end
 
-function [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, T, halfWin, thresh)
+function [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, ...
+    metric, T, halfWin, thresh)
 %% Compute wave propagation at each discharge time as described in 
 % Liou, Jyun You, et al. ?Multivariate Regression Methods for Estimating
 % Velocity of Ictal Discharges from Human Microelectrode Recordings.?
