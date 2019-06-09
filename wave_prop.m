@@ -188,7 +188,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
             if thresh == -Inf, threshI = max(min(temp)) / 2; 
             else threshI = thresh; end
 			data = arrayfun(@(ii) ...  % Find where each channel deviates 2sd from baseline
-				find([dir * (temp(:, ii)); thresh] - thresh >= 0, 1), 1:size(temp, 2));
+				find([dir * (temp(:, ii)); threshI] - threshI >= 0, 1), 1:size(temp, 2));
 			data(data > size(temp, 1)) = nan;
 			data = data(:);
 			tt = TimeMs(inds);
