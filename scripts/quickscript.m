@@ -23,7 +23,7 @@ end
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
-outfile = matfile([name '_wave_prop_all_waves'], 'writable', true);
+outfile = matfile([name '_wave_prop'], 'writable', true);
 
 % disp('Computing wave directions from events ...')
 % [events, mea] = wave_prop(mea, 'events');
@@ -49,7 +49,7 @@ mea = exclude_channels(mea);
 [falling, mea] = wave_prop(mea, 'falling', 'thresh', -Inf, 'exclude', false);
 plot_wave_directions(mea, falling);
 print(gcf, falling.Name, '-dpng');
-outfile.falling = falling;
+outfile.falling_allwaves = falling;
 
 % disp('Computing wave directions from delays ...')
 % [delays, mea] = wave_prop(mea, 'delays');
