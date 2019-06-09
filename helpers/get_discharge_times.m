@@ -56,9 +56,9 @@ switch method
 
 
 		win = 10;  % ms windows (lfp is already downsampled to 1 kHz)
-		peaksF = diff(smoothdata(peaks, 'movmean', win));
-		peaksF = (peaksF > 0) & (circshift(peaksF, -1) <= 0);
-		allpeaks = smoothdata(sum(peaksF, 2), 'movmean', win) * win;  % show increases in activity within win
+% 		peaksF = diff(smoothdata(peaks, 'movmean', win));
+% 		peaksF = (peaksF > 0) & (circshift(peaksF, -1) <= 0);
+		allpeaks = smoothdata(sum(peaks, 2), 'movmean', win) * win;  % show increases in activity within win
 		waveTimes = time((allpeaks <= 10) & (circshift(allpeaks, -1) > 10));  % Find where at least 10 electrodes peak within win of each other
 end
 
