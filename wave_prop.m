@@ -29,6 +29,7 @@ addParameter(p, 'showPlots', true, @islogical);
 addParameter(p, 'T', 10, @isnumeric);
 addParameter(p, 'halfWin', 50, @isnumeric);
 addParameter(p, 'exclude', true, @islogical);
+addParameter(p, 'thresh', Inf, @isnumeric);
 
 parse(p, mea, metric, varargin{:})
 struct2var(p.Results)
@@ -58,11 +59,11 @@ end
 
 %% Compute fits
 [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, ...
-	T, halfWin);
+	T, halfWin, thresh);
 
 end
 
-function [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, T, halfWin)
+function [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, T, halfWin, thresh)
 %% Compute wave propagation at each discharge time as described in 
 % Liou, Jyun You, et al. ?Multivariate Regression Methods for Estimating
 % Velocity of Ictal Discharges from Human Microelectrode Recordings.?
@@ -101,10 +102,10 @@ switch metric
 		lfp = lfp ./ std(lfp(TimeMs < 0, :));
         if strcmpi(metric, 'rising')
             dir = 1;
-            thresh = 10;
+            if isinf(thresh), thresh = 10; end
         else
             dir = -1;
-            thresh = 20;
+            if isinf(thresh), thresh = 20; end
         end
 	case 'maxdescent'
 		[computeTimes, mea] = get_waveTimes(mea);
