@@ -4,8 +4,8 @@ nF = numel(files);
 
 clear res;
 res(nF) = struct('name', [], 'data', [], 'Z', [], 'time', [], 'Vx', 'Vy');
-figure(); fullwidth(true);
-whichfields = [2 3 4];
+figure(1); clf; fullwidth(true);
+whichfields = [1:3 5:6]; %[2 3 4];
 for ii = 1:nF
 	res(ii).name = files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8));
 	res(ii).data = load(fullfile(files(ii).folder, files(ii).name));
@@ -13,7 +13,7 @@ for ii = 1:nF
 	res(ii).time = res(ii).data.(fields{whichfields(1)}).computeTimes / 1e3;
 	[res(ii).Z, res(ii).Vx, res(ii).Vy] = ...
 		deal(zeros(length(res(ii).data.(fields{whichfields(1)}).computeTimes), length(fields)));
-	for jj = whichfields
+	for jj = 1:numel(fields)
 		for f = {'Z', 'Vx', 'Vy'}
 			f = f{1};
 			switch f
@@ -43,6 +43,7 @@ for ii = 1:nF
 % 		sin(res(ii).Z(:, whichfields)), res(ii).time, '.', 'markersize', 10); hold off
 % 	title([pat ' ' res(ii).name]);
 	axis tight;
+    title(strrep(res(ii).name, '_', '')); 
 % 	hold on;
 % 	set(gca, 'ColorOrderIndex', 1)
 	ax(ii + nF) = polaraxes();
@@ -51,6 +52,8 @@ for ii = 1:nF
 		'markersize', 10);
 	hold off;
 	axis tight
+    title(strrep(res(ii).name, '_', ''));
+    
 end
 legend(fields(whichfields), 'position', [.9 .55 0 0])
 rlim = arrayfun(@(a) a.RLim(2), ax);
@@ -59,4 +62,34 @@ for ii = 1:numel(ax)
 	ax(ii).ThetaTickLabel = [];
 	ax(ii).RTickLabel = [];
 end
-
+ttl = @(s) annotation('textbox', ...
+    'string', s, ...
+    'Position', [.5 .98 0 0], ...
+    'FontSize', 18, 'FontWeight', 'bold', 'HorizontalAlignment', 'center', ...
+    'FitBoxToText', 'on', ...
+    'LineStyle', 'none');
+ttl(pat)
+%%
+figure(2); clf; fullwidth(true);
+S = 3;
+metrics = [1 3:6];
+pairs = nchoosek(metrics, 2);
+nP = size(pairs, 1);
+r = floor(sqrt(nP)); c = ceil(sqrt(nP));
+fields = fieldnames(res(S).data);
+for dd = 1:nP
+    ax = polaraxes();
+    subplot(r, c, dd, ax)
+    d1 = pairs(dd, 1); d2 = pairs(dd, 2);
+    data = res(S).Z(:, d1) - res(S).Z(:, d2);
+    edges = linspace(0, 2*pi, 41);
+    bc = histcounts(mod(data, 2*pi), edges);
+    bc = bc/max(bc) * res(S).time(end);
+    polarhistogram(ax, 'BinEdges', edges, 'BinCounts', bc); hold on;
+    polarplot(ax, data, res(S).time, '.'); hold off;
+    title(ax, sprintf('%s - %s', fields{d1}, fields{d2}))
+    axis tight
+    ax.ThetaTickLabel = [];
+%     set(gca, 'thetaticklabels', [])
+end
+ttl(sprintf('%s Seizure%s', pat, strrep(res(S).name, '_', '')));
