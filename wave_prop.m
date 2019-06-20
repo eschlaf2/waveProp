@@ -190,7 +190,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			data = arrayfun(@(ii) ...  % Find where each channel deviates 2sd from baseline
 				find([dir * (temp(:, ii)); threshI] - threshI >= 0, 1), 1:size(temp, 2));
 			data(data > size(temp, 1)) = nan;
-			data = data(:);
+			data = data(:) - 1;
 			tt = TimeMs(inds);
             dataToPlot = data;
 			dataToPlot(~isnan(data)) = ...
@@ -204,7 +204,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			temp = temp - temp(1, :);  % set first time point as baseline (for visualization early)
 			
 			[~, data] = min(diff(temp, 1, 1));  % Find time of maximal descent
-			data = data(:);
+			data = data(:) - 1;
             tt = TimeMs(inds);
 			dataToPlot = tt(data) - (t - halfWin);
 			pos_inds = 1:numCh;
@@ -229,9 +229,12 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			pos_inds = 1:numCh;
     end
     
+    % Use the largest cluster of data points
     dataS = sort(data(:));
     diffdata = diff(dataS);  % calculate gaps between data points
-    gaps = [0; find(diffdata > max(2*std(diffdata, 'omitnan'), 4)); numel(data)];  % find large gaps between datapoints
+    gaps = [0; ...
+        find(diffdata > max(2*std(diffdata, 'omitnan'), 4)); ...
+        numel(data)];  % find large gaps between datapoints
     [~, cM] = max(diff(gaps));  % find the largest group without a gap
     bounds = dataS(gaps(cM:cM+1) + [1; 0]);
     data(data < bounds(1) | data > bounds(2)) = nan;
@@ -465,7 +468,10 @@ end
 
 function [beta, V, p] = fit_wave_bos(data, position, metric)
 	[beta, ~, ~, ~, ~, p] = estimate_wave(data, position);
-	if isnan(beta)
+    
+    % beta is invalid if nan or if the slope is 0 in both directions
+    invalid = any(isnan(beta)) || all(beta(2:3).^2 < eps^2);
+	if invalid
 		V = nan;
 		return
 	end
