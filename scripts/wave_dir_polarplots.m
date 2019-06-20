@@ -1,11 +1,19 @@
-pat = 'c5';
-files = dir(['~/Desktop/temp/' pat '_Seizure*wave_prop.mat']);
+pat = 'MG49';
+files = dir(['~/Desktop/temp/' pat '_Seizure*wave_prop_all_waves.mat']);
 nF = numel(files);
 
 clear res;
-res(nF) = struct('name', [], 'data', [], 'Z', [], 'time', [], 'Vx', 'Vy');
+res(nF) = struct(...
+    'name', [], ...
+    'data', [], ...
+    'Z', [], ...
+    'time', [], ...
+    'Vx', [], ...
+    'Vy', []);
+
 figure(1); clf; fullwidth(true);
 whichfields = [1:3 5:6]; %[2 3 4];
+whichfields = 1;
 for ii = 1:nF
 	res(ii).name = files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8));
 	res(ii).data = load(fullfile(files(ii).folder, files(ii).name));
@@ -25,7 +33,10 @@ for ii = 1:nF
 					data = res(ii).data.(fields{jj}).V(2, :);
 			end
 			res(ii).(f)(:, jj) = data;
+            % Remove values where fit is not significant
 			res(ii).(f)(res(ii).data.(fields{jj}).p > .05, :) = nan;
+            % Remove values where slope is zero in both directions
+            res(ii).(f)(all(abs(res(ii).data.(fields{jj}).beta(1:2, :)) < eps), :) = nan;
 		end
 	end
 	ax(ii) = polaraxes();
@@ -33,9 +44,12 @@ for ii = 1:nF
 	subplot(2, nF, ii, ax(ii));
 	tt = linspace(res(ii).time(1), res(ii).time(end), length(res(ii).time) * 10);
 % 	data = interp1(res(ii).time, smoothdata(unwrap(res(ii).Z(:, whichvars)), 'movmean', 20), tt);
+    Zu = unwrap(res(ii).Z(:, whichfields));
+%     valid = ~isnan(Zu);
+%     f = fit(res.time(valid)', Zu(valid), 'smoothingspline', 'smoothing', .05);
 	data = smoothdata(...
-		interp1(res(ii).time, unwrap(res(ii).Z(:, whichfields)), tt), ...
-		'movmean', 100);
+		interp1(res(ii).time, Zu, tt), ...
+		'rlowess', 1/mean(diff(res(ii).time))^3, 'omitnan');
 	polarplot(ax(ii), data, tt, '-', 'linewidth', 2);
 % % 	plot3(ax(ii), cos(data), sin(data), tt); hold on
 % 	ax(ii).ColorOrderIndex = 1;
@@ -57,10 +71,10 @@ for ii = 1:nF
 end
 legend(fields(whichfields), 'position', [.9 .55 0 0])
 rlim = arrayfun(@(a) a.RLim(2), ax);
-for ii = 1:numel(ax)
-	ax(ii).RLim = [0 max(rlim)];
-	ax(ii).ThetaTickLabel = [];
-	ax(ii).RTickLabel = [];
+for kk = 1:numel(ax)
+	ax(kk).RLim = [0 max(rlim)];
+	ax(kk).ThetaTickLabel = [];
+	ax(kk).RTickLabel = [];
 end
 ttl = @(s) annotation('textbox', ...
     'string', s, ...
