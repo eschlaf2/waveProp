@@ -1,5 +1,5 @@
 pat = 'MG49';
-files = dir(['~/Desktop/temp/' pat '_Seizure*wave_prop_all_waves.mat']);
+files = dir([pat '_Seizure*wave_prop_all_waves.mat']);
 nF = numel(files);
 
 clear res;
