@@ -21,6 +21,7 @@ for ii = 1:nF
 	whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
     whichfields = flip(whichfields);
     res(ii).time = res(ii).data.(fields{whichfields(1)}).computeTimes / 1e3;
+	time = res(ii).time - min(res(ii).time);
 	[res(ii).Z, res(ii).Vx, res(ii).Vy] = ...
 		deal(zeros(length(res(ii).data.(fields{whichfields(1)}).computeTimes), length(fields)));
 	for jj = 1:numel(fields)
@@ -36,7 +37,7 @@ for ii = 1:nF
 			end
 			res(ii).(f)(:, jj) = data;
             % Remove values where fit is not significant
-			res(ii).(f)(res(ii).data.(fields{jj}).p > sig, :) = nan;
+			res(ii).(f)(res(ii).data.(fields{jj}).p >= sig, :) = nan;
             % Remove values where slope is zero in both directions
             res(ii).(f)(all(abs(res(ii).data.(fields{jj}).beta(1:2, :)) < eps), :) = nan;
 		end
@@ -44,7 +45,7 @@ for ii = 1:nF
 	ax(ii) = polaraxes();
 % 	ax(ii) = axes();
 	subplot(2, nF, ii, ax(ii));
-	tt = (res(ii).time(1): 1e-3: res(ii).time(end));
+	tt = (time(1): 1e-3: time(end));
 % 	data = interp1(res(ii).time, smoothdata(unwrap(res(ii).Z(:, whichvars)), 'movmean', 20), tt);
     Zu = unwrap(res(ii).Z(:, whichfields));
 %     valid = ~isnan(Zu);
@@ -52,7 +53,7 @@ for ii = 1:nF
 	data = smoothdata(...
 		interp1(res(ii).time, Zu, tt), ...
 		'movmean', 5 / (tt(2) - tt(1)), 'omitnan');
-	polarplot(ax(ii), data, tt - min(tt), '-', 'linewidth', 2);
+	polarplot(ax(ii), data, tt, '-', 'linewidth', 2);
     ax(ii).ColorOrder = varycolor(5);
 % % 	plot3(ax(ii), cos(data), sin(data), tt); hold on
 % 	ax(ii).ColorOrderIndex = 1;
@@ -65,7 +66,7 @@ for ii = 1:nF
 % 	set(gca, 'ColorOrderIndex', 1)
 	ax(ii + nF) = polaraxes();
 	subplot(2, nF, ii + nF, ax(ii + nF));
-	polarplot(ax(ii + nF), res(ii).Z(:, whichfields), res(ii).time, '.', ...
+	polarplot(ax(ii + nF), res(ii).Z(:, whichfields), time, '.', ...
 		'markersize', 10);
 	hold off;
 	axis tight
