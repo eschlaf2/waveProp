@@ -115,6 +115,7 @@ ttl(sprintf('%s Seizure%s', pat, strrep(res(S).name, '_', '')));
 dim = 100;
 figure(3); fullwidth()
 whichmetrics = 4;
+scale = @(x, M) round((x - min(x)) / range(x) * (M - 1) + 1);
 for field = 1:nF
     ax = subplot(1, nF, field);
     time = res(field).time(:); time = time - min(time);
