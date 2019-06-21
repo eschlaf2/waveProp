@@ -180,6 +180,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			data = spike_times(inds);
 			temp = data(:)';
 			position = position(pos_inds, :);
+            if numel(data) == 0, continue, end
 		
 		case {'rising'; 'falling'; 'deviance'}
 			inds = (TimeMs >= t - halfWin) & (TimeMs <= t + halfWin);  % Select the window around the event time
