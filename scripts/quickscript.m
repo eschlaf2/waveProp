@@ -3,6 +3,7 @@ datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't foll
 addpath(datapath);  % ... add the original data path first
 patpath = genpath(pat);  % ... and then add the local patient path on top 
 addpath(patpath);  % ... so that it is searched first
+computetimesmethod = 1;
 
 fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
 if ~exist(fname, 'file')
@@ -23,15 +24,16 @@ end
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
-outfile = matfile([name '_wave_prop_all_waves'], 'writable', true);
+outfile = matfile([name '_wave_prop_' num2str(computetimesmethod)], ...
+	'writable', true);
 mea = exclude_channels(mea);
-[~, mea] = get_discharge_times(mea, 'method', 2);
+[~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
 
-% disp('Computing wave directions from events ...')
-% [events, mea] = wave_prop(mea, 'events', 'exclude', false);
-% plot_wave_directions(mea, events);
-% print(gcf, events.Name, '-dpng');
-% outfile.events = events;
+disp('Computing wave directions from events ...')
+[events, mea] = wave_prop(mea, 'events', 'exclude', false);
+plot_wave_directions(mea, events);
+print(gcf, events.Name, '-dpng');
+outfile.events = events;
 
 disp('Computing wave directions from maxdescent ...')
 [maxdescent, mea] = wave_prop(mea, 'maxdescent', 'exclude', false);
