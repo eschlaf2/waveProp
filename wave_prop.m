@@ -197,7 +197,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			dataToPlot(~isnan(data)) = ...
                 tt(data(~isnan(data))) - (t - halfWin);  % Convert to time (ms)
 			pos_inds = 1:numCh;
-            if numel(unique(data)) < 2, continue, end
+            if numel(unique(data)) < 3, continue, end
 			
 		case 'maxdescent'
 			
@@ -210,7 +210,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
             tt = TimeMs(inds);
 			dataToPlot = tt(data) - (t - halfWin);
 			pos_inds = 1:numCh;
-			if numel(unique(data)) < 2, continue, end
+			if numel(unique(data)) < 3, continue, end
 
 		case 'delays'
 
