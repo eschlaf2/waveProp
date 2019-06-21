@@ -273,8 +273,13 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
                 temp(sub2ind(size(temp), ...
                 data(valid)', pos_inds(valid))), 'r*'); hold off
 		end
-		
-		frame1 = getframe(h);
+		try
+            frame1 = getframe(h);
+        catch ME
+            disp(ME);
+            disp(ME.stack);
+            continue
+        end
 		writeVideo(v, frame1)
 		
 	end
