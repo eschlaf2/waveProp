@@ -13,7 +13,7 @@ res(nF) = struct(...
 
 figure(1); clf; fullwidth(true);
 whichfields = [1:3 5:6]; %[2 3 4];
-whichfields = 1;
+whichfields = 4;
 for ii = 1:nF
 	res(ii).name = files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8));
 	res(ii).data = load(fullfile(files(ii).folder, files(ii).name));
