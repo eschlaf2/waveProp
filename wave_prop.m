@@ -245,6 +245,10 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
     positionout{ii} = position;
 	[beta(:, ii), V(:, ii), p(ii)] = fit_wave(data, position);
 	
+	if isnan(p(ii))
+		% don't waste time (risk errors) plotting if a wave can't be fit
+		continue
+	end
 	if showPlots
 		figure(h); clf
 		[p1, p2] = plot_wave_fit(position, data, beta(:, ii));
