@@ -260,7 +260,6 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		colorbar();
 		cmap = h.Colormap;
 		cInds = round(dataToPlot) + 1;
-        cInds(isnan(cInds)) = 1;
 		cInds = min(max(cInds, 1), 2*halfWin+2);
 		if strcmpi(metric, 'events'), cInds = cInds(pos_inds); end
 		
@@ -277,6 +276,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		try
             frame1 = getframe(h);
         catch ME
+            disp(ii)
             disp(ME);
             disp(ME.stack);
             continue
