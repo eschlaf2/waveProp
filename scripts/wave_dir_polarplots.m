@@ -19,7 +19,6 @@ for ii = 1:nF
 	res(ii).data = load(fullfile(files(ii).folder, files(ii).name));
 	fields = fieldnames(res(ii).data);
 	whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
-    whichfields = flip(whichfields);
     res(ii).time = res(ii).data.(fields{whichfields(1)}).computeTimes / 1e3;
 	time = res(ii).time - min(res(ii).time);
 	[res(ii).Z, res(ii).Vx, res(ii).Vy] = ...
