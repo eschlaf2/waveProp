@@ -132,6 +132,7 @@ for field = 1:nF
     im(inds) = 1;
     imagesc(ax, conv2(im, K, 'same'))
     axis square
+    axis xy
 end
 
 
