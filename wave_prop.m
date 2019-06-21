@@ -187,9 +187,9 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			temp = (temp - temp(1, :));  % Set initial value as baseline
             if thresh == -Inf, threshI = quantile(max(dir*temp), .25) / 2; 
             else, threshI = thresh; end
-			data = arrayfun(@(ii) ...  % Find where each channel deviates 2sd from baseline
+			data = arrayfun(@(ii) ...  % Find where each channel deviates thresh from baseline
 				find([dir * (temp(:, ii)); threshI] - threshI >= 0, 1), 1:size(temp, 2));
-			data(data > size(temp, 1)) = nan;
+			data(data > size(temp, 1)) = size(temp, 1);
 			data = data(:) - 1;
 			tt = TimeMs(inds);
             dataToPlot = data;
