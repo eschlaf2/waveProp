@@ -1,5 +1,5 @@
 % pat = 'MG49';
-files = dir([pat '_Seizure*wave_prop_all_waves.mat']);
+files = dir([pat '_Seizure*wave_prop.mat']);
 nF = numel(files);
 
 clear res;
@@ -85,8 +85,9 @@ ttl = @(s) annotation('textbox', ...
 ttl(pat)
 %%
 figure(2); clf; fullwidth(true);
-S = 3;
+S = 1;
 metrics = [1 3:6];
+metrics = 1:4;
 pairs = nchoosek(metrics, 2);
 nP = size(pairs, 1);
 r = floor(sqrt(nP)); c = ceil(sqrt(nP));
@@ -107,3 +108,30 @@ for dd = 1:nP
 %     set(gca, 'thetaticklabels', [])
 end
 ttl(sprintf('%s Seizure%s', pat, strrep(res(S).name, '_', '')));
+
+
+%% Blurred im
+
+dim = 100;
+figure(3); fullwidth()
+whichmetrics = 4;
+for field = 1:nF
+    ax = subplot(1, nF, field);
+    time = res(field).time(:); time = time - min(time);
+    xdata = time .* cos(res(field).Z(:, whichmetrics)); 
+    ydata = time .* sin(res(field).Z(:, whichmetrics)); 
+    valid = ~isnan(xdata);
+    cdata = ones(size(ydata));
+    inds = sub2ind([dim, dim], ...
+        scale(xdata(valid), dim), scale(ydata(valid), dim));
+    k = 10;
+    K = gausswin(k) * gausswin(k)';  
+    % K = ones(k) / k^2;
+    im = zeros(dim);
+    im(inds) = 1;
+    imagesc(ax, conv2(im, K, 'same'))
+    axis square
+end
+
+
+
