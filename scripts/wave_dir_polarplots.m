@@ -36,9 +36,10 @@ for ii = 1:nF
 			end
 			res(ii).(f)(:, jj) = data;
             % Remove values where fit is not significant
-			res(ii).(f)(res(ii).data.(fields{jj}).p >= sig, :) = nan;
+			mask = res(ii).data.(fields{jj}).p < sig;
+			res(ii).(f)(~mask, jj) = nan;
             % Remove values where slope is zero in both directions
-            res(ii).(f)(all(abs(res(ii).data.(fields{jj}).beta(1:2, :)) < eps), :) = nan;
+            res(ii).(f)(all(abs(res(ii).data.(fields{jj}).beta(1:2, :)) < eps), jj) = nan;
 		end
 	end
 	ax(ii) = polaraxes();
