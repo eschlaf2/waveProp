@@ -191,7 +191,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			data = arrayfun(@(ii) ...  % Find where each channel deviates thresh from baseline
 				find([dir * (temp(:, ii)); threshI] - threshI >= 0, 1), 1:size(temp, 2));
 			data(data > size(temp, 1)) = size(temp, 1);
-			data = data(:) - 1;
+			data = data(:);
 			tt = TimeMs(inds);
             dataToPlot = data;
 			dataToPlot(~isnan(data)) = ...
@@ -205,7 +205,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			temp = temp - temp(1, :);  % set first time point as baseline (for visualization early)
 			
 			[~, data] = min(diff(temp, 1, 1));  % Find time of maximal descent
-			data = data(:) - 1;
+			data = data(:);
             tt = TimeMs(inds);
 			dataToPlot = tt(data) - (t - halfWin);
 			pos_inds = 1:numCh;
