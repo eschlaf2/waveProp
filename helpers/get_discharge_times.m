@@ -36,8 +36,6 @@ switch method
 			mea.SamplingRate / 1e3, ...  % ... in ms 
 			'minpeakprom', 100 * std(diff(meanFr)), ...  % ... use discrete peaks
 			'minpeakdistance', 100);  % ... that are at least 100 ms apart
-		time = mea.Time() * 1e3;
-		waveTimes = time(waveTimes);
 		
 	case 2  % based on peaks in LFP
 		
