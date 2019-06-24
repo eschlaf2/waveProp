@@ -29,11 +29,11 @@ outfile = matfile([name '_wave_prop_' num2str(computetimesmethod)], ...
 mea = exclude_channels(mea);
 [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
 
-disp('Computing wave directions from events ...')
-[events, mea] = wave_prop(mea, 'events', 'exclude', false);
-plot_wave_directions(mea, events);
-print(gcf, events.Name, '-dpng');
-outfile.events = events;
+% disp('Computing wave directions from events ...')
+% [events, mea] = wave_prop(mea, 'events', 'exclude', false);
+% plot_wave_directions(mea, events);
+% print(gcf, events.Name, '-dpng');
+% outfile.events = events;
 
 disp('Computing wave directions from maxdescent ...')
 [maxdescent, mea] = wave_prop(mea, 'maxdescent', 'exclude', false);
