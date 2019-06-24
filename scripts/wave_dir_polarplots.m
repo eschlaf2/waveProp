@@ -1,4 +1,4 @@
-% pat = 'MG49';
+pat = 'MG49';
 files = dir([pat '_Seizure*wave_prop.mat']);
 nF = numel(files);
 sig = 5e-2;
@@ -9,13 +9,12 @@ res(nF) = struct(...
     'data', [], ...
     'Z', [], ...
     'time', [], ...
-    'Vx', [], ...
-    'Vy', []);
+    'p', []);
 
 figure(1); clf; fullwidth(true);
-metrics = {'events', 'delays', 'maxdescent'};
+metrics = {'delays', 'events', 'maxdescent'};
 for ii = 1:nF
-	res(ii).name = files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8));
+	res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');
 	res(ii).data = load(fullfile(files(ii).folder, files(ii).name));
 	fields = fieldnames(res(ii).data);
 	whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
@@ -24,10 +23,10 @@ for ii = 1:nF
 	[res(ii).Z, res(ii).Vx, res(ii).Vy] = ...
 		deal(zeros(length(res(ii).data.(fields{whichfields(1)}).computeTimes), length(fields)));
 	for jj = 1:numel(fields)
-		for f = {'Z', 'Vx', 'Vy'}
+		for f = {'Z', 'p'}
 			f = f{1};
 			switch f
-				case 'Z'
+				case {'Z', 'p'}
 					data = res(ii).data.(fields{jj}).(f);
 				case 'Vx'
 					data = res(ii).data.(fields{jj}).V(1, :);
@@ -161,5 +160,37 @@ for file = 1:nF
     axis xy
 end
 
+%% Plot p-values
 
+figure(4); fullwidth();
+
+seizure = 1;
+thresh = 5e-10;
+metrics = {'delays', 'events', 'maxdescent'};
+
+whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
+p = res(seizure).p(:, whichfields);
+p(p > thresh) = nan;
+stem(res(seizure).time, p, 'filled', 'linewidth', 2)
+
+legend(metrics)
+title('p-values')
+
+%%
+
+figure(5); fullwidth(1)
+metrics = {'delays', 'events'};
+whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
+
+a1 = subplot(2,1,1);
+stem(res(1).time, res(1).Z(:, whichfields), 'filled');
+legend(metrics)
+
+a2 = subplot(2,1,2);
+d1 = -diff(res(1).Z(:, whichfields)');
+d1(d1 > pi) = d1(d1 > pi) - 2*pi;
+stem(res(1).time, d1, 'filled');
+legend('difference')
+
+linkaxes([a1, a2], 'xy')
 
