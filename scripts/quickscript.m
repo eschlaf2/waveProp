@@ -4,6 +4,7 @@ addpath(datapath);  % ... add the original data path first
 patpath = genpath(pat);  % ... and then add the local patient path on top 
 addpath(patpath);  % ... so that it is searched first
 computetimesmethod = 1;
+showplots = false;
 
 fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
 if ~exist(fname, 'file')
@@ -29,14 +30,16 @@ outfile = matfile([name '_wave_prop_' num2str(computetimesmethod)], ...
 mea = exclude_channels(mea);
 [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
 
-% disp('Computing wave directions from events ...')
-% [events, mea] = wave_prop(mea, 'events', 'exclude', false);
-% plot_wave_directions(mea, events);
-% print(gcf, events.Name, '-dpng');
-% outfile.events = events;
+disp('Computing wave directions from events ...')
+[events, mea] = wave_prop(mea, 'events', ...
+	'exclude', false, 'showplots', showplots);
+plot_wave_directions(mea, events);
+print(gcf, events.Name, '-dpng');
+outfile.events = events;
 
 disp('Computing wave directions from maxdescent ...')
-[maxdescent, mea] = wave_prop(mea, 'maxdescent', 'exclude', false);
+[maxdescent, mea] = wave_prop(mea, 'maxdescent', ...
+	'exclude', false, 'showplots', showplots);
 plot_wave_directions(mea, maxdescent);
 print(gcf, maxdescent.Name, '-dpng');
 outfile.maxdescent = maxdescent;
@@ -53,11 +56,12 @@ outfile.maxdescent = maxdescent;
 % print(gcf, falling.Name, '-dpng');
 % outfile.falling = falling;
 
-% disp('Computing wave directions from delays ...')
-% [delays, mea] = wave_prop(mea, 'delays');
-% plot_wave_directions(mea, delays);
-% print(gcf, delays.Name, '-dpng')
-% outfile.delays = delays;
+disp('Computing wave directions from delays ...')
+[delays, mea] = wave_prop(mea, 'delays', ...
+	'exclude', false, 'showplots', showplots);
+plot_wave_directions(mea, delays);
+print(gcf, delays.Name, '-dpng')
+outfile.delays = delays;
 
 disp('Done.')
 
