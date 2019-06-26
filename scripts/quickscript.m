@@ -21,7 +21,7 @@ nCh = size(mea.lfp, 2);
 % mea.Time = mea.Time();
 
 T = 10;  % Window (s)
-STEP = 1;  % Step (s)
+STEP = .5;  % Step (s)
 THRESH = 5e-2;  % significance threshold
 TW = 20;  % bandwidth (Hz)
 FS = floor(mea.SamplingRate / mea.skipfactor);  % sampling frequency (Hz)
@@ -36,11 +36,17 @@ params.tapers = [TW 2*TW-1];
 pairs = nchoosek(1:nCh, 2);
 data1 = mea.lfp(:, pairs(:, 1));
 data2 = mea.lfp(:, pairs(:, 2));
-
+ii = length(pairs);
+disp('Initializing arrays with last pair...')
+[C{ii}, phi{ii}, S12{ii}, S1{ii}, S2{ii}, ...
+		t, f, confC{ii}, phistd{ii}] = ...
+		cohgramc(data1(:, ii), data2(:, ii), movingwin, params);
+disp('Arrays initialized.')
+%%	
 % Compute coherence and spectrograms for each pair of channels
-for ii = length(pairs):-1:1
+parfor ii = 1:100 % length(pairs)
 	[C{ii}, phi{ii}, S12{ii}, S1{ii}, S2{ii}, ...
-		t{ii}, f{ii}, confC{ii}, phistd{ii}] = ...
+		~, ~, confC{ii}, phistd{ii}] = ...
 		cohgramc(data1(:, ii), data2(:, ii), movingwin, params);
 	sprintf('ii=%d\n', ii);
 end
