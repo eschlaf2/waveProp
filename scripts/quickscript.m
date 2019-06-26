@@ -1,4 +1,4 @@
-pat = 'c7'; seizure = 1;
+% pat = 'c7'; seizure = 1;
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
 addpath(datapath);  % ... add the original data path first
 patpath = genpath(pat);  % ... and then add the local patient path on top 
@@ -46,7 +46,7 @@ disp('Initializing arrays with last pair...')
 disp('Arrays initialized.')
 %%	
 % Compute coherence and spectrograms for each pair of channels
-parfor ii = 1:100 % length(pairs)
+parfor ii = 1:length(pairs) - 1
 	[C{ii}, phi{ii}, S12{ii}, S1{ii}, S2{ii}, ...
 		~, ~, confC{ii}, phistd{ii}] = ...
 		cohgramc(data1(:, ii), data2(:, ii), movingwin, params);
