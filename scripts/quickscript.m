@@ -50,7 +50,7 @@ parfor ii = 1:length(pairs) - 1
 	[C{ii}, phi{ii}, S12{ii}, S1{ii}, S2{ii}, ...
 		~, ~, confC{ii}, phistd{ii}] = ...
 		cohgramc(data1(:, ii), data2(:, ii), movingwin, params);
-	disp('ii=', num2str(ii));
+	disp(['ii=' num2str(ii)]);
 end
 
 disp('Saving result.')
