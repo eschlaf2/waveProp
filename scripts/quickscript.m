@@ -38,8 +38,12 @@ data1 = mea.lfp(:, pairs(:, 1));
 data2 = mea.lfp(:, pairs(:, 2));
 
 % Compute coherence and spectrograms for each pair of channels
-[C, phi, S12, S1, S2, t, f, confC, phistd] = ...
-    cohgramc(data1, data2, movingwin, params);
+for ii = length(pairs):-1:1
+	[C{ii}, phi{ii}, S12{ii}, S1{ii}, S2{ii}, ...
+		t{ii}, f{ii}, confC{ii}, phistd{ii}] = ...
+		cohgramc(data1(:, ii), data2(:, ii), movingwin, params);
+	sprintf('ii=%d\n', ii);
+end
 
 % Save results
 outfile.C = C;
