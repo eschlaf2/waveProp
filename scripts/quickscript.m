@@ -55,7 +55,7 @@ ii = length(pairs);
 % 	disp(['ii=' num2str(ii)]);
 % end
 
-[C, phi, ~, ~, ~, ~, ~, confC, phistd] = ...
+[C, phi, ~, ~, ~, t, f, confC, phistd] = ...
 	cohgramc(data1, data2, movingwin, params);
 
 disp('Saving result.')
