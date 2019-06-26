@@ -1,4 +1,4 @@
-% pat = 'c7'; seizure = 1;
+% pat = 'c7'; seizure = 1; T = 10;
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
 addpath(datapath);  % ... add the original data path first
 patpath = genpath(pat);  % ... and then add the local patient path on top 
@@ -20,7 +20,7 @@ nCh = size(mea.lfp, 2);
 % [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
 % mea.Time = mea.Time();
 
-T = 10;  % Window (s)
+% T = 10;  % Window (s)
 STEP = .5;  % Step (s)
 THRESH = 5e-2;  % significance threshold
 TW = 20;  % bandwidth (Hz)
