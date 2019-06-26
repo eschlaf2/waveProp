@@ -12,9 +12,10 @@ mea = load(fname);
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
-outfile = matfile([name '_cohgram_T' num2str(T, '%02d')], ...
-	'writable', true);
+basename = [name '_cohgram_T' num2str(T, '%02d')];
+outfile = matfile(basename, 'writable', true);
 % mea = exclude_channels(mea);
+mea = exclude_channels(mea);
 [~, mea] = filter_mea(mea, 'lfp');
 nCh = size(mea.lfp, 2);
 % [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
@@ -39,29 +40,29 @@ data2 = mea.lfp(:, pairs(:, 2));
 
 %% Initialize arrays
 ii = length(pairs);
-disp('Initializing arrays with last pair...')
-[C{ii}, phi{ii}, S12{ii}, S1{ii}, S2{ii}, ...
-		t, f, confC{ii}, phistd{ii}] = ...
-		cohgramc(data1(:, ii), data2(:, ii), movingwin, params);
-disp('Arrays initialized.')
+% disp('Initializing arrays with last pair...')
+% [C{ii}, phi{ii}, ~, ~, ~, ...
+% 		t, f, confC{ii}, phistd{ii}] = ...
+% 		cohgramc(data1(:, ii), data2(:, ii), movingwin, params);
+% disp('Arrays initialized.')
 %%	
 % Compute coherence and spectrograms for each pair of channels
-parfor ii = 1:length(pairs) - 1
-	[C{ii}, phi{ii}, S12{ii}, S1{ii}, S2{ii}, ...
-		~, ~, confC{ii}, phistd{ii}] = ...
-		cohgramc(data1(:, ii), data2(:, ii), movingwin, params);
-	disp(['ii=' num2str(ii)]);
-end
+% parfor ii = 1:length(pairs) - 1
+% 	[C{ii}, phi{ii}, ~, ~, ~, ...
+% 		~, ~, confC{ii}, phistd{ii}] = ...
+% 		cohgramc(data1(:, ii), data2(:, ii), movingwin, params);
+% 	save(sprintf('%s_%d', basename, ii), 'C', 'phi', 
+% 	disp(['ii=' num2str(ii)]);
+% end
+
+[C, phi, ~, ~, ~, ~, ~, confC, phistd] = ...
+	cohgramc(data1, data2, movingwin, params);
 
 disp('Saving result.')
-[~, id] = unique(pairs(:));
-S = {S1, S2};  % Remove duplicates of spectra
 t = t - mea.Padding(1);  % correct for padding
 % Save results
 outfile.C = C;
 outfile.phi = phi;
-outfile.S12 = S12;
-outfile.S = S(id);
 outfile.t = t;
 outfile.f = f;
 outfile.confC = confC;
