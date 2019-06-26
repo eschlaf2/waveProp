@@ -27,7 +27,7 @@ TW = 20;  % bandwidth (Hz)
 FS = floor(mea.SamplingRate / mea.skipfactor);  % sampling frequency (Hz)
 % FPASS = [0 100];  % Frequencies of interest
 
-movingwin = [10 1];  % [window step] seconds
+movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = FS;  % sampling rate (Hz)
 % params.fpass
@@ -36,6 +36,8 @@ params.tapers = [TW 2*TW-1];
 pairs = nchoosek(1:nCh, 2);
 data1 = mea.lfp(:, pairs(:, 1));
 data2 = mea.lfp(:, pairs(:, 2));
+
+%% Initialize arrays
 ii = length(pairs);
 disp('Initializing arrays with last pair...')
 [C{ii}, phi{ii}, S12{ii}, S1{ii}, S2{ii}, ...
