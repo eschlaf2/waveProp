@@ -55,7 +55,8 @@ end
 
 disp('Saving result.')
 [~, id] = unique(pairs(:));
-S = {S1, S2};
+S = {S1, S2};  % Remove duplicates of spectra
+t = t - mea.Padding(1);  % correct for padding
 % Save results
 outfile.C = C;
 outfile.phi = phi;
