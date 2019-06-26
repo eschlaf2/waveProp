@@ -189,7 +189,11 @@ legend(metrics)
 a2 = subplot(2,1,2);
 d1 = -diff(res(1).Z(:, whichfields)');
 d1(d1 > pi) = d1(d1 > pi) - 2*pi;
+d1(d1 < -pi) = d1(d1 < -pi) + 2*pi;
 stem(res(1).time, d1, 'filled');
+hold on
+plot(res(1).time, smoothdata(d1, 'movmean', 10))
+hold off;
 legend('difference')
 
 linkaxes([a1, a2], 'xy')
