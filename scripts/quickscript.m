@@ -23,7 +23,7 @@ nCh = size(mea.lfp, 2);
 
 % T = 10;  % Window (s)
 STEP = .5;  % Step (s)
-THRESH = 5e-2;  % significance threshold
+THRESH = 5e-3;  % significance threshold
 TW = 20;  % bandwidth (Hz)
 FS = floor(mea.SamplingRate / mea.skipfactor);  % sampling frequency (Hz)
 % FPASS = [0 100];  % Frequencies of interest
