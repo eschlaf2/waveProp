@@ -31,8 +31,8 @@ FS = floor(mea.SamplingRate / mea.skipfactor);  % sampling frequency (Hz)
 movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = FS;  % sampling rate (Hz)
-% params.fpass
-params.tapers = [TW 2*TW-1];  
+params.fpass = [2 50];  % lfp filtered range
+params.tapers = [TW 2*TW-1]; 
 
 pairs = nchoosek(1:nCh, 2);
 data1 = mea.lfp(:, pairs(:, 1));
