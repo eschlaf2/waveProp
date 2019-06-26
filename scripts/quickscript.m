@@ -12,7 +12,7 @@ mea = load(fname);
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
-outfile = matfile([name '_cohgram'], ...
+outfile = matfile([name '_cohgram_T' num2str(T, '%02d')], ...
 	'writable', true);
 % mea = exclude_channels(mea);
 [~, mea] = filter_mea(mea, 'lfp');
