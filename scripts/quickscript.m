@@ -12,10 +12,10 @@ mea = load(fname);
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
-outfile = matfile([name '_wave_prop_' num2str(computetimesmethod)], ...
+outfile = matfile([name '_cohgram'], ...
 	'writable', true);
 % mea = exclude_channels(mea);
-[~, mea] = filter_mea(mea, {'lfp', 'mua'});
+[~, mea] = filter_mea(mea, 'lfp');
 % [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
 % mea.Time = mea.Time();
 
