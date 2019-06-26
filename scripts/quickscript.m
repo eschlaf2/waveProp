@@ -16,6 +16,7 @@ outfile = matfile([name '_cohgram'], ...
 	'writable', true);
 % mea = exclude_channels(mea);
 [~, mea] = filter_mea(mea, 'lfp');
+nCh = size(mea.lfp, 2);
 % [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
 % mea.Time = mea.Time();
 
@@ -26,17 +27,21 @@ TW = 20;  % bandwidth (Hz)
 FS = floor(mea.SamplingRate / mea.skipfactor);  % sampling frequency (Hz)
 % FPASS = [0 100];  % Frequencies of interest
 
-data1 = mea.lfp;
-data2 = mea.lfp;
 movingwin = [10 1];  % [window step] seconds
-params.err = [1 THRESH];
-params.Fs = FS;
+params.err = [1 THRESH];  % [type threshold]
+params.Fs = FS;  % sampling rate (Hz)
 % params.fpass
 params.tapers = [TW 2*TW-1];  
 
+pairs = nchoosek(1:nCh, 2);
+data1 = mea.lfp(:, pairs(:, 1));
+data2 = mea.lfp(:, pairs(:, 2));
+
+% Compute coherence and spectrograms for each pair of channels
 [C, phi, S12, S1, S2, t, f, confC, phistd] = ...
     cohgramc(data1, data2, movingwin, params);
 
+% Save results
 outfile.C = C;
 outfile.phi = phi;
 outfile.S12 = S12;
@@ -46,40 +51,12 @@ outfile.t = t;
 outfile.f = f;
 outfile.confC = confC;
 outfile.phistd = phistd;
-
-
-% disp('Computing wave directions from events ...')
-% [events, mea] = wave_prop(mea, 'events', ...
-% 	'exclude', false, 'showplots', showplots);
-% plot_wave_directions(mea, events);
-% print(gcf, events.Name, '-dpng');
-% outfile.events = events;
-% 
-% disp('Computing wave directions from maxdescent ...')
-% [maxdescent, mea] = wave_prop(mea, 'maxdescent', ...
-% 	'exclude', false, 'showplots', showplots);
-% plot_wave_directions(mea, maxdescent);
-% print(gcf, maxdescent.Name, '-dpng');
-% outfile.maxdescent = maxdescent;
-% 
-% % disp('Computing wave directions from rising deviance ...')
-% % [rising, mea] = wave_prop(mea, 'rising', 'exclude', false);
-% % plot_wave_directions(mea, rising);
-% % print(gcf, rising.Name, '-dpng');
-% % outfile.rising = rising;
-% % 
-% % disp('Computing wave directions from falling deviance ...')
-% % [falling, mea] = wave_prop(mea, 'falling', 'thresh', -Inf, 'exclude', false);
-% % plot_wave_directions(mea, falling);
-% % print(gcf, falling.Name, '-dpng');
-% % outfile.falling = falling;
-% 
-% disp('Computing wave directions from delays ...')
-% [delays, mea] = wave_prop(mea, 'delays', ...
-% 	'exclude', false, 'showplots', showplots);
-% plot_wave_directions(mea, delays);
-% print(gcf, delays.Name, '-dpng')
-% outfile.delays = delays;
+outfile.position = mea.Position;
+outfile.badchannels = mea.BadChannels;
+outfile.pairs = pairs;
+outfile.params = params;
+outfile.lfp = mea.lfp;
+outfile.movingwin = movingwin;
 
 disp('Done.')
 
