@@ -14,9 +14,9 @@ mea = load(fname);
 % name = mea.Name;
 outfile = matfile([name '_wave_prop_' num2str(computetimesmethod)], ...
 	'writable', true);
-mea = exclude_channels(mea);
+% mea = exclude_channels(mea);
 [~, mea] = filter_mea(mea, {'lfp', 'mua'});
-[~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
+% [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
 % mea.Time = mea.Time();
 
 T = 10;  % Window (s)
@@ -29,7 +29,7 @@ FS = floor(mea.SamplingRate / mea.skipfactor);  % sampling frequency (Hz)
 data1 = mea.lfp;
 data2 = mea.lfp;
 movingwin = [10 1];  % [window step] seconds
-params.err = [1 thresh];
+params.err = [1 THRESH];
 params.Fs = FS;
 % params.fpass
 params.tapers = [TW 2*TW-1];  
