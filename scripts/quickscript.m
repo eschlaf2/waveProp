@@ -50,15 +50,17 @@ parfor ii = 1:length(pairs) - 1
 	[C{ii}, phi{ii}, S12{ii}, S1{ii}, S2{ii}, ...
 		~, ~, confC{ii}, phistd{ii}] = ...
 		cohgramc(data1(:, ii), data2(:, ii), movingwin, params);
-	sprintf('ii=%d\n', ii);
+	disp('ii=', num2str(ii));
 end
 
+disp('Saving result.')
+[~, id] = unique(pairs(:));
+S = {S1, S2};
 % Save results
 outfile.C = C;
 outfile.phi = phi;
 outfile.S12 = S12;
-outfile.S1 = S1;
-outfile.S2 = S2;
+outfile.S = S(id);
 outfile.t = t;
 outfile.f = f;
 outfile.confC = confC;
