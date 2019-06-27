@@ -20,6 +20,8 @@ skipfactor = floor(mea.SamplingRate / 1e3);
 mea.Data = downsample(mea.Data, skipfactor);
 mea.SamplingRate = mea.SamplingRate / skipfactor;
 
+Fs = mea.SamplingRate;
+
 [~, mea] = filter_mea(mea, 'mua');
 nCh = size(mea.mua, 2);
 % [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
@@ -28,8 +30,8 @@ nCh = size(mea.mua, 2);
 % T = 10;  % Window (s)
 STEP = .5;  % Step (s)
 THRESH = 5e-3;  % significance threshold
-TW = 20;  % bandwidth (Hz)
-FS = floor(mea.SamplingRate / mea.skipfactor);  % sampling frequency (Hz)
+TW = 20;  % time-bandwidth product
+FS = Fs;  % sampling frequency (Hz)
 % FPASS = [0 100];  % Frequencies of interest
 
 movingwin = [T STEP];  % [window step] seconds
