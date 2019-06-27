@@ -12,12 +12,16 @@ mea = load(fname);
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
-basename = [name '_cohgram_T' num2str(T, '%02d')];
+basename = [name '_cohgram_mua_T' num2str(T, '%02d')];
 outfile = matfile(basename, 'writable', true);
-% mea = exclude_channels(mea);
 mea = exclude_channels(mea);
-[~, mea] = filter_mea(mea, 'lfp');
-nCh = size(mea.lfp, 2);
+
+skipfactor = floor(mea.SamplingRate / 1e3);
+mea.Data = downsample(mea.Data, skipfactor);
+mea.SamplingRate = mea.SamplingRate / skipfactor;
+
+[~, mea] = filter_mea(mea, 'mua');
+nCh = size(mea.mua, 2);
 % [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
 % mea.Time = mea.Time();
 
@@ -31,12 +35,12 @@ FS = floor(mea.SamplingRate / mea.skipfactor);  % sampling frequency (Hz)
 movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = FS;  % sampling rate (Hz)
-params.fpass = [2 50];  % lfp filtered range
+params.fpass = [300 500];  % lfp filtered range
 params.tapers = [TW 2*TW-1]; 
 
 pairs = nchoosek(1:nCh, 2);
-data1 = mea.lfp(:, pairs(:, 1));
-data2 = mea.lfp(:, pairs(:, 2));
+data1 = mea.mua(:, pairs(:, 1));
+data2 = mea.mua(:, pairs(:, 2));
 
 %% Initialize arrays
 ii = length(pairs);
