@@ -61,8 +61,10 @@ ii = length(pairs);
 % 	disp(['ii=' num2str(ii)]);
 % end
 
+tic
 [C, phi, ~, ~, ~, t, f, confC, ~] = ...
 	cohgramc(data1, data2, movingwin, params);
+toc
 
 disp('Saving result.')
 t = t - mea.Padding(1);  % correct for padding
