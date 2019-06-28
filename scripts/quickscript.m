@@ -22,7 +22,7 @@ outfile = matfile(basename, 'writable', true);
 mea = exclude_channels(mea);
 
 skipfactor = floor(mea.SamplingRate / 1e3);
-data = single(downsample(mea.Data, skipfactor));
+data = double(downsample(mea.Data, skipfactor));
 Fs = mea.SamplingRate / skipfactor;
 
 % [~, mea] = filter_mea(mea, 'mua');
@@ -40,12 +40,12 @@ FS = Fs;  % sampling frequency (Hz)
 movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = FS;  % sampling rate (Hz)
-params.fpass = [1 500];  % lfp filtered range
+params.fpass = [0 500];  % lfp filtered range
 params.tapers = [W T 1]; 
 
 pairs = nchoosek(1:nCh, 2);
-data1 = data(:, pairs(:, 1));
-data2 = data(:, pairs(:, 2));
+data1 = data(:, pairs(1:500, 1));
+data2 = data(:, pairs(1:500, 2));
 
 outfile.data = data;
 clear data;
