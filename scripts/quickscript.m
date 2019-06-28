@@ -17,13 +17,10 @@ outfile = matfile(basename, 'writable', true);
 mea = exclude_channels(mea);
 
 skipfactor = floor(mea.SamplingRate / 1e3);
-mea.Data = downsample(mea.Data, skipfactor);
-mea.SamplingRate = mea.SamplingRate / skipfactor;
+data = downsample(mea.Data, skipfactor);
+Fs = mea.SamplingRate / skipfactor;
 
-Fs = mea.SamplingRate;
-
-[~, mea] = filter_mea(mea, 'mua');
-data = mea.mua;
+% [~, mea] = filter_mea(mea, 'mua');
 nCh = size(data, 2);
 % [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
 % mea.Time = mea.Time();
@@ -38,7 +35,7 @@ FS = Fs;  % sampling frequency (Hz)
 movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = FS;  % sampling rate (Hz)
-params.fpass = [300 500];  % lfp filtered range
+params.fpass = [1 500];  % lfp filtered range
 params.tapers = [W T 1]; 
 
 pairs = nchoosek(1:nCh, 2);
