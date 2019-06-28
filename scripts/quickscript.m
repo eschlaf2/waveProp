@@ -109,7 +109,7 @@ function plotmean
     figure(); fullwidth(1)
     h = pcolor(t, f, mn'); h.LineStyle = 'none';
     title(sprintf('%s Seizure%d\nT=%f', pat, seizure, T))
-    print(gcf, sprintf('%s_%d-%d', basename, round(f(1)), round(f(end))), '-dpng'); 
+    print(gcf, sprintf('%s_%03d-%03d', basename, round(f(1)), round(f(end))), '-dpng'); 
     close(gcf);
 end
 
