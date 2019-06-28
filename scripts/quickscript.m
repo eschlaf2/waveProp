@@ -1,5 +1,5 @@
 % pat = 'c7'; seizure = 1; T = 10;
-if ~exist('T', 'var'); T = 10; end
+if isempty('T'); T = 10; end
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
 addpath(datapath);  % ... add the original data path first
 patpath = genpath(pat);  % ... and then add the local patient path on top 
