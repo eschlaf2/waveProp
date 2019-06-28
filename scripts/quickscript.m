@@ -23,7 +23,8 @@ mea.SamplingRate = mea.SamplingRate / skipfactor;
 Fs = mea.SamplingRate;
 
 [~, mea] = filter_mea(mea, 'mua');
-nCh = size(mea.mua, 2);
+data = mea.mua;
+nCh = size(data, 2);
 % [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
 % mea.Time = mea.Time();
 
@@ -41,9 +42,11 @@ params.fpass = [300 500];  % lfp filtered range
 params.tapers = [TW 2*TW-1]; 
 
 pairs = nchoosek(1:nCh, 2);
-data1 = mea.mua(:, pairs(:, 1));
-data2 = mea.mua(:, pairs(:, 2));
+data1 = data(:, pairs(:, 1));
+data2 = data(:, pairs(:, 2));
 
+outfile.data = data;
+clear data;
 %% Initialize arrays
 ii = length(pairs);
 % disp('Initializing arrays with last pair...')
@@ -77,7 +80,6 @@ outfile.position = mea.Position;
 outfile.badchannels = mea.BadChannels;
 outfile.pairs = pairs;
 outfile.params = params;
-outfile.lfp = mea.lfp;
 outfile.movingwin = movingwin;
 
 disp('Done.')
