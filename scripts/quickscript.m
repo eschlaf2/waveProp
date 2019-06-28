@@ -31,7 +31,7 @@ nCh = size(data, 2);
 % T = 10;  % Window (s)
 STEP = .5;  % Step (s)
 THRESH = 5e-3;  % significance threshold
-TW = 20;  % time-bandwidth product
+W = 2;  % bandwidth (Hz)
 FS = Fs;  % sampling frequency (Hz)
 % FPASS = [0 100];  % Frequencies of interest
 
@@ -39,7 +39,7 @@ movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = FS;  % sampling rate (Hz)
 params.fpass = [300 500];  % lfp filtered range
-params.tapers = [TW 2*TW-1]; 
+params.tapers = [W T 1]; 
 
 pairs = nchoosek(1:nCh, 2);
 data1 = data(:, pairs(:, 1));
@@ -64,18 +64,19 @@ ii = length(pairs);
 % 	disp(['ii=' num2str(ii)]);
 % end
 
-[C, phi, ~, ~, ~, t, f, confC, phistd] = ...
+[C, phi, ~, ~, ~, t, f, confC, ~] = ...
 	cohgramc(data1, data2, movingwin, params);
 
 disp('Saving result.')
 t = t - mea.Padding(1);  % correct for padding
+confC = confC(1);
 % Save results
 outfile.C = C;
 outfile.phi = phi;
 outfile.t = t;
 outfile.f = f;
 outfile.confC = confC;
-outfile.phistd = phistd;
+% outfile.phistd = phistd;
 outfile.position = mea.Position;
 outfile.badchannels = mea.BadChannels;
 outfile.pairs = pairs;
@@ -84,3 +85,13 @@ outfile.movingwin = movingwin;
 
 disp('Done.')
 
+%%
+disp('Plotting mean')
+
+mn = mean(C, 3);
+mn(mn < confC) = nan;
+figure(); fullwidth(1)
+h = pcolor(t, f, mn'); h.LineStyle = 'none';
+title(sprintf('%s Seizure%d\nT=%f', pat, seizure, T))
+print(gcf, basename, '-dpng'); 
+close(gcf);
