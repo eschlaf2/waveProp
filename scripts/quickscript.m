@@ -1,11 +1,15 @@
 % pat = 'c7'; seizure = 1; T = 10;
+compute_coherograms(pat, seizure, T);
+
+function compute_coherograms(pat, seizure, T)
+
 if isempty('T'); T = 10; end
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
 addpath(datapath);  % ... add the original data path first
 patpath = genpath(pat);  % ... and then add the local patient path on top 
 addpath(patpath);  % ... so that it is searched first
-computetimesmethod = 1;
-showplots = false;
+% computetimesmethod = 1;
+% showplots = false;
 
 fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
 mea = load(fname);
@@ -46,7 +50,7 @@ data2 = data(:, pairs(:, 2));
 outfile.data = data;
 clear data;
 %% Initialize arrays
-ii = length(pairs);
+% ii = length(pairs);
 % disp('Initializing arrays with last pair...')
 % [C{ii}, phi{ii}, ~, ~, ~, ...
 % 		t, f, confC{ii}, phistd{ii}] = ...
@@ -62,19 +66,29 @@ ii = length(pairs);
 % 	disp(['ii=' num2str(ii)]);
 % end
 
-tic
-[C, phi, ~, ~, ~, t, f, confC, ~] = ...
-	cohgramc(data1, data2, movingwin, params);
-toc
-
+for ii = 0:100:400
+    params.fpass = [ii ii+100];
+    disp(ii)
+    tic
+    [C, phi, ~, ~, ~, t, f, confC, ~] = ...
+        cohgramc(data1, data2, movingwin, params);
+    toc
+    outfile.(sprintf('C%03d', ii)) = C;
+    outfile.(sprintf('phi%03d', ii)) = phi;
+    outfile.(sprintf('f%03d', ii)) = f;
+    
+    plotmean();  % nested plotting function
+    
+    clear C phi
+end
 disp('Saving result.')
 t = t - mea.Padding(1);  % correct for padding
 confC = confC(1);
 % Save results
-outfile.C = C;
-outfile.phi = phi;
+% outfile.C = C;
+% outfile.phi = phi;
 outfile.t = t;
-outfile.f = f;
+% outfile.f = f;
 outfile.confC = confC;
 % outfile.phistd = phistd;
 outfile.position = mea.Position;
@@ -85,13 +99,18 @@ outfile.movingwin = movingwin;
 
 disp('Done.')
 
-%%
-disp('Plotting mean')
+%% Nested plotting function
+function plotmean
+    disp('Plotting mean')
 
-mn = mean(C, 3);
-mn(mn < confC) = nan;
-figure(); fullwidth(1)
-h = pcolor(t, f, mn'); h.LineStyle = 'none';
-title(sprintf('%s Seizure%d\nT=%f', pat, seizure, T))
-print(gcf, basename, '-dpng'); 
-close(gcf);
+    mn = mean(C, 3);
+    mn(mn < confC(1)) = nan;
+    mn(sum(C > confC(1), 3) < size(C, 3) / 2) = nan;  % Set to nan if fewer than half of the values have significant coherence
+    figure(); fullwidth(1)
+    h = pcolor(t, f, mn'); h.LineStyle = 'none';
+    title(sprintf('%s Seizure%d\nT=%f', pat, seizure, T))
+    print(gcf, sprintf('%s_%d-%d', basename, round(f(1)), round(f(end))), '-dpng'); 
+    close(gcf);
+end
+
+end
