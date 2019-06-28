@@ -73,6 +73,13 @@ clear mea;
 % 	disp(['ii=' num2str(ii)]);
 % end
 
+[C, phi, t, f, confC] = deal(cell(1, ceil(numpairs / 100)));
+
+% [C, phi, ~, ~, ~, t, f, confC, ~] = ...
+%         cohgramc(...
+%             data(:, pairs(1, 1)), data(:, pairs(1, 2)), ...
+%             movingwin, params);
+        
 parfor ii = 1:(numpairs / 100)
     disp(ii)
     pairs = nchoosek(nCh, 2);
@@ -80,59 +87,43 @@ parfor ii = 1:(numpairs / 100)
     iF = min(i0 + 99, numpairs);
     pinds = i0:iF;
     tic
-    [C, phi, ~, ~, ~, t, f, confC, ~] = ...
+    [C{ii}, phi{ii}, ~, ~, ~, t{ii}, f{ii}, confC{ii}, ~] = ...
         cohgramc(...
             data(:, pairs(pinds, 1)), data(:, pairs(pinds, 2)), ...
             movingwin, params);
     toc
+    C{ii} = int16(C{ii} * 1e4);
+    phi{ii} = int16(phi{ii} * 1e4);
     
-%     tic
-%     [C, phi, ~, ~, ~, t, f, confC, ~] = ...
-%         cohgramc(...
-%             data1, data2, ...
-%             movingwin, params);
-%     toc
-    
-    if ii == 1
-        Cfull = int16(C * 1e4);
-        phifull = int16(phi * 1e4);
-    else 
-        Cfull = cat(3, Cfull, int16(C * 1e4));  % scale C up and cast to int16
-        phifull = cat(3, phifull, int16(phi * 1e4));  % scale phi up and then cut it to int16
-    end
+%     if ii == 1
+%         C = int16(Csub * 1e4);
+%         phi = int16(phisub * 1e4);
+%     else 
+%         C = cat(3, C, int16(Csub * 1e4));  % scale C up and cast to int16
+%         phi = cat(3, phi, int16(phisub * 1e4));  % scale phi up and then cut it to int16
+%     end
 %     outfile.(sprintf('C%03d', ii)) = int16(C * 1e4);
 %     outfile.(sprintf('phi%03d', ii)) = int16(phi / pi * 1e4);
 %     outfile.(sprintf('f%03d', ii)) = f;
+        
+%     clear Csub phisub
     
-    plotmean();  % nested plotting function
-    
-    clear C phi
 end
 disp('Saving result.')
-t = t - padding(1);  % correct for padding
-confC = confC(1);
+plotmean();  % nested plotting function
+f = f{1};
+t = t{1} - padding(1);  % correct for padding
+confC = confC{1}(1);
 % Save results
-outfile.C = Cfull;
-outfile.phi = phifull;
+outfile.C = cat(3, C{:});
+outfile.phi = cat(3, phi{:});
 outfile.t = t;
-% outfile.f = f;
+outfile.f = f;
 outfile.confC = confC;
 % outfile.phistd = phistd;
 
 disp('Done.')
 
 %% Nested plotting function
-function plotmean
-    disp('Plotting mean')
-
-    mn = mean(C, 3);
-    mn(mn < confC(1)) = nan;
-    mn(sum(C > confC(1), 3) < size(C, 3) / 2) = nan;  % Set to nan if fewer than half of the values have significant coherence
-    figure(); fullwidth(1)
-    h = pcolor(t, f, mn'); h.LineStyle = 'none';
-    title(sprintf('%s Seizure%d\nT=%f', pat, seizure, T))
-    print(gcf, sprintf('%s_%03d-%03d', basename, round(f(1)), round(f(end))), '-dpng'); 
-    close(gcf);
-end
 
 end
