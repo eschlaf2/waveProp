@@ -18,7 +18,7 @@ outfile = matfile(basename, 'writable', true);
 mea = exclude_channels(mea);
 
 skipfactor = floor(mea.SamplingRate / 1e3);
-data = downsample(mea.Data, skipfactor);
+data = single(downsample(mea.Data, skipfactor));
 Fs = mea.SamplingRate / skipfactor;
 
 % [~, mea] = filter_mea(mea, 'mua');
