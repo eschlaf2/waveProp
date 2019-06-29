@@ -96,6 +96,7 @@ parfor ii = 1:floor(numpairs / 100)
             single(data1), single(data2), ...
             movingwin, params);
     toc
+    
     C{ii} = int16(C{ii} * 1e4);
     phi{ii} = int16(phi{ii} * 1e4);
     
@@ -114,7 +115,7 @@ parfor ii = 1:floor(numpairs / 100)
     
 end
 disp('Saving result.')
-plotmean();  % nested plotting function
+% plotmean();  % nested plotting function
 f = f{1};
 t = t{1} - padding(1);  % correct for padding
 confC = confC{1}(1);
