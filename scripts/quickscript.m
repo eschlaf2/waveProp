@@ -41,16 +41,13 @@ params.fpass = [0 500];  % lfp filtered range
 params.tapers = [W T 1];  % [bandwidth time k] (numtapers = 2TW - k)
 params.pad = -1;  % no padding
 
-pairs = nchoosek(1:nCh, 2);  % generate all pairs of channels
-numpairs = size(pairs, 1);
-
 mea.Position(mea.BadChannels, :) = [];  % Remove bad channels
 
 % Save information about the run
 outfile.data = data;
 outfile.position = mea.Position;
 outfile.badchannels = mea.BadChannels;
-outfile.pairs = pairs;
+outfile.pairs = nchoosek(1:nCh, 2);  % generate all pairs of channels
 outfile.params = params;
 outfile.movingwin = movingwin;
 
@@ -81,6 +78,7 @@ clear mea;  % free up memory
         
 %%
 % Initialize variables
+numpairs = nchoosek(nCh, 2);
 slicesize = 100;
 numslices = floor(numpairs / slicesize);
 [C, phi, t, f, confC] = deal(cell(1, numslices));
