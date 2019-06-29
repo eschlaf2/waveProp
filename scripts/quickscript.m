@@ -8,8 +8,6 @@ datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't foll
 addpath(datapath);  % ... add the original data path first
 patpath = genpath(pat);  % ... and then add the local patient path on top 
 addpath(patpath);  % ... so that it is searched first
-% computetimesmethod = 1;
-% showplots = false;
 
 fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
 mea = load(fname);
@@ -17,19 +15,17 @@ mea = load(fname);
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
-basename = [name '_cohgram_mua_T' num2str(T, '%02d')];
+basename = [name '_cohgram_ds_T' num2str(T, '%02d')];
 outfile = matfile(basename, 'writable', true);
 mea = exclude_channels(mea);
 
-skipfactor = floor(mea.SamplingRate / 1e3);
+skipfactor = floor(mea.SamplingRate / 1e3);  % Downsample data to ~1e3 Hz
 data = downsample(mea.Data, skipfactor);
 Fs = mea.SamplingRate / skipfactor;
 
-% [~, mea] = filter_mea(mea, 'mua');
 nCh = size(data, 2);
-% [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
-% mea.Time = mea.Time();
 
+%% Set some parameters
 % T = 10;  % Window (s)
 STEP = .5;  % Step (s)
 THRESH = 5e-3;  % significance threshold
@@ -37,17 +33,20 @@ W = 2;  % bandwidth (Hz)
 FS = Fs;  % sampling frequency (Hz)
 % FPASS = [0 100];  % Frequencies of interest
 
+%% Convert parameters to function input
 movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = FS;  % sampling rate (Hz)
 params.fpass = [0 500];  % lfp filtered range
-params.tapers = [W T 1]; 
-params.pad = -1;
+params.tapers = [W T 1];  % [bandwidth time k] (numtapers = 2TW - k)
+params.pad = -1;  % no padding
 
-pairs = nchoosek(1:nCh, 2);
+pairs = nchoosek(1:nCh, 2);  % generate all pairs of channels
 numpairs = size(pairs, 1);
-padding = mea.Padding;
 
+mea.Position(mea.BadChannels, :) = [];  % Remove bad channels
+
+% Save information about the run
 outfile.data = data;
 outfile.position = mea.Position;
 outfile.badchannels = mea.BadChannels;
@@ -55,8 +54,9 @@ outfile.pairs = pairs;
 outfile.params = params;
 outfile.movingwin = movingwin;
 
-% clear data;
-clear mea;
+padding = mea.Padding;  % Store to correct t later
+clear mea;  % free up memory
+
 %% Initialize arrays
 % ii = length(pairs);
 % disp('Initializing arrays with last pair...')
@@ -74,30 +74,33 @@ clear mea;
 % 	disp(['ii=' num2str(ii)]);
 % end
 
-[C, phi, t, f, confC] = deal(cell(1, floor(numpairs / 100)));
-
 % [C, phi, ~, ~, ~, t, f, confC, ~] = ...
 %         cohgramc(...
 %             data(:, pairs(1, 1)), data(:, pairs(1, 2)), ...
 %             movingwin, params);
         
-parfor ii = 1:floor(numpairs / 100)
-    disp(ii)
-    pairs = nchoosek(1:nCh, 2);
-    i0 = (ii - 1) * 100 + 1;
-    iF = min(i0 + 99, numpairs);
-    pinds = i0:iF;
+%%
+% Initialize variables
+slicesize = 100;
+numslices = floor(numpairs / slicesize);
+[C, phi, t, f, confC] = deal(cell(1, numslices));
+
+parfor ii = 1:numslices
     
-    data1 = data(:, pairs(pinds, 1));
-    data2 = data(:, pairs(pinds, 2));
+    disp(ii)  % show progress
     
-    tic
+    pairs = nchoosek(1:nCh, 2);  % avoid overhead communication
+    i0 = (ii - 1) * slicesize + 1;  % index of starting pair
+    iF = min(i0 + slicesize - 1, numpairs);  % index of final pair
+    
+    tic  % start timer
     [C{ii}, phi{ii}, ~, ~, ~, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
-            single(data1), single(data2), ...
-            movingwin, params);
-    toc
+            single(data(:, pairs(i0:iF, 1))), ...  % data1
+            single(data(:, pairs(i0:iF, 2))), ...  % data2
+            movingwin, params);  % parameters
+    toc  % end timer and display
     
-    C{ii} = int16(C{ii} * 1e4);
+    C{ii} = uint16(C{ii} * 1e4);  % convert to int16
     phi{ii} = int16(phi{ii} * 1e4);
     
 %     if ii == 1
@@ -118,7 +121,7 @@ disp('Saving result.')
 % plotmean();  % nested plotting function
 f = f{1};
 t = t{1} - padding(1);  % correct for padding
-confC = confC{1}(1);
+confC = int16(confC{1}(1) * 1e4);
 % Save results
 outfile.C = cat(3, C{:});
 outfile.phi = cat(3, phi{:});
