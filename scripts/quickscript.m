@@ -22,7 +22,7 @@ outfile = matfile(basename, 'writable', true);
 mea = exclude_channels(mea);
 
 skipfactor = floor(mea.SamplingRate / 1e3);
-data = single(downsample(mea.Data, skipfactor));
+data = downsample(mea.Data, skipfactor);
 Fs = mea.SamplingRate / skipfactor;
 
 % [~, mea] = filter_mea(mea, 'mua');
@@ -42,6 +42,7 @@ params.err = [1 THRESH];  % [type threshold]
 params.Fs = FS;  % sampling rate (Hz)
 params.fpass = [0 500];  % lfp filtered range
 params.tapers = [W T 1]; 
+params.pad = -1;
 
 pairs = nchoosek(1:nCh, 2);
 numpairs = size(pairs, 1);
@@ -54,7 +55,7 @@ outfile.pairs = pairs;
 outfile.params = params;
 outfile.movingwin = movingwin;
 
-clear data;
+% clear data;
 clear mea;
 %% Initialize arrays
 % ii = length(pairs);
@@ -86,10 +87,13 @@ parfor ii = 1:floor(numpairs / 100)
     i0 = (ii - 1) * 100 + 1;
     iF = min(i0 + 99, numpairs);
     pinds = i0:iF;
+    
+    data1 = data(:, pairs(pinds, 1));
+    data2 = data(:, pairs(pinds, 2));
+    
     tic
-    [C{ii}, phi{ii}, ~, ~, ~, t{ii}, f{ii}, confC{ii}, ~] = ...
-        cohgramc(...
-            data(:, pairs(pinds, 1)), data(:, pairs(pinds, 2)), ...
+    [C{ii}, phi{ii}, ~, ~, ~, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
+            single(data1), single(data2), ...
             movingwin, params);
     toc
     C{ii} = int16(C{ii} * 1e4);
