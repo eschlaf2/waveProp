@@ -73,14 +73,14 @@ clear mea;
 % 	disp(['ii=' num2str(ii)]);
 % end
 
-[C, phi, t, f, confC] = deal(cell(1, ceil(numpairs / 100)));
+[C, phi, t, f, confC] = deal(cell(1, floor(numpairs / 100)));
 
 % [C, phi, ~, ~, ~, t, f, confC, ~] = ...
 %         cohgramc(...
 %             data(:, pairs(1, 1)), data(:, pairs(1, 2)), ...
 %             movingwin, params);
         
-parfor ii = 1:(numpairs / 100)
+parfor ii = 1:floor(numpairs / 100)
     disp(ii)
     pairs = nchoosek(nCh, 2);
     i0 = (ii - 1) * 100 + 1;
