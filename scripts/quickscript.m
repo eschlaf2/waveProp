@@ -83,7 +83,7 @@ clear mea;
         
 parfor ii = 1:floor(numpairs / 100)
     disp(ii)
-    pairs = nchoosek(nCh, 2);
+    pairs = nchoosek(1:nCh, 2);
     i0 = (ii - 1) * 100 + 1;
     iF = min(i0 + 99, numpairs);
     pinds = i0:iF;
