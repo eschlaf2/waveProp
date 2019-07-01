@@ -138,7 +138,7 @@ disp('Done.')
 %         close all
 %         for file = {files.name}
 %             [~, basename, ~] = fileparts(file{:});
-%             disp(fid);
+%             disp(basename);
 %             try
 %                 load(basename);
 %             catch ME
