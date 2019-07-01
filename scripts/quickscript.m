@@ -116,7 +116,6 @@ parfor ii = 1:numslices
     
 end
 disp('Saving result.')
-plotmean();  % nested plotting function
 f = f{1};
 t = t{1} - padding(1);  % correct for padding
 confC = int16(confC{1}(1) * 1e4);
@@ -153,18 +152,34 @@ disp('Done.')
             T = str2double(strinfo{end}(2:end));
         
             figure(); fullwidth(true)
-%         C = single(C);
-        mn = quantile(C, .9, 3);
-%         C(C <= confC) = nan;
-        mn(mn < cast(confC, 'like', mn)) = nan;
-%         mn(sum(C > confC, 3) < length(pairs) / 2) = nan;
-        
-        imagesc(t, f, mn'); colorbar; axis xy;
-        title(sprintf('%s Seizure %d\nT=%0.1f', pat, seizure, T))
-        xlabel('Time (s)'); ylabel('Frequency (Hz)')
-        
-        print(fid, '-dpng')
-        close(gcf)
+            
+            mn = single(quantile(C, .9, 3));
+            mn(mn <= confC) = nan;
+            phimn = single(phi) / 1e4;
+            phimn(C <= confC) = nan;
+            phistd = std(phimn, [], 3, 'omitnan');
+            phimn = mean(phimn, 3, 'omitnan');
+
+            subplot(2,2,1)
+            imagesc(t, f, mn'); colorbar; axis xy;
+            title(sprintf('%s Seizure %d\nT=%0.1f\nMean coherence', pat, seizure, T))
+            xlabel('Time (s)'); ylabel('Frequency (Hz)')
+
+            subplot(2, 2, 2);
+            imagesc(t, f, phimn'); colorbar; axis xy;
+            title(sprintf('%s Seizure %d\nT=%0.1f\nMean phi', pat, seizure, T))
+            xlabel('Time (s)'); ylabel('Frequency (Hz)')
+
+    %         print([fid '_mean_phi'], '-dpng')
+
+            subplot(2, 2, 4);
+            imagesc(t, f, phistd'); colorbar; axis xy;
+            title(sprintf('%s Seizure %d\nT=%0.1f\nstd phi', pat, seizure, T))
+            xlabel('Time (s)'); ylabel('Frequency (Hz)')
+
+            print(fid, '-dpng')
+
+            close(gcf)
 %         end
     end
 
