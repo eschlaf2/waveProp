@@ -129,6 +129,8 @@ outfile.confC = confC;
 
 disp('Done.')
 
+plotmean();
+
 %% Nested plotting function
     function plotmean
         
