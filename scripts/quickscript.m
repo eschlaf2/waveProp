@@ -98,7 +98,7 @@ parfor ii = 1:numslices
             movingwin, params);  % parameters
     toc  % end timer and display
     
-    C{ii} = uint16(C{ii} * 1e4);  % convert to int16
+    C{ii} = int16(C{ii} * 1e4);  % convert to int16
     phi{ii} = int16(phi{ii} * 1e4);
     
 %     if ii == 1
@@ -116,7 +116,7 @@ parfor ii = 1:numslices
     
 end
 disp('Saving result.')
-% plotmean();  % nested plotting function
+plotmean();  % nested plotting function
 f = f{1};
 t = t{1} - padding(1);  % correct for padding
 confC = int16(confC{1}(1) * 1e4);
@@ -131,5 +131,40 @@ outfile.confC = confC;
 disp('Done.')
 
 %% Nested plotting function
+    function plotmean
+        
+        files = dir('*cohgram*ds*.mat');
+        
+        close all
+        for file = {files.name}
+            [~, fid, ~] = fileparts(file{:});
+            disp(fid);
+            try
+                load(fid);
+            catch ME
+                disp(['Error loading ' fid])
+                continue
+            end
+            disp('Loaded')
+            
+            strinfo = strsplit(fid, '_');
+            pat = strinfo{1};
+            seizure = str2double(strinfo{2}(8:end));
+            T = str2double(strinfo{end}(2:end));
+        
+            figure(); fullwidth(true)
+%         C = single(C);
+        mn = quantile(C, .9, 3);
+%         C(C <= confC) = nan;
+        mn(mn < confC) = nan;
+%         mn(sum(C > confC, 3) < length(pairs) / 2) = nan;
+        
+        h = pcolor(t, f, mn'); h.LineStyle = 'none'; colorbar; 
+        title(sprintf('%s Seizure %d\nT=%0.1f', pat, seizure, T))
+        
+        print(fid, '-dpng')
+        close(gcf)
+        end
+    end
 
 end
