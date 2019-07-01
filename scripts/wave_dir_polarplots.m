@@ -1,4 +1,4 @@
-pat = 'MG49';
+% pat = 'MG49';
 files = dir([pat '_Seizure*wave_prop_1.mat']);
 nF = numel(files);
 sig = 5e-2;
