@@ -133,21 +133,21 @@ disp('Done.')
 %% Nested plotting function
     function plotmean
         
-        files = dir('*cohgram*ds*.mat');
+%         files = dir('*cohgram*ds*.mat');
         
-        close all
-        for file = {files.name}
-            [~, fid, ~] = fileparts(file{:});
-            disp(fid);
-            try
-                load(fid);
-            catch ME
-                disp(['Error loading ' fid])
-                continue
-            end
-            disp('Loaded')
+%         close all
+%         for file = {files.name}
+%             [~, basename, ~] = fileparts(file{:});
+%             disp(fid);
+%             try
+%                 load(basename);
+%             catch ME
+%                 disp(['Error loading ' basename])
+%                 continue
+%             end
+%             disp('Loaded')
             
-            strinfo = strsplit(fid, '_');
+            strinfo = strsplit(basename, '_');
             pat = strinfo{1};
             seizure = str2double(strinfo{2}(8:end));
             T = str2double(strinfo{end}(2:end));
@@ -156,15 +156,16 @@ disp('Done.')
 %         C = single(C);
         mn = quantile(C, .9, 3);
 %         C(C <= confC) = nan;
-        mn(mn < confC) = nan;
+        mn(mn < cast(confC, 'like', mn)) = nan;
 %         mn(sum(C > confC, 3) < length(pairs) / 2) = nan;
         
-        h = pcolor(t, f, mn'); h.LineStyle = 'none'; colorbar; 
+        imagesc(t, f, mn'); colorbar; axis xy;
         title(sprintf('%s Seizure %d\nT=%0.1f', pat, seizure, T))
+        xlabel('Time (s)'); ylabel('Frequency (Hz)')
         
         print(fid, '-dpng')
         close(gcf)
-        end
+%         end
     end
 
 end
