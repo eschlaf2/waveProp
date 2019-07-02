@@ -1,4 +1,4 @@
-pat = 'MG49';
+pat = 'c7';
 files = dir([pat '_Seizure*wave_prop_1.mat']);
 nF = numel(files);
 sig = 5e-2;
@@ -198,3 +198,6 @@ legend('difference')
 
 linkaxes([a1, a2], 'xy')
 
+close 1 3 4
+print(2, [pat '_polarhist'], '-dpng');
+print(5, [pat '_Seizure' res(1).name '_diff'], '-dpng')
