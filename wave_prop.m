@@ -129,6 +129,7 @@ switch metric
 		% Get band appropriate lfp
 		skipfactor = round(mea.SamplingRate / max(1e3, band(2)));
 		lfp = downsample(mea.Data, skipfactor);
+		lfp(:, mea.BadChannels) = [];
 		Time = downsample(Time, skipfactor);
 		samplingRate = 1 / mean(diff(Time));
 		filterband = ceil(band + [-.5 .5] .* band);
