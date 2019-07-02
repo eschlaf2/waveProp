@@ -42,12 +42,16 @@ params.tapers = [W T 1];  % [bandwidth time k] (numtapers = 2TW - k)
 params.pad = -1;  % no padding
 
 mea.Position(mea.BadChannels, :) = [];  % Remove bad channels
+[~, center] = min(sum((mea.Position - mean(mea.Position)).^2, 2));
+pairs = [repmat(center, nCh) 1:nCh];
 
 % Save information about the run
 outfile.data = data;
 outfile.position = mea.Position;
 outfile.badchannels = mea.BadChannels;
-outfile.pairs = nchoosek(1:nCh, 2);  % generate all pairs of channels
+% outfile.pairs = nchoosek(1:nCh, 2);  % generate all pairs of channels
+outfile.pairs = pairs;  % All pairs that include the central electrode
+outfile.center = center;
 outfile.params = params;
 outfile.movingwin = movingwin;
 
@@ -78,8 +82,9 @@ clear mea;  % free up memory
         
 %%
 % Initialize variables
-numpairs = nchoosek(nCh, 2);
-slicesize = 100;
+% numpairs = nchoosek(nCh, 2);
+numpairs = nCh;
+slicesize = 10;
 numslices = floor(numpairs / slicesize);
 [C, phi, t, f, confC] = deal(cell(1, numslices));
 
@@ -87,7 +92,7 @@ parfor ii = 1:numslices
     
     disp(ii)  % show progress
     
-    pairs = nchoosek(1:nCh, 2);  % avoid overhead communication
+%     pairs = nchoosek(1:nCh, 2);  % avoid overhead communication
     i0 = (ii - 1) * slicesize + 1;  % index of starting pair
     iF = min(i0 + slicesize - 1, numpairs);  % index of final pair
     
@@ -101,18 +106,6 @@ parfor ii = 1:numslices
     C{ii} = int16(C{ii} * 1e4);  % convert to int16
     phi{ii} = int16(phi{ii} * 1e4);
     
-%     if ii == 1
-%         C = int16(Csub * 1e4);
-%         phi = int16(phisub * 1e4);
-%     else 
-%         C = cat(3, C, int16(Csub * 1e4));  % scale C up and cast to int16
-%         phi = cat(3, phi, int16(phisub * 1e4));  % scale phi up and then cut it to int16
-%     end
-%     outfile.(sprintf('C%03d', ii)) = int16(C * 1e4);
-%     outfile.(sprintf('phi%03d', ii)) = int16(phi / pi * 1e4);
-%     outfile.(sprintf('f%03d', ii)) = f;
-        
-%     clear Csub phisub
     
 end
 disp('Saving result.')
