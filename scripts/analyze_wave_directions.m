@@ -65,7 +65,7 @@ disp('Computing wave directions from delays ...')
 	'exclude', false, 'showplots', showplots, 'T', T, 'band', band);
 plot_wave_directions(mea, delays);
 print(gcf, delays.Name, '-dpng')
-outfile.(sprintf('delays_T%02d_fband%d-%d', T, band)) = delays;
+outfile.(sprintf('delays_T%02d_fband%d_%d', T, band)) = delays;
 
 disp('Done.')
 
