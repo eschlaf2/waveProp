@@ -130,7 +130,7 @@ switch metric
 		skipfactor = round(mea.SamplingRate / max(1e3, band(2)));
 		lfp = downsample(mea.Data, skipfactor);
 		Time = downsample(Time, skipfactor);
-		samplingRate = mean(diff(Time));
+		samplingRate = 1 / mean(diff(Time));
 		filterband = ceil(band + [-.5 .5] .* band);
 		b = fir1(150, 2 * filterband / samplingRate);  % lo-pass to just over upper band
 		lfp = single(filtfilt(b, 1, double(lfp)));
