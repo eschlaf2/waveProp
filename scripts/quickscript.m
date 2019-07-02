@@ -44,6 +44,7 @@ params.pad = -1;  % no padding
 mea.Position(mea.BadChannels, :) = [];  % Remove bad channels
 [~, center] = min(sum((mea.Position - mean(mea.Position)).^2, 2));
 pairs = [repmat(center, 1, nCh); 1:nCh]';
+pairs(pairs(:, 1) - pairs(:, 2) == 0, :) = [];
 
 % Save information about the run
 outfile.data = data;
@@ -83,7 +84,7 @@ clear mea;  % free up memory
 %%
 % Initialize variables
 % numpairs = nchoosek(nCh, 2);
-numpairs = nCh;
+numpairs = nCh - 1;
 slicesize = 10;
 numslices = floor(numpairs / slicesize);
 [C, phi, t, f, confC] = deal(cell(1, numslices));
@@ -112,9 +113,12 @@ disp('Saving result.')
 f = f{1};
 t = t{1} - padding(1);  % correct for padding
 confC = int16(confC{1}(1) * 1e4);
+C = cat(3, C{:});
+phi = cat(3, phi{:});
+
 % Save results
-outfile.C = cat(3, C{:});
-outfile.phi = cat(3, phi{:});
+outfile.C = C;
+outfile.phi = phi;
 outfile.t = t;
 outfile.f = f;
 outfile.confC = confC;
