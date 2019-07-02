@@ -43,7 +43,7 @@ params.pad = -1;  % no padding
 
 mea.Position(mea.BadChannels, :) = [];  % Remove bad channels
 [~, center] = min(sum((mea.Position - mean(mea.Position)).^2, 2));
-pairs = [repmat(center, nCh) 1:nCh];
+pairs = [repmat(center, 1, nCh); 1:nCh]';
 
 % Save information about the run
 outfile.data = data;
