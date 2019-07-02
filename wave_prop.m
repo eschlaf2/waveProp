@@ -26,10 +26,11 @@ addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile')
 addRequired(p, 'metric', @(x) validate(x, allMetrics));
 addParameter(p, 'fitMethod', 'bos', @(x) validate(x, allFitMethods));
 addParameter(p, 'showPlots', true, @islogical);
-addParameter(p, 'T', 10, @isnumeric);
-addParameter(p, 'halfWin', 50, @isnumeric);
-addParameter(p, 'exclude', true, @islogical);
-addParameter(p, 'thresh', Inf, @isnumeric);
+addParameter(p, 'T', 10, @isnumeric);  % window length for delay method (s)
+addParameter(p, 'halfWin', 50, @isnumeric);  % half-window length for all non-delay methods (ms)
+addParameter(p, 'exclude', true, @islogical);  % logical: exclude inactive channels?
+addParameter(p, 'thresh', Inf, @isnumeric);  % threshold for deiviance methods
+addParameter(p, 'band', [1 13], @isnumeric);  % frequency band for coherence
 
 parse(p, mea, metric, varargin{:})
 struct2var(p.Results)
@@ -64,7 +65,7 @@ end
 end
 
 function [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, ...
-    metric, T, halfWin, thresh)
+    metric, T, halfWin, thresh, band)
 %% Compute wave propagation at each discharge time as described in 
 % Liou, Jyun You, et al. ?Multivariate Regression Methods for Estimating
 % Velocity of Ictal Discharges from Human Microelectrode Recordings.?
@@ -128,7 +129,7 @@ switch metric
 		Time = downsample(Time, skipfactor);
 		TimeMs = Time * 1e3;
 		compute_inds = arrayfun(@(t) find([TimeMs(:); Inf] >= t, 1), computeTimes);
-		[params, ~] = set_coherence_params(mea, Time, T);
+		[params, ~] = set_coherence_params(mea, Time, T, band);
 		plotTitles = strrep(mea.Name, '_', ' ');
 % 		computeTimes = TimeMs(compute_inds);
 		samplingRate = mea.SamplingRate / skipfactor;
@@ -389,9 +390,9 @@ function [lfp, skipfactor, mea] = get_lfp(mea)
 
 end
 
-function [params, compute_inds] = set_coherence_params(mea, Time, T)
+function [params, compute_inds] = set_coherence_params(mea, Time, T, band)
 
-	BAND = [1 13];                  % Select a frequency range to analyze
+% 	band = [1 13];                  % Select a frequency range to analyze
 	W = 2;                          % Bandwidth
 	NTAPERS = 2*(T * W) - 1;        % Choose the # of tapers.
 	OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
@@ -401,7 +402,7 @@ function [params, compute_inds] = set_coherence_params(mea, Time, T)
 	params.tapers = [T * W, NTAPERS];  % ... time-bandwidth product and tapers.
 	params.Fs = samplingRate; % ... sampling rate
 	params.pad = -1;                % ... no zero padding.
-	params.fpass = BAND;            % ... freq range to pass
+	params.fpass = band;            % ... freq range to pass
 	params.err = [1 0.05];          % ... theoretical error bars, p=0.05.
 	params.T = T;
 	
