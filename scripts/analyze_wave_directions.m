@@ -26,7 +26,7 @@ end
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
-outname = sprintf('%s_wave_prop_T%02d_%d', name, T, computetimesmethod);
+outname = sprintf('%s_wave_prop_%d', name, computetimesmethod);
 outfile = matfile(outname, 'writable', true);
 mea = exclude_channels(mea);
 [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
@@ -64,7 +64,7 @@ disp('Computing wave directions from delays ...')
 	'exclude', false, 'showplots', showplots, 'T', T);
 plot_wave_directions(mea, delays);
 print(gcf, delays.Name, '-dpng')
-outfile.delays = delays;
+outfile.(['delays' num2str(T)]) = delays;
 
 disp('Done.')
 
