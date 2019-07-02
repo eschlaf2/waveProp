@@ -55,6 +55,7 @@ outfile.pairs = pairs;  % All pairs that include the central electrode
 outfile.center = center;
 outfile.params = params;
 outfile.movingwin = movingwin;
+outfile.basename = basename;
 
 padding = mea.Padding;  % Store to correct t later
 clear mea;  % free up memory
@@ -176,7 +177,7 @@ plotmean();
             title(sprintf('%s Seizure %d\nT=%0.1f\nstd phi', pat, seizure, T))
             xlabel('Time (s)'); ylabel('Frequency (Hz)')
 
-            print(fid, '-dpng')
+            print(basename, '-dpng')
 
             close(gcf)
 %         end
