@@ -5,6 +5,7 @@ patpath = genpath(pat);  % ... and then add the local patient path on top
 addpath(patpath);  % ... so that it is searched first
 computetimesmethod = 1;
 T = 2;
+band = [25 50];
 showplots = false;
 
 fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
@@ -61,10 +62,10 @@ mea = exclude_channels(mea);
 
 disp('Computing wave directions from delays ...')
 [delays, mea] = wave_prop(mea, 'delays', ...
-	'exclude', false, 'showplots', showplots, 'T', T);
+	'exclude', false, 'showplots', showplots, 'T', T, 'band', band);
 plot_wave_directions(mea, delays);
 print(gcf, delays.Name, '-dpng')
-outfile.(['delays' num2str(T)]) = delays;
+outfile.(sprintf('delays_T%02d_fband%d-%d', T, band)) = delays;
 
 disp('Done.')
 
