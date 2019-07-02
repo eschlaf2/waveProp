@@ -60,7 +60,7 @@ end
 
 %% Compute fits
 [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, ...
-	T, halfWin, thresh);
+	T, halfWin, thresh, band);
 
 end
 
@@ -124,15 +124,23 @@ switch metric
 		spike_times = TimeMs(timeInds);                                    % Get the spike times in ms
         warning off MATLAB:scatteredInterpolant:DupPtsAvValuesWarnId
 	case 'delays'
-		[computeTimes, mea] = get_waveTimes(mea);                          % Get discharge times
-		[lfp, skipfactor, mea] = get_lfp(mea);
+		[computeTimes, mea] = get_waveTimes(mea);  % Get discharge times
+		
+		% Get band appropriate lfp
+		skipfactor = round(mea.SamplingRate / max(1e3, band(2)));
+		lfp = downsample(mea.Data, skipfactor);
 		Time = downsample(Time, skipfactor);
+		samplingRate = mean(diff(Time));
+		filterband = ceil(band + [-.5 .5] .* band);
+		b = fir1(150, 2 * filterband / samplingRate);  % lo-pass to just over upper band
+		lfp = single(filtfilt(b, 1, double(lfp)));
+		
 		TimeMs = Time * 1e3;
-		compute_inds = arrayfun(@(t) find([TimeMs(:); Inf] >= t, 1), computeTimes);
-		[params, ~] = set_coherence_params(mea, Time, T, band);
+% 		compute_inds = arrayfun(@(t) find([TimeMs(:); Inf] >= t, 1), computeTimes);
+		[params, ~] = set_coherence_params(Time, T, band);
 		plotTitles = strrep(mea.Name, '_', ' ');
 % 		computeTimes = TimeMs(compute_inds);
-		samplingRate = mea.SamplingRate / skipfactor;
+% 		samplingRate = mea.SamplingRate / skipfactor;
 		[~, center] = min(sum((position - mean(position)).^2, 2));         % find the most central electrode
 end
 		
@@ -215,7 +223,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 
 		case 'delays'
 
-			inds = and((TimeMs >= t -  T / 2 * 1e3), ...
+			inds = and((TimeMs >= t - T / 2 * 1e3), ...
 				(TimeMs <= t + T / 2 * 1e3));  % Select the window around the event time
 			params.T = range(TimeMs(inds)) / 1e3;
 % 			inds = compute_inds(ii) : (compute_inds(ii) + T * samplingRate - 1);
@@ -390,14 +398,14 @@ function [lfp, skipfactor, mea] = get_lfp(mea)
 
 end
 
-function [params, compute_inds] = set_coherence_params(mea, Time, T, band)
+function [params, compute_inds] = set_coherence_params(Time, T, band)
 
 % 	band = [1 13];                  % Select a frequency range to analyze
 	W = 2;                          % Bandwidth
 	NTAPERS = 2*(T * W) - 1;        % Choose the # of tapers.
 	OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
 	
-	samplingRate = mea.SamplingRate / mea.skipfactor;
+	samplingRate = 1 / mean(diff(Time));
 	
 	params.tapers = [T * W, NTAPERS];  % ... time-bandwidth product and tapers.
 	params.Fs = samplingRate; % ... sampling rate
