@@ -181,21 +181,22 @@ title('p-values')
 
 %%
 
-figure(5); fullwidth(1)
-metrics = {'delays2', 'events'};
+figure(5); fullwidth(true)
+seizure = 3;
+metrics = {'events', 'delays_T02_fband25_50'};
 whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
 
 a1 = subplot(2,1,1);
-stem(res(1).time, res(1).Z(:, whichfields), 'filled');
+stem(res(seizure).time, res(seizure).Z(:, whichfields), 'filled');
 legend(metrics)
 
 a2 = subplot(2,1,2);
-d1 = -diff(res(1).Z(:, whichfields)');
+d1 = -diff(res(seizure).Z(:, whichfields)');
 d1(d1 > pi) = d1(d1 > pi) - 2*pi;
 d1(d1 < -pi) = d1(d1 < -pi) + 2*pi;
-stem(res(1).time, d1, 'filled');
+stem(res(seizure).time, d1, 'filled');
 hold on
-plot(res(1).time, smoothdata(d1, 'movmean', 10))
+plot(res(seizure).time, smoothdata(d1, 'movmean', 10))
 hold off;
 legend('difference')
 
@@ -203,4 +204,4 @@ linkaxes([a1, a2], 'xy')
 
 close 1 3 4
 print(2, [pat '_polarhist'], '-dpng');
-print(5, [pat '_Seizure' res(1).name '_diff'], '-dpng')
+print(5, [pat '_Seizure' res(seizure).name '_diff'], '-dpng')
