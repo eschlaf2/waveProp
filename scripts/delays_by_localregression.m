@@ -1,4 +1,5 @@
 % delays_by_localregression
+phi(C < confC) = nan;
 if isinteger(phi); phi = single(phi) / 1e4; end
 dphi = permute(phi, [2 1 3]);  % permute array to f x t x pairs
 dphi = gradient(dphi, f(2) - f(1));  % d/df
@@ -14,9 +15,10 @@ delays = matlab.internal.math.localRegression(dphi, winsz, dim, ...
         
 %% Imagesc delays
 
+clims = quantile(delays(:), [.025 .975]);
 for ii = 1:10
     temp = delays(:, :, ii);
-    imagesc(t, f, temp, quantile(temp(:), [.05, .95]));
+    imagesc(t, f, temp, clims);
     axis xy; colorbar; ylim([0 100]); drawnow(); pause();
 end 
 
