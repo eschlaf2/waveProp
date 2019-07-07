@@ -166,11 +166,13 @@ plotmean();
             imagesc(t, f, mn'); colorbar; axis xy;
             title(sprintf('%s Seizure %d\nT=%0.1f\nMean coherence', pat, seizure, T))
             xlabel('Time (s)'); ylabel('Frequency (Hz)')
+            ylim([0 50])
 
             subplot(2, 2, 2);
             imagesc(t, f, phimn'); colorbar; axis xy;
             title(sprintf('%s Seizure %d\nT=%0.1f\nMean phi', pat, seizure, T))
             xlabel('Time (s)'); ylabel('Frequency (Hz)')
+            ylim([0 50])
 
     %         print([fid '_mean_phi'], '-dpng')
 
@@ -178,6 +180,7 @@ plotmean();
             imagesc(t, f, phistd'); colorbar; axis xy;
             title(sprintf('%s Seizure %d\nT=%0.1f\nstd phi', pat, seizure, T))
             xlabel('Time (s)'); ylabel('Frequency (Hz)')
+            ylim([0 50])
 
             print(fid, '-dpng')
 
