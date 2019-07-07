@@ -1,5 +1,5 @@
 % delays_by_localregression
-if ~isinteger(phi); phi = single(phi) / 1e4; end
+if isinteger(phi); phi = single(phi) / 1e4; end
 dphi = permute(phi, [2 1 3]);  % permute array to f x t x pairs
 dphi = gradient(dphi, f(2) - f(1));  % d/df
 
