@@ -1,4 +1,4 @@
-% pat = 'MG49';
+% pat = 'c7';
 files = dir([pat '_Seizure*wave_prop_1.mat']);
 nF = numel(files);
 sig = 5e-2;
@@ -12,7 +12,7 @@ res(nF) = struct(...
     'p', []);
 
 figure(1); clf; fullwidth(true);
-metrics = {'delays', 'events', 'maxdescent'};
+metrics = {'delays', 'events', 'delays_T02_fband25_50'};
 for ii = 1:nF
 	res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');
 	res(ii).data = load(fullfile(files(ii).folder, files(ii).name));
@@ -72,7 +72,7 @@ for ii = 1:nF
     title(strrep(res(ii).name, '_', ''));
     
 end
-legend(fields(whichfields), 'position', [.9 .55 0 0])
+legend(strrep(fields(whichfields), '_', ' '), 'position', [.9 .55 0 0])
 rlim = arrayfun(@(a) a.RLim(2), ax);
 for kk = 1:numel(ax)
 	ax(kk).RLim = [0 max(rlim)];
@@ -86,9 +86,10 @@ ttl = @(s) annotation('textbox', ...
     'FitBoxToText', 'on', ...
     'LineStyle', 'none');
 ttl(pat)
+
 %% Comparison of metrics
 
-metrics = {'delays', 'events', 'maxdescent'};
+metrics = {'delays', 'events', 'delays_T02_fband25_50'};
 alltime = cell(numel(metrics), 1);
 % Make a matrix of all metrics from all seizures
 for seiz = 1:nF  % for each seizure
@@ -125,7 +126,7 @@ for dd = 1:nP  % For each pair
     polarplot(ax, data, alltime, '.'); hold off;  % ... add the differences at each time
     
     % Prettify
-    title(ax, sprintf('%s - %s', metrics{d1}, metrics{d2}))
+    title(ax, strrep(sprintf('%s - %s', metrics{d1}, metrics{d2}), '_', ' '))
     axis tight
     ax.ThetaTickLabel = [];
 %     set(gca, 'thetaticklabels', [])
@@ -134,32 +135,34 @@ ttl(sprintf('%s', pat));
 
 
 %% Blurred im
+HIDE = true;
 
-dim = 100;
-figure(3); fullwidth()
-metrics = {'falling'};
-scale = @(x, M) round((x - min(x)) / range(x) * (M - 1) + 1);
-for file = 1:nF
-    fields = fieldnames(res(file).data);
-    whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
-    ax = subplot(1, nF, file);
-    time = res(file).time(:); time = time - min(time);
-    xdata = time .* cos(res(file).Z(:, whichfields)); 
-    ydata = time .* sin(res(file).Z(:, whichfields)); 
-    valid = ~isnan(xdata);
-    cdata = ones(size(ydata));
-    inds = sub2ind([dim, dim], ...
-        scale(xdata(valid), dim), scale(ydata(valid), dim));
-    k = 10;
-    K = gausswin(k) * gausswin(k)';  
-    % K = ones(k) / k^2;
-    im = zeros(dim);
-    im(inds) = 1;
-    imagesc(ax, conv2(im, K, 'same'))
-    axis square
-    axis xy
+if ~HIDE
+	dim = 100;
+	figure(3); fullwidth()
+	metrics = {'falling'};
+	scale = @(x, M) round((x - min(x)) / range(x) * (M - 1) + 1);
+	for file = 1:nF
+		fields = fieldnames(res(file).data);
+		whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
+		ax = subplot(1, nF, file);
+		time = res(file).time(:); time = time - min(time);
+		xdata = time .* cos(res(file).Z(:, whichfields)); 
+		ydata = time .* sin(res(file).Z(:, whichfields)); 
+		valid = ~isnan(xdata);
+		cdata = ones(size(ydata));
+		inds = sub2ind([dim, dim], ...
+			scale(xdata(valid), dim), scale(ydata(valid), dim));
+		k = 10;
+		K = gausswin(k) * gausswin(k)';  
+		% K = ones(k) / k^2;
+		im = zeros(dim);
+		im(inds) = 1;
+		imagesc(ax, conv2(im, K, 'same'))
+		axis square
+		axis xy
+	end
 end
-
 %% Plot p-values
 
 figure(4); fullwidth();
@@ -178,23 +181,27 @@ title('p-values')
 
 %%
 
-figure(5); fullwidth(1)
-metrics = {'delays', 'events'};
+figure(5); fullwidth(true)
+seizure = 3;
+metrics = {'events', 'delays_T02_fband25_50'};
 whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
 
 a1 = subplot(2,1,1);
-stem(res(1).time, res(1).Z(:, whichfields), 'filled');
+stem(res(seizure).time, res(seizure).Z(:, whichfields), 'filled');
 legend(metrics)
 
 a2 = subplot(2,1,2);
-d1 = -diff(res(1).Z(:, whichfields)');
+d1 = -diff(res(seizure).Z(:, whichfields)');
 d1(d1 > pi) = d1(d1 > pi) - 2*pi;
 d1(d1 < -pi) = d1(d1 < -pi) + 2*pi;
-stem(res(1).time, d1, 'filled');
+stem(res(seizure).time, d1, 'filled');
 hold on
-plot(res(1).time, smoothdata(d1, 'movmean', 10))
+plot(res(seizure).time, smoothdata(d1, 'movmean', 10))
 hold off;
 legend('difference')
 
 linkaxes([a1, a2], 'xy')
 
+close 1 3 4
+print(2, [pat '_polarhist'], '-dpng');
+print(5, [pat '_Seizure' res(seizure).name '_diff'], '-dpng')

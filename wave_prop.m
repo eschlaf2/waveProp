@@ -26,10 +26,11 @@ addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile')
 addRequired(p, 'metric', @(x) validate(x, allMetrics));
 addParameter(p, 'fitMethod', 'bos', @(x) validate(x, allFitMethods));
 addParameter(p, 'showPlots', true, @islogical);
-addParameter(p, 'T', 10, @isnumeric);
-addParameter(p, 'halfWin', 50, @isnumeric);
-addParameter(p, 'exclude', true, @islogical);
-addParameter(p, 'thresh', Inf, @isnumeric);
+addParameter(p, 'T', 10, @isnumeric);  % window length for delay method (s)
+addParameter(p, 'halfWin', 50, @isnumeric);  % half-window length for all non-delay methods (ms)
+addParameter(p, 'exclude', true, @islogical);  % logical: exclude inactive channels?
+addParameter(p, 'thresh', Inf, @isnumeric);  % threshold for deiviance methods
+addParameter(p, 'band', [1 13], @isnumeric);  % frequency band for coherence
 
 parse(p, mea, metric, varargin{:})
 struct2var(p.Results)
@@ -59,12 +60,12 @@ end
 
 %% Compute fits
 [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, ...
-	T, halfWin, thresh);
+	T, halfWin, thresh, band);
 
 end
 
 function [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, ...
-    metric, T, halfWin, thresh)
+    metric, T, halfWin, thresh, band)
 %% Compute wave propagation at each discharge time as described in 
 % Liou, Jyun You, et al. ?Multivariate Regression Methods for Estimating
 % Velocity of Ictal Discharges from Human Microelectrode Recordings.?
@@ -123,15 +124,24 @@ switch metric
 		spike_times = TimeMs(timeInds);                                    % Get the spike times in ms
         warning off MATLAB:scatteredInterpolant:DupPtsAvValuesWarnId
 	case 'delays'
-		[computeTimes, mea] = get_waveTimes(mea);                          % Get discharge times
-		[lfp, skipfactor, mea] = get_lfp(mea);
+		[computeTimes, mea] = get_waveTimes(mea);  % Get discharge times
+		
+		% Get band appropriate lfp
+		skipfactor = round(mea.SamplingRate / max(1e3, band(2)));
+		lfp = downsample(mea.Data, skipfactor);
+		lfp(:, mea.BadChannels) = [];
 		Time = downsample(Time, skipfactor);
+		samplingRate = 1 / mean(diff(Time));
+		filterband = ceil(band + [-.5 .5] .* band);
+		b = fir1(150, 2 * filterband / samplingRate);  % lo-pass to just over upper band
+		lfp = single(filtfilt(b, 1, double(lfp)));
+		
 		TimeMs = Time * 1e3;
-		compute_inds = arrayfun(@(t) find([TimeMs(:); Inf] >= t, 1), computeTimes);
-		[params, ~] = set_coherence_params(mea, Time, T);
+% 		compute_inds = arrayfun(@(t) find([TimeMs(:); Inf] >= t, 1), computeTimes);
+		[params, ~] = set_coherence_params(Time, T, band);
 		plotTitles = strrep(mea.Name, '_', ' ');
 % 		computeTimes = TimeMs(compute_inds);
-		samplingRate = mea.SamplingRate / skipfactor;
+% 		samplingRate = mea.SamplingRate / skipfactor;
 		[~, center] = min(sum((position - mean(position)).^2, 2));         % find the most central electrode
 end
 		
@@ -214,7 +224,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 
 		case 'delays'
 
-			inds = and((TimeMs >= t -  T / 2 * 1e3), ...
+			inds = and((TimeMs >= t - T / 2 * 1e3), ...
 				(TimeMs <= t + T / 2 * 1e3));  % Select the window around the event time
 			params.T = range(TimeMs(inds)) / 1e3;
 % 			inds = compute_inds(ii) : (compute_inds(ii) + T * samplingRate - 1);
@@ -310,174 +320,6 @@ mea.wave_fit = wave_fit;
 
 end
 
-
-function [wave_fit, mea] = bos_method(mea, PLOT, varargin)
-
-
-%% Parse input and set defaults
-
-BAND = [1 13];                  % Select a frequency range to analyze
-T = 10;                         % Length of recording (s)
-W = 2;                          % Bandwidth
-ntapers = 2*(T * W) - 1;        % Choose the # of tapers.
-OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
-Name = strrep(mea.Name, '_', ' ');
-
-if any(cellfun(@(v) strcmpi(v, 'T'), varargin{1}))
-	ind = find(cellfun(@(v) strcmp(v, 'T'), varargin{1}));
-	T = varargin{1}{ind + 1};
-end
-
-if PLOT
-	% 
-	PLOT = 'plot';
-	figure;
-	img_dir = sprintf('%s_wave_prop_bos_T%d', mea.Name, T);
-	if ~exist(img_dir, 'dir')
-		mkdir(img_dir);
-	end
-else
-	PLOT = '';
-end
-
-try
-	lfp = mea.lfp;  % import lfp band
-	if any(strcmpi(fieldnames(mea), 'skipfactor'))
-		skipfactor = mea.skipfactor;
-	else
-		skipfactor = 1;
-	end
-catch ME
-	lfp = filter_mea(mea, 'lfp');
-	skipfactor = lfp.skipfactor;
-	lfp = lfp.lfp;
-	
-end
-
-position = mea.Position;
-if any(strcmpi(fieldnames(mea), 'BadChannels'))
-	position(mea.BadChannels, :) = [];
-end
-
-[~, center] = min((position(:,1) - mean(position(:,1))).^2 +...         % find the most central electrode
-			  (position(:,2) - mean(position(:,2))).^2);
-
-%% Set parameters
-% Note: the chronux toolbox must be on the path
-
-% Downsample lfp
-	
-ds_freq = 1e3;  % downsampled frequency (Hz)
-samplingRate = mea.SamplingRate;
-lfp_freq = samplingRate / skipfactor;
-ds_step = floor(max(1, lfp_freq / ds_freq));  % how to step through the data
-lfp = lfp(1 : ds_step : end, :);  % downsample
-		
-ds_freq = lfp_freq / ds_step;  % recompute DS_FREQ in case of rounding
-nsamp = size(lfp, 1);
-
-time = mea.Time;  % import time
-time = time();
-time = time(1:skipfactor:end);  % downsample to match lfp
-time = time(1 : ds_step : end);  % downsample further if necessary
-% wave_times = mea.waveTimes;
-padding = mea.Padding;
-
-params.tapers = [T * W, ntapers];  % ... time-bandwidth product and tapers.
-params.Fs = ds_freq;                 % ... sampling rate
-params.pad = -1;                % ... no zero padding.
-params.fpass = BAND;            % ... freq range to pass
-params.err = [1 0.05];          % ... theoretical error bars, p=0.05.
-
-
-COMPUTE_INDS = [round(1 : OVERLAP_COMPLEMENT * ds_freq : nsamp - T * ds_freq) nsamp];
-% [~, COMPUTE_INDS] = arrayfun(@(t) min(abs(t - time)), wave_times / 1e3);
-
-TS = find(time(COMPUTE_INDS) > 0, 1);
-TE = find(time(COMPUTE_INDS) > (time(end) - max(padding(2), T)), 1) - 1;
-if isempty(TE)
-	TE = numel(COMPUTE_INDS);
-end
-
-COMPUTE_INDS = COMPUTE_INDS(TS : TE);  % only compute while in seizure
-N = numel(COMPUTE_INDS);
-
-
-%%
-
-% Initialize arrays
-beta = zeros(N, 3);
-src_dir = zeros(N, 1);
-speed = zeros(N, 1);
-ci_dir = zeros(N, 2);
-ci_sp = zeros(N, 2);
-psig = zeros(N, 1);
-delays = zeros(N, length(position), 'single');
-if PLOT
-	phis = cell(N, 1);
-end
-
-for i = 1:N  % For each interval during the seizure
-	
-	% get time indices over which to compute coherence
-	inds = COMPUTE_INDS(i) : (COMPUTE_INDS(i) + T * ds_freq - 1);
-	
-	% compute the coherence over the selected interval
-	fprintf('Estimating waves at time %d/%d\n', i, N)
-	try
-	[coh, phi, freq, coh_conf] = compute_coherence(lfp(inds, :), params, 'pairs', center);
-	% compute delays on each electrode based on coherence
-	[delay, ~, ~] = compute_delay(coh, coh_conf, phi, freq);
-	
-	delay = delay(center,:);                                                % we use delays relative to the center
-
-	delays(i, :) = delay;
-	
-	if PLOT
-		phi(coh < coh_conf) = NaN;
-		phis{i} = squeeze(phi(center, :, :));
-	end
-	
-	% fit plane to delays
-	[beta(i, :), src_dir(i), speed(i), ci_dir(i, :), ci_sp(i, :), psig(i)] = ...
-		estimate_wave(delay, position, PLOT);
-	
-	catch ME
-		rethrow(ME);
-		disp(ME)
-		disp(i)
-		continue
-	end
-	
-	if PLOT
-		title(sprintf('%s\n %0.3f s', Name, time(COMPUTE_INDS(i))));
-		print(gcf, fullfile(img_dir, num2str(i, '%03d')), '-dpng')
-% 		frame = getframe(gcf);
-% 		writeVideo(v, frame);
-	end
-
-end
-V = speed .* exp(1i * src_dir);  % wave velocity (for consistency with NYC method)
-V = [real(V) imag(V)];
-
-wave_fit = struct('Z', src_dir, 'V', V, 'sp', speed, ...
-	'ci_Z', ci_dir, 'ci_sp', ci_sp,...
-	'delays', delays, ...
-	'freq', freq, ...
-	'p', psig, ...							  % significance level
-	'params', params, ...                     % analysis parameters
-	'wave_times', time(COMPUTE_INDS) * 1e3);  % wave times in ms.
-if PLOT
-	wave_fit.phis = phis;
-end
-
-mea.(sprintf('wave_fit_bos_T%d', T)) = wave_fit;
-
-if PLOT
-	png2avi(img_dir);
-end
-end
-
 function [beta, V, p] = fit_wave_bos(data, position, metric)
 	[beta, ~, ~, ~, ~, p] = estimate_wave(data, position);
     
@@ -557,19 +399,19 @@ function [lfp, skipfactor, mea] = get_lfp(mea)
 
 end
 
-function [params, compute_inds] = set_coherence_params(mea, Time, T)
+function [params, compute_inds] = set_coherence_params(Time, T, band)
 
-	BAND = [1 13];                  % Select a frequency range to analyze
+% 	band = [1 13];                  % Select a frequency range to analyze
 	W = 2;                          % Bandwidth
 	NTAPERS = 2*(T * W) - 1;        % Choose the # of tapers.
 	OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
 	
-	samplingRate = mea.SamplingRate / mea.skipfactor;
+	samplingRate = 1 / mean(diff(Time));
 	
 	params.tapers = [T * W, NTAPERS];  % ... time-bandwidth product and tapers.
 	params.Fs = samplingRate; % ... sampling rate
 	params.pad = -1;                % ... no zero padding.
-	params.fpass = BAND;            % ... freq range to pass
+	params.fpass = band;            % ... freq range to pass
 	params.err = [1 0.05];          % ... theoretical error bars, p=0.05.
 	params.T = T;
 	
