@@ -34,11 +34,9 @@ function plot_wave_polar(res, metrics, sig, ax1, ax2)
 		interp1(res.time, Zu, tt), ...
 		'movmean', 5 / (tt(2) - tt(1)), 'omitnan');
 	polarplot(ax1, data, tt, '-', 'linewidth', 2);
-    ax1.ColorOrder = varycolor(5);
 	axis tight;
     title(strrep(res.name, '_', ''));
     
-	subplot(2, nF, ii + nF, ax2);
 	polarplot(ax2, res.Z(:, whichfields), time, '.', ...
 		'markersize', 10);
 	hold off;
