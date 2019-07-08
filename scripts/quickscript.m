@@ -21,6 +21,7 @@ mea = exclude_channels(mea);
 
 skipfactor = floor(mea.SamplingRate / 1e3);  % Downsample data to ~1e3 Hz
 data = downsample(mea.Data, skipfactor);
+data(:, mea.BadChannels) = [];
 Fs = mea.SamplingRate / skipfactor;
 
 nCh = size(data, 2);
@@ -87,14 +88,13 @@ clear mea;  % free up memory
 % numpairs = nchoosek(nCh, 2);
 numpairs = nCh - 1;
 slicesize = 10;
-numslices = floor(numpairs / slicesize);
+numslices = ceil(numpairs / slicesize);
 [C, phi, t, f, confC] = deal(cell(1, numslices));
 
 parfor ii = 1:numslices
     
     disp(ii)  % show progress
     
-%     pairs = nchoosek(1:nCh, 2);  % avoid overhead communication
     i0 = (ii - 1) * slicesize + 1;  % index of starting pair
     iF = min(i0 + slicesize - 1, numpairs);  % index of final pair
     
