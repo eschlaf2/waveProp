@@ -19,6 +19,7 @@ for ii = 1:nF
 	
     [ax1, ax2] = deal(polaraxes());
     subplot(2, nF, ii, ax1);
+    subplot(2, nF, ii + nF, ax2);
     plot_wave_polar(res(ii), metrics, sig, ax1, ax2);
     
 end
