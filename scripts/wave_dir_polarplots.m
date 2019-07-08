@@ -17,7 +17,9 @@ for ii = 1:nF
 	res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');
 	res(ii).data = load(fullfile(files(ii).folder, files(ii).name));
 	
-    plot_wave_polar(res(ii), metrics, sig);
+    [ax1, ax2] = deal(polaraxes());
+    subplot(2, nF, ii, ax1);
+    plot_wave_polar(res(ii), metrics, sig, ax1, ax2);
     
 end
 legend(strrep(fields(whichfields), '_', ' '), 'position', [.9 .55 0 0])
