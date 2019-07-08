@@ -19,6 +19,18 @@ clims = quantile(delays(:), [.025 .975]);
 for ii = 1:10
     temp = delays(:, :, ii);
     imagesc(t, f, temp, clims);
-    axis xy; colorbar; ylim([0 100]); drawnow(); pause();
+    axis xy; colorbar; ylim([0 500]); drawnow(); pause();
 end 
+
+%% Fit delays
+
+predictors = [ones(size(f)); f; f.^2; f.^3]';
+delaysR = reshape(delays, length(f), []);
+[polyfit, ~, ~, ~, stats] = arrayfun(@(ii) regress(delaysR(:, ii), predictors), 1:length(delaysR), 'uni', 0);
+polyfit = reshape(cat(2, polyfit{:}), size(predictors, 2), length(t), []);
+polyfit = permute(polyfit, [2 3 1]);
+p = reshape(cellfun(@(x) x(3), stats), length(t), []);
+
+
+
 
