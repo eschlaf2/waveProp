@@ -68,20 +68,20 @@ nP = size(pairs, 1);
 r = floor(sqrt(nP)); c = ceil(nP / r);  % Create an appropriate number of subplots
 figure(2); clf; fullwidth(r > 1);
 for dd = 1:nP  % For each pair
-    ax = polaraxes();  % Create a polar axis,
-    subplot(r, c, dd, ax)  % ... place it,
+    ax2 = polaraxes();  % Create a polar axis,
+    subplot(r, c, dd, ax2)  % ... place it,
     d1 = pairs(dd, 1); d2 = pairs(dd, 2);  % ... assign convenience vars,
     data = alldata(:, d1) - alldata(:, d2);  % ... compute the difference between angles from each metric,
     edges = linspace(0, 2*pi, 41);  % ... create 40 bins between 0 and 2pi,
     bc = histcounts(mod(data, 2*pi), edges);  % ... get the counts per bin,
     bc = bc/max(bc);  % ... scale to match time (relative), 
-    polarhistogram(ax, 'BinEdges', edges, 'BinCounts', bc); hold on;  % ... draw the histogram,
-    polarplot(ax, data, alltime, '.'); hold off;  % ... add the differences at each time
+    polarhistogram(ax2, 'BinEdges', edges, 'BinCounts', bc); hold on;  % ... draw the histogram,
+    polarplot(ax2, data, alltime, '.'); hold off;  % ... add the differences at each time
     
     % Prettify
-    title(ax, strrep(sprintf('%s - %s', metrics{d1}, metrics{d2}), '_', ' '))
+    title(ax2, strrep(sprintf('%s - %s', metrics{d1}, metrics{d2}), '_', ' '))
     axis tight
-    ax.ThetaTickLabel = [];
+    ax2.ThetaTickLabel = [];
 %     set(gca, 'thetaticklabels', [])
 end
 ttl(sprintf('%s', pat));
