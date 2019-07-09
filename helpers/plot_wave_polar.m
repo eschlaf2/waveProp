@@ -1,4 +1,7 @@
-function [res, ax1, ax2] = plot_wave_polar(res, metrics, sig)
+function [res, ax1, ax2] = plot_wave_polar(res, metrics, sig, ax1, ax2)
+    
+    if ~exist('ax1', 'var'); ax1 = polaraxes(); end
+    if ~exist('ax2', 'var'); ax2 = polaraxes(); end
     
     fields = fieldnames(res.data);
 	whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
@@ -34,12 +37,10 @@ function [res, ax1, ax2] = plot_wave_polar(res, metrics, sig)
 		interp1(res.time, Zu, tt), ...
 		'movmean', 5 / (tt(2) - tt(1)), 'omitnan');
     
-    ax1 = polaraxes();
 	polarplot(ax1, data, tt, '-', 'linewidth', 2);
 	axis tight;
     title(strrep(res.name, '_', ''));
     
-    ax2 = polaraxes();
 	polarplot(ax2, res.Z(:, whichfields), time, '.', ...
 		'markersize', 10);
 	hold off;
