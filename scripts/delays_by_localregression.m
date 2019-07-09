@@ -42,7 +42,7 @@ temp = bfit.o0;
 clims = quantile(temp(:), [.01, .99]);
 imagesc(t, pairs(:, 2), temp', clims); colorbar
 
-bfit.o0 = squeeze(mean(delays, 1), 'omitnan');
+bfit.o0 = squeeze(median(delays, 1, 'omitnan'));
 
 %% Fit waves
 
