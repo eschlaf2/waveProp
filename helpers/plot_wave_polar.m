@@ -1,4 +1,4 @@
-function [ax1, ax2] = plot_wave_polar(res, metrics, sig)
+function [res, ax1, ax2] = plot_wave_polar(res, metrics, sig)
     
     fields = fieldnames(res.data);
 	whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
