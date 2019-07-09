@@ -27,6 +27,7 @@ end
 %% Fit delays
 
 predictors = [ones(size(f)); f; f.^2; f.^3]';
+predictors = [ones(size(f))]';
 delaysR = reshape(delays, length(f), []);
 [polyfit, ~, ~, ~, stats] = arrayfun(@(ii) regress(delaysR(finds, ii), predictors(finds, :)), 1:length(delaysR), 'uni', 0);
 polyfit = reshape(cat(2, polyfit{:}), size(predictors, 2), length(t), []);
@@ -42,7 +43,7 @@ temp = bfit.o0;
 clims = quantile(temp(:), [.01, .99]);
 imagesc(t, pairs(:, 2), temp', clims); colorbar
 
-bfit.o0 = squeeze(median(delays, 1, 'omitnan'));
+% bfit.o0 = squeeze(median(delays, 1, 'omitnan'));
 
 %% Fit waves
 
