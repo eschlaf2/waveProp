@@ -64,6 +64,7 @@ Z = angle(V * [1; 1i]);
 
 %% for comparison with other delay algorithms
 pat = 'c7';
+plotnum = 1;
 wave_dir_polarplots;
 res.data.delays_all.Z = interp1(t, Z, res.time, 'nearest');
 res.data.delays_all.p = interp1(t, pdel, res.time, 'nearest');
