@@ -63,14 +63,14 @@ alltime = cat(1, alltime{:});  % make a long column of all time points
 % ... in time relative to seizure progression
 
 
-pairs = nchoosek(1:numel(metrics), 2);  % Get each pair of metrics
-nP = size(pairs, 1);
+metricpairs = nchoosek(1:numel(metrics), 2);  % Get each pair of metrics
+nP = size(metricpairs, 1);
 r = floor(sqrt(nP)); c = ceil(nP / r);  % Create an appropriate number of subplots
 figure(2); clf; fullwidth(r > 1);
 for dd = 1:nP  % For each pair
     ax2 = polaraxes();  % Create a polar axis,
     subplot(r, c, dd, ax2)  % ... place it,
-    d1 = pairs(dd, 1); d2 = pairs(dd, 2);  % ... assign convenience vars,
+    d1 = metricpairs(dd, 1); d2 = metricpairs(dd, 2);  % ... assign convenience vars,
     data = alldata(:, d1) - alldata(:, d2);  % ... compute the difference between angles from each metric,
     edges = linspace(0, 2*pi, 41);  % ... create 40 bins between 0 and 2pi,
     bc = histcounts(mod(data, 2*pi), edges);  % ... get the counts per bin,

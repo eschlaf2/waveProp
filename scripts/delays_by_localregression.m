@@ -12,7 +12,7 @@ nanflag = 'includenan';  % don't interpolate nans
 degree = 2;  % linear
 method = 'rlowess';
 
-delays = matlab.internal.math.localRegression(dphi, winsz, dim, ...
+delays = -matlab.internal.math.localRegression(dphi, winsz, dim, ...
             nanflag, degree, method, f);
         
 %% Imagesc delays
@@ -35,16 +35,18 @@ pdel = reshape(cellfun(@(x) x(3), stats), length(t), []);
 
 for ii = 1:size(polyfit, 3)
     fn = sprintf('o%d', ii - 1);
-    b.(fn) = polyfit(:, :, ii); b.(fn)(pdel >= .05) = nan;
+    bfit.(fn) = polyfit(:, :, ii); bfit.(fn)(pdel >= .05) = nan;
 end
 
-temp = b.o0;
+temp = bfit.o0;
 clims = quantile(temp(:), [.01, .99]);
 imagesc(t, pairs(:, 2), temp', clims); colorbar
 
+bfit.o0 = squeeze(mean(delays, 1));
+
 %% Fit waves
 
-delaystofit = b.o0;
+delaystofit = bfit.o0;
 [beta, ~, ~, ~, ~, pdel] = arrayfun(@(ii)...
     estimate_wave(delaystofit(ii, :), position(pairs(:, 2), :)), ...
     1:numel(t), 'uni', 0);
@@ -68,4 +70,10 @@ res.data.delays_all.p = interp1(t, pdel, res.time, 'nearest');
 res.data.delays_all.beta = beta(interp1(t, 1:length(t), res.time, 'nearest', 'extrap'), :);
 res.Z = [res.Z res.data.delays_all.Z];
 res.p = [res.p res.data.delays_all.p];
+metrics = {'delays', 'delays_all', 'delays_T02_fband25_50'};
+res = plot_wave_polar(res, metrics, sig, ax(1), ax(2));
+legend(metrics)
+
+
+
 
