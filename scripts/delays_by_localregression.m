@@ -1,9 +1,9 @@
 % delays_by_localregression
 
-winsz = 3;  % Hz
+winsz = 5;  % Hz
 thresh = 5e-2; 
 df = f(2) - f(1); 
-fband = [25 50];
+fband = [1 50];
 % MASK = false;
 
 if isinteger(phi); phi = single(phi) / 1e4; end
@@ -45,15 +45,16 @@ method = 'rlowess';
 
 % delays = -matlab.internal.math.localRegression(dphi, winsz, dim, ...
 %             nanflag, degree, method, f);
-delays = -smoothdata(dphi, 1, method, winsz, nanflag, 'SamplePoints', f(finds));	
+[delays, wn] = smoothdata(-dphi, 1, method, winsz / df, nanflag);	
         
 %% Imagesc delays
 
-clims = quantile(phif(:), [.025 .975]);
+clims = quantile(delays(:), [.025 .975]);
 for ii = 1:10
 	inds = (ii - 1) * numel(t) + 1: ii * numel(t);
-    temp = phif(:, inds);
+    temp = delays(:, inds);
     imagesc(t, f(finds), temp, clims);
+	line(t, ones(size(t)) * 13, 'color', 'green', 'linewidth', 2);
     axis xy; colorbar; ylim(fband); drawnow(); pause();
 end 
 
