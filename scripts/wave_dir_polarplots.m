@@ -13,7 +13,7 @@ res(nF) = struct(...
 
 figure(1); clf; fullwidth(true);
 metrics = {'delays', 'events', 'delays_T02_fband25_50'};
-ax = gobjects(6);
+ax = gobjects(2*nF, 1);
 for ii = 1:nF
 	res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');
 	res(ii).data = load(fullfile(files(ii).folder, files(ii).name));
