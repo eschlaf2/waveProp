@@ -20,9 +20,9 @@ switch plotnum
             res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');
             res(ii).data = load(fullfile(files(ii).folder, files(ii).name));
 
-            fields = fieldnames(res.data);
+            fields = fieldnames(res(ii).data);
             whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
-            res.time = res.data.(fields{whichfields(1)}).computeTimes / 1e3;
+            res(ii).time = res(ii).data.(fields{whichfields(1)}).computeTimes / 1e3;
             ax(ii) = subplot(2, nF, ii, polaraxes());
             ax(ii + nF) = subplot(2, nF, ii + nF, polaraxes());
             [res, ax(ii), ax(ii + nF)] = plot_wave_polar(res(ii), metrics, sig, ax(ii), ax(ii + nF));
