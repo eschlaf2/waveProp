@@ -13,7 +13,6 @@ transform = @(A) reshape(permute(A(:, finds, :), [2 1 3]), sum(finds), []);
 Cf = transform(C);  % limit to band of interest
 phif = unwrap(transform(phi));  % ... same for phi
 phif(Cf <= confC) = nan;  % set insignificant values to nan
-[~, dphi] = gradient(phif, df);  % Compute the gradient of phi wrt freq
 
 if exist('MASK', 'var') && MASK
 	temp = padarray(Cf, [1 0], 'both');  % Pad with 0s
@@ -35,6 +34,8 @@ if exist('MASK', 'var') && MASK
 
 	phif(~mask) = nan;
 end
+
+[~, dphi] = gradient(phif, df);  % Compute the gradient of phi wrt freq
 
 %% Delays
 dim = 1;  % frequency dimension
