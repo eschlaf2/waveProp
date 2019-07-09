@@ -1,45 +1,77 @@
 % delays_by_localregression
-if isinteger(phi); phi = single(phi) / 1e4; end
+
+island = 3;  % Hz
+thresh = 5e-2; 
+df = f(2) - f(1); 
 fband = [25 50];
+
+if isinteger(phi); phi = single(phi) / 1e4; end
 finds = (f >= fband(1)) & (f <= fband(2));
-phi(C <= confC) = nan;
-dphi = permute(phi, [2 1 3]);  % permute array to f x t x pairs
-dphi = gradient(dphi, f(2) - f(1));  % d/df
 
-winsz = 4;  % Hz
-dim = 1; % frequency dimension
-nanflag = 'includenan';  % don't interpolate nans
-degree = 2;  % linear
-method = 'rlowess';
+transform = @(A) reshape(permute(A(:, finds, :), [2 1 3]), sum(finds), []);
+Cf = transform(C);  % limit to band of interest
+phif = transform(phi);  % ... same for phi
+phif(Cf <= confC) = nan;  % set insignificant values to nan
+% dphi = permute(phif, [2 1 3]);  % permute array to f x t x pairs
+% dphi = gradient(dphi, f(2) - f(1));  % d/df
 
-delays = -matlab.internal.math.localRegression(dphi, winsz, dim, ...
-            nanflag, degree, method, f);
+temp = padarray(Cf, [1 0], 'both');  % Pad with 0s
+starts = arrayfun(@(ii) ...  % find where streaks of significant coherence start
+	find((temp(:, ii) <= confC) & (circshift(temp(:, ii), [-1 0]) > confC)), ...
+	1:size(temp, 2), 'uni', 0);
+ends = arrayfun(@(ii) ...  % ... and where they end
+	find((temp(:, ii) > confC) & (circshift(temp(:, ii), [-1 0]) <= confC)), ...
+	1:size(temp, 2), 'uni', 0);
+[~, streak] = cellfun(@(s, e) max(e - s), starts, ends, 'uni', 0);  % Isolate the longest streak
+startinds = cellfun(@(s, ii) s(ii), starts, streak, 'uni', 0);  % Get the start ind for each streak
+endinds = cellfun(@(e, ii) e(ii), ends, streak, 'uni', 0);   % ... and the end ind
+mask = false(size(temp));  % Initialize a mask of longest streak of significant values
+for ii = 1:size(temp, 2)
+	if endinds{ii} - startinds{ii} < island / df; continue; end
+	mask(startinds{ii}:endinds{ii}, ii) = true;
+end
+mask([1 end], :) = [];  % unpad
+
+phif(~mask) = nan;
+
+
+
+% winsz = 3;  % Hz
+% dim = 1;  % frequency dimension
+% nanflag = 'includenan';  % don't interpolate nans
+% degree = 2;  % linear
+% method = 'rlowess';
+% 
+% delays = -matlab.internal.math.localRegression(dphi, winsz, dim, ...
+%             nanflag, degree, method, f);
         
 %% Imagesc delays
 
-clims = quantile(delays(:), [.025 .975]);
+clims = quantile(phif(:), [.025 .975]);
 for ii = 1:10
-    temp = delays(:, :, ii);
-    imagesc(t, f, temp, clims);
+	inds = (ii - 1) * numel(t) + 1: ii * numel(t);
+    temp = phif(:, inds);
+    imagesc(t, f(finds), temp, clims);
     axis xy; colorbar; ylim(fband); drawnow(); pause();
 end 
 
 %% Fit delays
 
 predictors = [ones(size(f)); f; f.^2; f.^3]';
-predictors = ones(size(f))';
-delaysR = reshape(delays, length(f), []);
-[polyfit, ~, ~, ~, stats] = arrayfun(@(ii) regress(delaysR(finds, ii), predictors(finds, :)), 1:length(delaysR), 'uni', 0);
+predictors = [ones(size(f)); f]';
+% delaysR = reshape(delays, length(f), []);
+% delaysR = delaysR .* mask;
+[polyfit, ~, ~, ~, stats] = arrayfun(@(ii) regress(phif(:, ii), predictors(finds, :)), 1:size(phif, 2), 'uni', 0);
 polyfit = reshape(cat(2, polyfit{:}), size(predictors, 2), length(t), []);
 polyfit = permute(polyfit, [2 3 1]);
 pdel = reshape(cellfun(@(x) x(3), stats), length(t), []);
 
 for ii = 1:size(polyfit, 3)
     fn = sprintf('o%d', ii - 1);
-    bfit.(fn) = polyfit(:, :, ii); bfit.(fn)(pdel >= .005) = nan;
+    bfit.(fn) = polyfit(:, :, ii); bfit.(fn)(pdel >= .05) = nan;
 end
 
-temp = bfit.o0;
+temp = bfit.o1;
 clims = quantile(temp(:), [.01, .99]);
 imagesc(t, pairs(:, 2), temp', clims); colorbar
 
@@ -47,7 +79,7 @@ imagesc(t, pairs(:, 2), temp', clims); colorbar
 
 %% Fit waves
 
-delaystofit = bfit.o0;
+delaystofit = -bfit.o1;
 [beta, ~, ~, ~, ~, pdel] = arrayfun(@(ii)...
     estimate_wave(delaystofit(ii, :), position(pairs(:, 2), :)), ...
     1:numel(t), 'uni', 0);
@@ -72,7 +104,7 @@ res.data.delays_all.p = interp1(t, pdel, res.time, 'nearest');
 res.data.delays_all.beta = beta(interp1(t, 1:length(t), res.time, 'nearest', 'extrap'), :);
 res.Z = [res.Z res.data.delays_all.Z];
 res.p = [res.p res.data.delays_all.p];
-metrics = {'delays', 'delays_all', 'delays_T02_fband25_50'};
+metrics = {'events', 'delays_all', 'delays_T02_fband25_50'};
 res = plot_wave_polar(res, metrics, sig, ax(1), ax(2));
 legend(metrics)
 
