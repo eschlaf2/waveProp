@@ -13,13 +13,14 @@ res(nF) = struct(...
 
 figure(1); clf; fullwidth(true);
 metrics = {'delays', 'events', 'delays_T02_fband25_50'};
+ax(nF * 2) = polaraxes();
 for ii = 1:nF
 	res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');
 	res(ii).data = load(fullfile(files(ii).folder, files(ii).name));
 	
-    [ax1, ax2] = plot_wave_polar(res(ii), metrics, sig);
-    subplot(2, nF, ii, ax1);
-    subplot(2, nF, ii + nF, ax2);
+    [ax(ii), ax(ii + nF)] = plot_wave_polar(res(ii), metrics, sig);
+    subplot(2, nF, ii, ax(ii));
+    subplot(2, nF, ii + nF, ax(ii + nF));
     
 end
 legend(strrep(fields(whichfields), '_', ' '), 'position', [.9 .55 0 0])
