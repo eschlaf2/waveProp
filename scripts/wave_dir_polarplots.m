@@ -21,7 +21,7 @@ for ii = 1:nF
     whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
     res.time = res.data.(fields{whichfields(1)}).computeTimes / 1e3;
     ax(ii) = subplot(2, nF, ii, polaraxes());
-    ax(ii + nF)subplot(2, nF, ii + nF, polaraxes());
+    ax(ii + nF) = subplot(2, nF, ii + nF, polaraxes());
     [res, ax(ii), ax(ii + nF)] = plot_wave_polar(res(ii), metrics, sig, ax(ii), ax(ii + nF));
     
 end
