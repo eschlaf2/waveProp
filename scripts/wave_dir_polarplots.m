@@ -18,6 +18,8 @@ for ii = 1:nF
 	res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');
 	res(ii).data = load(fullfile(files(ii).folder, files(ii).name));
 	
+    whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
+    res.time = res.data.(fields{whichfields(1)}).computeTimes / 1e3;
     [res, ax(ii), ax(ii + nF)] = plot_wave_polar(res(ii), metrics, sig);
     subplot(2, nF, ii, ax(ii));
     subplot(2, nF, ii + nF, ax(ii + nF));
