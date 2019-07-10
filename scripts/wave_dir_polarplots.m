@@ -25,7 +25,7 @@ switch plotnum
             res(ii).time = res(ii).data.(fields{whichfields(1)}).computeTimes / 1e3;
             ax(ii) = subplot(2, nF, ii, polaraxes());
             ax(ii + nF) = subplot(2, nF, ii + nF, polaraxes());
-            [res, ax(ii), ax(ii + nF)] = plot_wave_polar(res(ii), metrics, sig, ax(ii), ax(ii + nF));
+            [res(ii), ax(ii), ax(ii + nF)] = plot_wave_polar(res(ii), metrics, sig, ax(ii), ax(ii + nF));
 
         end
         legend(strrep(fields(whichfields), '_', ' '), 'position', [.9 .55 0 0])
