@@ -11,7 +11,9 @@ switch plotnum
             'data', [], ...
             'Z', [], ...
             'time', [], ...
-            'p', []);
+            'p', [], ...
+            'Vx', [], ...
+            'Vy', []);
 
         figure(1); clf; fullwidth(true);
         metrics = {'delays', 'events', 'delays_T02_fband25_50'};
@@ -159,8 +161,7 @@ end
 
         linkaxes([a1, a2], 'xy')
 
-        close 1 3 4
-        print(2, [pat '_polarhist'], '-dpng');
-        print(5, [pat '_Seizure' res(seizure).name '_diff'], '-dpng')
+%        print(2, [pat '_polarhist'], '-dpng');
+%        print(5, [pat '_Seizure' res(seizure).name '_diff'], '-dpng')
 end
 
