@@ -5,13 +5,13 @@ patpath = genpath(pat);  % ... and then add the local patient path on top
 addpath(patpath);  % ... so that it is searched first
 computetimesmethod = 1;
 T = 2;
-band = [25 50];
+band = [1 50];
 showplots = false;
 
-fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
+fname = sprintf('%s_Seizure%d_Neuroport_60_60.mat', pat, seizure);
 if ~exist(fname, 'file')
 	disp('Creating epoch file ...')
-	create_epoch(pat, seizure, 'padding', [10 10]);
+	create_epoch(pat, seizure, 'padding', [60 60]);
 end
 
 mea = load(fname);
