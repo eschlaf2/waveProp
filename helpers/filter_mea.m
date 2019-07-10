@@ -6,10 +6,7 @@ if ~isstruct(mea)
 	end
 end
 
-if ~exist('bands', 'var') || isempty(bands)
-	bands = {'mua'};
-end
-
+if ~exist('bands', 'var') || isempty(bands); bands = {'mua'}; end  % Default to mua if empty
 
 if any(strcmpi(fieldnames(mea), 'ElectrodeXY'))  % deprecated struct field
 	mea.Position = mea.ElectrodeXY;
@@ -21,9 +18,6 @@ SamplingRate = mea.SamplingRate;
 BadChannels = [];
 if any(strcmpi(fieldnames(mea), 'BadChannels'))
 	BadChannels = mea.BadChannels;
-elseif any(strcmpi(fieldnames(mea), 'Exclude'))
-	BadChannels = mea.Exclude;
-	mea.BadChannels = BadChannels;
 end
 
 ElectrodeXY = mea.Position;

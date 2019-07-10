@@ -3,18 +3,10 @@ function [fr, mea] = mua_firing_rate(mea)
 % spikes per second
 
 % Load necessary variables (faster with matfile objects)
+if ~isstruct(mea), mea = load(mea.Properties.Source); end
+if ~isfield(mea, 'event_inds'), mea.event_inds = mua_events(mea); end
 
-try
-	event_inds = mea.event_inds;
-catch ME
-	if ~strcmp(ME.identifier, 'MATLAB:nonExistentField')
-		rethrow(ME)
-	end
-	disp('Computing event times.')
-	if ~isstruct(mea), mea = load(mea.Properties.Source); end
-	event_inds = mua_events(mea);
-	mea.event_inds = event_inds;
-end
+event_inds = mea.event_inds;
 samplingRate = mea.SamplingRate;
 Time = mea.Time;
 T = numel(Time());
