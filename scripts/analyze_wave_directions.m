@@ -34,13 +34,13 @@ mea = exclude_channels(mea);
 
 %%
 
-% disp('Computing wave directions from events ...')
-% [events, mea] = wave_prop(mea, 'events', ...
-% 	'exclude', false, 'showplots', showplots);
-% plot_wave_directions(mea, events);
-% print(gcf, events.Name, '-dpng');
-% outfile.events = events;
-% 
+disp('Computing wave directions from events ...')
+[events, mea] = wave_prop(mea, 'events', ...
+	'exclude', false, 'showplots', showplots);
+plot_wave_directions(mea, events);
+print(gcf, events.Name, '-dpng');
+outfile.events = events;
+
 % disp('Computing wave directions from maxdescent ...')
 % [maxdescent, mea] = wave_prop(mea, 'maxdescent', ...
 % 	'exclude', false, 'showplots', showplots);
@@ -60,12 +60,12 @@ mea = exclude_channels(mea);
 % print(gcf, falling.Name, '-dpng');
 % outfile.falling = falling;
 
-disp('Computing wave directions from delays ...')
-[delays, mea] = wave_prop(mea, 'delays', ...
-	'exclude', false, 'showplots', showplots, 'T', T, 'band', band);
-plot_wave_directions(mea, delays);
-print(gcf, delays.Name, '-dpng')
-outfile.(sprintf('delays_T%02d_fband%d_%d', T, band)) = delays;
+% disp('Computing wave directions from delays ...')
+% [delays, mea] = wave_prop(mea, 'delays', ...
+% 	'exclude', false, 'showplots', showplots, 'T', T, 'band', band);
+% plot_wave_directions(mea, delays);
+% print(gcf, delays.Name, '-dpng')
+% outfile.(sprintf('delays_T%02d_fband%d_%d', T, band)) = delays;
 
 disp('Done.')
 

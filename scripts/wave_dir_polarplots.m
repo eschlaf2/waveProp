@@ -16,7 +16,7 @@ switch plotnum
             'Vy', []);
 
         figure(1); clf; fullwidth(true);
-        metrics = {'delays', 'events', 'delays_T02_fband25_50'};
+        metrics = {'delays', 'events', 'delays_T02_fband1_50'};
         ax = gobjects(2*nF, 1);
         for ii = 1:nF
             res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');
