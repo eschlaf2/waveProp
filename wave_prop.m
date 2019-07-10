@@ -300,7 +300,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 	end
 	
 end
-Z = angle(V * [1; 1i]);
+Z = angle([1 1i] * V);
 Zu = unwrap(Z);
 
 if showPlots, close(v); end
