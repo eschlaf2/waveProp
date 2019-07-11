@@ -1,7 +1,7 @@
 % pat = 'c7';
 switch plotnum
     case 1
-        files = dir([pat '_Seizure*wave_prop_1.mat']);
+        files = dir([pat '_Seizure*10_wave_prop_1.mat']);
         nF = numel(files);
         sig = 5e-2;
 
@@ -16,7 +16,7 @@ switch plotnum
             'Vy', []);
 
         figure(1); clf; fullwidth(true);
-        metrics = {'delays', 'events', 'delays_T02_fband1_50'};
+        metrics = {'delays', 'events', 'delays_T02_fband25_50'};
         ax = gobjects(2*nF, 1);
         for ii = 1:nF
             res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');

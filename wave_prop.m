@@ -127,12 +127,13 @@ switch metric
 		[computeTimes, mea] = get_waveTimes(mea);  % Get discharge times
 		
 		% Get band appropriate lfp
-		skipfactor = round(mea.SamplingRate / max(1e3, band(2)));
+        filterband = ceil(band + [-.5 .5] .* band);
+		skipfactor = round(mea.SamplingRate / max(1e3, 2*filterband(2)));
 		lfp = downsample(mea.Data, skipfactor);
 		lfp(:, mea.BadChannels) = [];
 		Time = downsample(Time, skipfactor);
 		samplingRate = 1 / mean(diff(Time));
-		filterband = ceil(band + [-.5 .5] .* band);
+        if filterband(2) >= round(samplingRate / 2); filterband(2) = filterband(2) - 1; end
 		b = fir1(150, 2 * filterband / samplingRate);  % lo-pass to just over upper band
 		lfp = single(filtfilt(b, 1, double(lfp)));
 		
