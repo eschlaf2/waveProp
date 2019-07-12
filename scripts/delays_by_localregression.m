@@ -14,7 +14,7 @@ Cf = transform(C);  % limit to band of interest
 phif = transform(phi);  % ... same for phi
 phif = smoothdata(unwrap(phif), 1, 'rlowess', winsz / df);  % ... unwrap
 [~, dphi] = gradient(phif, df);  % Compute the gradient of phi wrt freq
-phif(Cf <= confC) = nan;  % set insignificant values to nan
+dphi(Cf <= confC) = nan;  % set insignificant values to nan
 
 if exist('MASK', 'var') && MASK
 	temp = padarray(Cf, [1 0], 'both');  % Pad with 0s
