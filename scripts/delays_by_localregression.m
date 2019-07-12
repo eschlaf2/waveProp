@@ -63,10 +63,12 @@ end
 
 %% Imagesc delaysR
 
+if 0
 for ii = 1:10
     imagesc(t, f(finds), delaysR(:, :, ii), clims);
     line(t, ones(size(t)) * 13, 'color', 'green', 'linewidth', 2);
     axis xy; colorbar; ylim(fband); drawnow(); pause();
+end
 end
 
 %% All wave directions
@@ -92,8 +94,21 @@ for ii = 1:nf
     end
 end
 
+%% Compare to events
+wavefit = load(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop_1.mat', pat, seizure), 'events');
+events = interp1(wavefit.events.computeTimes, wavefit.events.Z, t, 'nearest');
+diffs = (events - Z)';
+diffs(diffs > pi) = diffs(diffs > pi) - 2 * pi;
+diffs(diffs < -pi) = diffs(diffs < -pi) + 2 * pi;
+[tt, ff] = ndgrid(t, f(finds));
+h = pcolor(tt, ff, diffs); h.LineStyle = 'none'; colormap('hsv'); colorbar;
+xlabel('Time (s)');
+ylabel('Freq (Hz)')
+title(sprintf('%s Seizure %d', pat, seizure));
 
 %% Fit delays
+
+if 0
 
 predictors = [ones(size(f)); f; f.^2; f.^3]';
 predictors = [ones(size(f))]';
@@ -115,7 +130,12 @@ imagesc(t, pairs(:, 2), temp', clims); colorbar
 
 % bfit.o0 = squeeze(median(delays, 1, 'omitnan'));
 
+end
+
 %% Fit waves
+
+if 0
+    
 delays2fit = bfit.o0;
 % delaystofit = -bfit.o1;
 [beta, ~, ~, ~, ~, pdel] = arrayfun(@(ii)...
@@ -133,7 +153,11 @@ V = cat(1, V{:});
 beta(invalid) = {[nan; nan; nan]}; beta = [beta{:}]';
 Z = angle(V * [1; 1i]);
 
+end
 %% for comparison with other delay algorithms
+
+if 0
+    
 pat = 'c7';
 plotnum = 1;
 wave_dir_polarplots;
@@ -146,6 +170,6 @@ metrics = {'events', 'delays_all', 'delays_T02_fband25_50'};
 res = plot_wave_polar(res, metrics, sig, ax(1), ax(2));
 legend(metrics)
 
-
+end
 
 
