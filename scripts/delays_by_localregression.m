@@ -1,6 +1,6 @@
 % delays_by_localregression
 
-winsz = 3;  % Hz
+winsz = 10;  % Hz
 thresh = 5e-2; 
 df = f(2) - f(1); 
 fband = [1 50];
@@ -12,8 +12,8 @@ finds = (f >= fband(1)) & (f <= fband(2));
 transform = @(A) reshape(permute(A(:, finds, :), [2 1 3]), sum(finds), []);
 Cf = transform(C);  % limit to band of interest
 phif = transform(phi);  % ... same for phi
+phif = unwrap(phif);  % ... unwrap
 phif(Cf <= confC) = nan;  % set insignificant values to nan
-phif = unwrap(phif);  % ... same for phi
 
 if exist('MASK', 'var') && MASK
 	temp = padarray(Cf, [1 0], 'both');  % Pad with 0s
@@ -99,18 +99,22 @@ for ii = 1:nf
     end
 end
 
-%% Compare to events
-wavefit = load(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop_1.mat', pat, seizure), 'events');
-events = interp1(wavefit.events.computeTimes, wavefit.events.Z, t, 'nearest');
-diffs = (events - Z)';
+%% Compare to measure
+compareto = 'delays';
+wavefit = load(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop_1.mat', pat, seizure), compareto);
+comparemetric = interp1(wavefit.(compareto).computeTimes, wavefit.(compareto).Z, t, 'nearest');
+diffs = (comparemetric - Z)';
 diffs(diffs > pi) = diffs(diffs > pi) - 2 * pi;
 diffs(diffs < -pi) = diffs(diffs < -pi) + 2 * pi;
 [tt, ff] = ndgrid(t, f(finds));
 cmap = make_diverging_colormap(cool);
 h = pcolor(tt, ff, diffs); h.LineStyle = 'none'; colormap(cmap); colorbar;
+h.Parent.CLim = [-pi pi];
+h.Parent.Color = .5*[1 1 1];
+line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
 ylabel('Freq (Hz)')
-title(sprintf('%s Seizure %d', pat, seizure));
+title(sprintf('%s Seizure %d\n%s', pat, seizure, compareto));
 
 %% Fit delays
 
