@@ -106,7 +106,8 @@ diffs = (events - Z)';
 diffs(diffs > pi) = diffs(diffs > pi) - 2 * pi;
 diffs(diffs < -pi) = diffs(diffs < -pi) + 2 * pi;
 [tt, ff] = ndgrid(t, f(finds));
-h = pcolor(tt, ff, diffs); h.LineStyle = 'none'; colormap('hsv'); colorbar;
+cmap = make_diverging_colormap(cool);
+h = pcolor(tt, ff, diffs); h.LineStyle = 'none'; colormap(cmap); colorbar;
 xlabel('Time (s)');
 ylabel('Freq (Hz)')
 title(sprintf('%s Seizure %d', pat, seizure));
