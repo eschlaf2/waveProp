@@ -52,6 +52,8 @@ delaysR = reshape(delays, size(delays, 1), numel(t), []);
 
 %% Imagesc delays
 
+if 0
+    
 clims = quantile(delays(:), [.025 .975]);
 for ii = 1:10
 	inds = (ii - 1) * numel(t) + 1: ii * numel(t);
@@ -61,14 +63,17 @@ for ii = 1:10
     axis xy; colorbar; ylim(fband); drawnow(); pause();
 end 
 
+end
 %% Imagesc delaysR
 
 if 0
+    
 for ii = 1:10
     imagesc(t, f(finds), delaysR(:, :, ii), clims);
     line(t, ones(size(t)) * 13, 'color', 'green', 'linewidth', 2);
     axis xy; colorbar; ylim(fband); drawnow(); pause();
 end
+
 end
 
 %% All wave directions
