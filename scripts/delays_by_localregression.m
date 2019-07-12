@@ -12,7 +12,7 @@ finds = (f >= fband(1)) & (f <= fband(2));
 transform = @(A) reshape(permute(A(:, finds, :), [2 1 3]), sum(finds), []);
 Cf = transform(C);  % limit to band of interest
 phif = transform(phi);  % ... same for phi
-phif = unwrap(phif);  % ... unwrap
+phif = smoothdata(unwrap(phif), 1, 'rlowess', winsz / df);  % ... unwrap
 phif(Cf <= confC) = nan;  % set insignificant values to nan
 
 if exist('MASK', 'var') && MASK
@@ -36,7 +36,8 @@ if exist('MASK', 'var') && MASK
 	phif(~mask) = nan;
 end
 
-[~, dphi] = gradient(phif, df);  % Compute the gradient of phi wrt freq
+dphi = diff(phif);
+% [~, dphi] = gradient(phif, df);  % Compute the gradient of phi wrt freq
 
 %% Delays
 dim = 1;  % frequency dimension
