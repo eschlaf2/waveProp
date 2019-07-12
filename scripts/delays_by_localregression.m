@@ -1,6 +1,6 @@
 % delays_by_localregression
 
-winsz = 10;  % Hz
+winsz = 3;  % Hz
 thresh = 5e-2; 
 df = f(2) - f(1); 
 fband = [1 50];
@@ -41,12 +41,12 @@ end
 %% Delays
 dim = 1;  % frequency dimension
 nanflag = 'includenan';  % don't interpolate nans
-degree = 1;  % linear
-method = 'rlowess';
+degree = 1;  % constant
+method = 'movmed';
 
-delays = matlab.internal.math.localRegression(dphi, winsz / df, dim, ...
-            nanflag, degree, method, f);
-% [delays, wn] = smoothdata(-dphi, 1, method, winsz / df, nanflag);	
+% delays = matlab.internal.math.localRegression(dphi, winsz / df, dim, ...
+%             nanflag, degree, method, f);
+[delays, wn] = smoothdata(dphi, 1, method, winsz / df, nanflag);	
 
 delaysR = reshape(delays, size(delays, 1), numel(t), []);
 
