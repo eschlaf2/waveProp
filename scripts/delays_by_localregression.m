@@ -1,18 +1,19 @@
 % delays_by_localregression
 
-winsz = 5;  % Hz
+winsz = 3;  % Hz
 thresh = 5e-2; 
 df = f(2) - f(1); 
 fband = [1 50];
 % MASK = false;
 
-if isinteger(phi); phi = single(phi) / 1e4; end
+if isinteger(phi); phi = -single(phi) / 1e4; end
 finds = (f >= fband(1)) & (f <= fband(2));
 
 transform = @(A) reshape(permute(A(:, finds, :), [2 1 3]), sum(finds), []);
 Cf = transform(C);  % limit to band of interest
-phif = unwrap(transform(phi));  % ... same for phi
+phif = transform(phi);  % ... same for phi
 phif(Cf <= confC) = nan;  % set insignificant values to nan
+phif = unwrap(phif);  % ... same for phi
 
 if exist('MASK', 'var') && MASK
 	temp = padarray(Cf, [1 0], 'both');  % Pad with 0s
@@ -40,13 +41,15 @@ end
 %% Delays
 dim = 1;  % frequency dimension
 nanflag = 'includenan';  % don't interpolate nans
-% degree = 2;  % linear
+degree = 1;  % linear
 method = 'rlowess';
 
-% delays = -matlab.internal.math.localRegression(dphi, winsz, dim, ...
-%             nanflag, degree, method, f);
-[delays, wn] = smoothdata(-dphi, 1, method, winsz / df, nanflag);	
-        
+delays = matlab.internal.math.localRegression(dphi, winsz / df, dim, ...
+            nanflag, degree, method, f);
+% [delays, wn] = smoothdata(-dphi, 1, method, winsz / df, nanflag);	
+
+delaysR = reshape(delays, size(delays, 1), numel(t), []);
+
 %% Imagesc delays
 
 clims = quantile(delays(:), [.025 .975]);
@@ -57,6 +60,38 @@ for ii = 1:10
 	line(t, ones(size(t)) * 13, 'color', 'green', 'linewidth', 2);
     axis xy; colorbar; ylim(fband); drawnow(); pause();
 end 
+
+%% Imagesc delaysR
+
+for ii = 1:10
+    imagesc(t, f(finds), delaysR(:, :, ii), clims);
+    line(t, ones(size(t)) * 13, 'color', 'green', 'linewidth', 2);
+    axis xy; colorbar; ylim(fband); drawnow(); pause();
+end
+
+%% All wave directions
+
+MIN_RATIO_FINITE = .25;
+[nf, nt, np] = size(delaysR);
+Z = nan(nf, nt);
+pos = position(pairs(:, 2), :);
+
+warning('off', 'stats:statrobustfit:IterationLimit');
+for ii = 1:nf
+    for jj = 1:nt
+        delays2fit = squeeze(delaysR(ii, jj, :));
+        finite = sum(isfinite(delays2fit));
+        if finite <= max(MIN_RATIO_FINITE * size(pos, 1), 3); continue; end  % check enough delay data is not NaN.
+        [beta,stats] = robustfit(pos, delays2fit, 'fair');                     % fit the delay vs two-dimensional positions
+        H = [0 1 0; 0 0 1];  
+        c = [0; 0];
+        pdel = linhyptest(beta, stats.covb, c, H, stats.dfe);  
+        if pdel > thresh || isnan(pdel); continue; end
+        V = pinv(beta(2:3));
+        Z(ii, jj) = angle([1 1i] * V(:));
+    end
+end
+
 
 %% Fit delays
 
@@ -81,10 +116,10 @@ imagesc(t, pairs(:, 2), temp', clims); colorbar
 % bfit.o0 = squeeze(median(delays, 1, 'omitnan'));
 
 %% Fit waves
-delaystofit = bfit.o0;
+delays2fit = bfit.o0;
 % delaystofit = -bfit.o1;
 [beta, ~, ~, ~, ~, pdel] = arrayfun(@(ii)...
-    estimate_wave(delaystofit(ii, :), position(pairs(:, 2), :)), ...
+    estimate_wave(delays2fit(ii, :), position(pairs(:, 2), :)), ...
     1:numel(t), 'uni', 0);
 pdel = [pdel{:}]';
 
