@@ -48,7 +48,7 @@ switch plotnum
 %% Comparison of metrics
 
     case 2
-        metrics = {'delays', 'events', 'delays_T02_fband25_50'};
+        metrics = {'delays', 'events', 'delays_T02_fband25_50', 'delays_T02_fband1_50'};
         alltime = cell(numel(metrics), 1);
         % Make a matrix of all metrics from all seizures
         for seiz = 1:nF  % for each seizure
