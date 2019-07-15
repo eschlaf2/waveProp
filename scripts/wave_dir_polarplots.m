@@ -1,7 +1,9 @@
 % pat = 'c7';
+if ~exist('files', 'var'); files = dir([pat '_Seizure*10_wave_prop_1.mat']); end
+if ~exist('metrics', 'var'); metrics = {'delays', 'events', 'delays_T02_fband25_50'}; end
+
 switch plotnum
     case 1
-        files = dir([pat '_Seizure*10_wave_prop_1.mat']);
         nF = numel(files);
         sig = 5e-2;
 
@@ -16,7 +18,6 @@ switch plotnum
             'Vy', []);
 
         figure(1); clf; fullwidth(true);
-        metrics = {'delays', 'events', 'delays_T02_fband25_50'};
         ax = gobjects(2*nF, 1);
         for ii = 1:nF
             res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');
@@ -48,7 +49,6 @@ switch plotnum
 %% Comparison of metrics
 
     case 2
-        metrics = {'delays', 'events', 'delays_T02_fband25_50'};
         alltime = cell(numel(metrics), 1);
         % Make a matrix of all metrics from all seizures
         for seiz = 1:nF  % for each seizure
@@ -99,7 +99,6 @@ HIDE = true;
 if ~HIDE
 	dim = 100;
 	figure(3); fullwidth()
-	metrics = {'falling'};
 	scale = @(x, M) round((x - min(x)) / range(x) * (M - 1) + 1);
 	for file = 1:nF
 		fields = fieldnames(res(file).data);
@@ -128,7 +127,6 @@ end
 
     seizure = 1;
     thresh = 5e-10;
-    metrics = {'delays', 'events', 'maxdescent'};
 
     whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
     p = res(seizure).p(:, whichfields);
@@ -142,7 +140,6 @@ end
     case 5
         figure(5); fullwidth(true)
         seizure = 3;
-        metrics = {'events', 'delays_T02_fband25_50'};
         whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
 
         a1 = subplot(2,1,1);
