@@ -22,9 +22,11 @@ numWaves = numel(Z);
 computeTimes = waveFit.computeTimes / 1e3;
 
 %% Plot the firing rate and wave velocity at each discharge
+
+if 1
+    
 output(1) = figure(); clf; fullwidth(true)
 p(1) = subplot(rows, cols, 1:7);  % Left plot
-p(2) = subplot(rows, cols, 9:10); % right plot (compass)
 title(p(1), plotTitle)
 xlabel(p(1), 'Time (s)')
 
@@ -68,14 +70,6 @@ ylabel(p(1), 'Mean firing rate (spikes/s)')
 p(1).XGrid = 'on';
 hold(p(1), 'on');
 
-% Right plot
-% Plot the velocities in a compass
-hold(p(2), 'off')
-compass(p(2), V(1, waveFit.p < sig), V(2, waveFit.p < sig)); 
-hold(p(2), 'on');
-colormap(p(2), 'cool');
-
-
 cmap = cool(numWaves);  % compass color corresponds to time
 cmapDir = hsv;  % scatter color corresponds to direction
 colormap(p(1), cmapDir);
@@ -87,6 +81,35 @@ for i = 1:numWaves  % Overlay colored data points each discharge
 	end
 	yyaxis(p(1), 'left'); % right axis
 	scatter(p(1), computeTimes(i), b(1) + b(2) * Z(i), 40, waveFit.Z(i), 'filled');
+
+% 		drawnow()
+% 		pause(1e-2)
+end
+hold(p(1), 'off')
+
+
+
+end
+
+%% Compass plot
+
+if 0
+    
+p(2) = subplot(rows, cols, 9:10); % right plot (compass)
+
+
+% Right plot
+% Plot the velocities in a compass
+hold(p(2), 'off')
+compass(p(2), V(1, waveFit.p < sig), V(2, waveFit.p < sig)); 
+hold(p(2), 'on');
+colormap(p(2), 'cool');
+
+
+for i = 1:numWaves  % Overlay colored data points each discharge
+	if waveFit.p(i) > sig
+		continue
+	end
 	h = compass(p(2), waveFit.V(1, i), waveFit.V(2, i));
 	h.Color = cmap(i, :);
 	h.LineWidth = 2;
@@ -94,7 +117,7 @@ for i = 1:numWaves  % Overlay colored data points each discharge
 % 		drawnow()
 % 		pause(1e-2)
 end
-hold(p(1), 'off')
+
 hold(p(2), 'off')
 
 % Add colorbars
@@ -102,7 +125,10 @@ p(2).CLim = [computeTimes(1) computeTimes(end)];
 colorbar(p(2), 'southoutside', 'Ticks', [computeTimes(1) computeTimes(end)], ...
 	'TickLabels', {'start'; 'end'})
 
+end
 %% Plot direction and speed as a function of time
+if 0
+    
 p(3) = subplot(rows, cols, 11:17);
 speed = ((log(sqrt(sum(V.^2)))));
 zscore = @(x) (x - mean(x, 'omitnan')) / std(x, 'omitnan');
@@ -116,7 +142,12 @@ ylim(p(3), [-4, 4]);
 xlabel(p(3), 'Time (s)')
 grid on
 
+end
+
 %% Create histograms of directions in first and last n seconds
+
+if 0
+    
 n = 20;
 firstInds = logical((computeTimes >= 0) .* (computeTimes <= n));
 te = Time(end) - mea.Padding(2);
@@ -144,4 +175,8 @@ p(3).XLim = p(1).XLim;
 c = colorbar(p(3), 'northoutside');
 c.Label.String = 'Wave direction (rad)';
 
+end
+
+
+%% return
 output = {output; p};
