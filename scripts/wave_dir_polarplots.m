@@ -81,6 +81,7 @@ switch plotnum
             edges = linspace(0, 2*pi, 41);  % ... create 40 bins between 0 and 2pi,
             bc = histcounts(mod(data, 2*pi), edges);  % ... get the counts per bin,
             bc = bc/max(bc);  % ... scale to match time (relative), 
+            if ~any(isfinite(bc)); continue; end
             polarhistogram(ax2, 'BinEdges', edges, 'BinCounts', bc); hold on;  % ... draw the histogram,
             polarplot(ax2, data, alltime, '.'); hold off;  % ... add the differences at each time
 
