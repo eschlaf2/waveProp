@@ -108,7 +108,7 @@ diffs = (comparemetric - Z)';
 diffs(diffs > pi) = diffs(diffs > pi) - 2 * pi;
 diffs(diffs < -pi) = diffs(diffs < -pi) + 2 * pi;
 [tt, ff] = ndgrid(t, f(finds));
-cmap = make_diverging_colormap(cool);
+cmap = [hot(40); flipud(hot(40))];
 h = pcolor(tt, ff, diffs); h.LineStyle = 'none'; colormap(cmap); colorbar;
 h.Parent.CLim = [-pi pi];
 h.Parent.Color = .5*[1 1 1];
