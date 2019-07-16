@@ -108,7 +108,7 @@ diffs = (comparemetric - Z)';
 diffs(diffs > pi) = diffs(diffs > pi) - 2 * pi;
 diffs(diffs < -pi) = diffs(diffs < -pi) + 2 * pi;
 [tt, ff] = ndgrid(t, f(finds));
-cmap = [hot(40); flipud(hot(40))];
+cmap = [flipud(hot(40)); hot(40)];
 h = pcolor(tt, ff, diffs); h.LineStyle = 'none'; colormap(cmap); colorbar;
 h.Parent.CLim = [-pi pi];
 h.Parent.Color = .5*[1 1 1];
@@ -184,3 +184,32 @@ legend(metrics)
 end
 
 
+%% print plots
+
+if 0
+    
+files = dir('*_Neuroport_10_10_cohgram_ds_T02.mat');
+files = files(29:end);
+counter = 29;
+
+close all
+figure(1); fullwidth(true);
+for f = files'
+    fname = f.name
+    info = strsplit(fname, '_');         
+    pat = info{1}; seizure = str2double(info{2}(8:end));
+    load(fname)
+    subplot(2, 2, mod(counter - 1, 4) + 1);
+    delays_by_localregression;
+    if ~mod(counter, 4)
+        print(1, sprintf('delays_by_lr_%02d', counter), '-dpng')
+        clf;
+    end
+    counter = counter + 1;
+    disp(counter)
+    
+end
+print(1, sprintf('delays_by_lr_%d', counter), '-dpng')
+clf;
+
+end
