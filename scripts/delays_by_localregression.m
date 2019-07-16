@@ -101,7 +101,7 @@ for ii = 1:nf
 end
 
 %% Compare to measure
-compareto = 'delays';
+compareto = 'events';
 wavefit = load(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop_1.mat', pat, seizure), compareto);
 comparemetric = interp1(wavefit.(compareto).computeTimes, wavefit.(compareto).Z, t, 'nearest');
 diffs = (comparemetric - Z)';
@@ -189,8 +189,8 @@ end
 if 0
     
 files = dir('*_Neuroport_10_10_cohgram_ds_T02.mat');
-files = files(29:end);
-counter = 29;
+% files = files(29:end);
+counter = 1;
 
 close all
 figure(1); fullwidth(true);
@@ -202,7 +202,7 @@ for f = files'
     subplot(2, 2, mod(counter - 1, 4) + 1);
     delays_by_localregression;
     if ~mod(counter, 4)
-        print(1, sprintf('delays_by_lr_%02d', counter), '-dpng')
+        print(1, sprintf('delays_by_lr_%s_%02d', compareto, counter), '-dpng')
         clf;
     end
     counter = counter + 1;
