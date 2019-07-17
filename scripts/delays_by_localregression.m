@@ -101,6 +101,7 @@ for ii = 1:nf
 end
 
 %% Imagesc Z (angles computed using delays)
+[tt, ff] = ndgrid(t, f(finds));
 cmap = hsv(80);
 h = pcolor(tt, ff, Z'); h.LineStyle = 'none'; colormap(cmap); colorbar;
 h.Parent.CLim = [-pi pi];
