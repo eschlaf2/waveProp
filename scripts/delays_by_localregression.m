@@ -101,7 +101,7 @@ for ii = 1:nf
 end
 
 %% Compare to measure
-compareto = 'events';
+% compareto = 'events';
 wavefit = load(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop_1.mat', pat, seizure), compareto);
 comparemetric = interp1(wavefit.(compareto).computeTimes, wavefit.(compareto).Z, t * 1e3, 'nearest');
 diffs = (comparemetric - Z)';
