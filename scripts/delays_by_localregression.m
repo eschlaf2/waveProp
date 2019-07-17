@@ -101,16 +101,19 @@ for ii = 1:nf
 end
 
 %% Imagesc Z (angles computed using delays)
+cmap = hsv(80);
 h = pcolor(tt, ff, Z'); h.LineStyle = 'none'; colormap(cmap); colorbar;
-h.Parent.CLim = [-pi pi] * 1.1;
-h.Parent.Color = .5*[1 1 1];
+h.Parent.CLim = [-pi pi];
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
 ylabel('Freq (Hz)')
-title(sprintf('%s Seizure %d\n%s', pat, seizure, compareto));
+title(sprintf('%s Seizure %d', pat, seizure));
 
 %% Compare to measure
 % compareto = 'events';
+
+if 0
+	
 wavefit = load(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop_1.mat', pat, seizure), compareto);
 comparemetric = interp1(wavefit.(compareto).computeTimes, wavefit.(compareto).Z, t * 1e3, 'nearest');
 diffs = (comparemetric - Z)';
@@ -119,12 +122,14 @@ diffs(diffs < -pi) = diffs(diffs < -pi) + 2 * pi;
 [tt, ff] = ndgrid(t, f(finds));
 cmap = [flipud(hot(40)); hot(40)];
 h = pcolor(tt, ff, diffs); h.LineStyle = 'none'; colormap(cmap); colorbar;
-h.Parent.CLim = [-pi pi];
+h.Parent.CLim = [-pi pi] * 1.1;
 h.Parent.Color = .5*[1 1 1];
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
 ylabel('Freq (Hz)')
 title(sprintf('%s Seizure %d\n%s', pat, seizure, compareto));
+
+end
 
 %% Fit delays
 
