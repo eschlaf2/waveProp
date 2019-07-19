@@ -1,7 +1,10 @@
-% pat = 'c7'; seizure = 1; T = 10;
-compute_coherograms(pat, seizure, T);
+% pat = 'c7'; seizure = 1; T = 10; W = 2;
 
-function compute_coherograms(pat, seizure, T)
+if isempty(T), T = 10; else, T = str2double(T); end
+if isempty(W), W = 2; else, W = str2double(W); end
+compute_coherograms(pat, seizure, T, W);
+
+function compute_coherograms(pat, seizure, T, W)
 
 if isempty(T); T = 10; end
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
@@ -15,7 +18,8 @@ mea = load(fname);
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
-basename = [name '_cohgram_ds_T' num2str(T, '%02d')];
+basename = sprintf('%s_cohgram_ds_T%02d_W%02d', name, T, W);
+% basename = [name '_cohgram_ds_T' num2str(T, '%02d')];
 outfile = matfile(basename, 'writable', true);
 mea = exclude_channels(mea);
 
@@ -30,7 +34,7 @@ nCh = size(data, 2);
 % T = 10;  % Window (s)
 STEP = .5;  % Step (s)
 THRESH = 5e-3;  % significance threshold
-W = 2;  % bandwidth (Hz)
+% W = 2;  % bandwidth (Hz)
 FS = Fs;  % sampling frequency (Hz)
 % FPASS = [0 100];  % Frequencies of interest
 
