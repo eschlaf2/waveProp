@@ -12,8 +12,9 @@ finds = (f >= fband(1)) & (f <= fband(2));
 transform = @(A) reshape(permute(A(:, finds, :), [2 1 3]), sum(finds), []);
 Cf = transform(C);  % limit to band of interest
 phif = transform(phi);  % ... same for phi
-phif = smoothdata(unwrap(phif), 1, 'rlowess', winsz / df);  % ... unwrap
-[~, dphi] = gradient(phif, df);  % Compute the gradient of phi wrt freq
+% phif = smoothdata(unwrap(phif), 1, 'rlowess', winsz / df);  % ... unwrap
+% dphi = padarray(diff(unwrap(phif)), 1, 'pre');
+[~, dphi] = gradient(unwrap(phif), df);  % Compute the gradient of phi wrt freq
 dphi(Cf <= confC) = nan;  % set insignificant values to nan
 
 if exist('MASK', 'var') && MASK
@@ -47,7 +48,7 @@ method = 'movmed';
 
 % delays = matlab.internal.math.localRegression(dphi, winsz / df, dim, ...
 %             nanflag, degree, method, f);
-[delays, wn] = smoothdata(dphi, 1, method, winsz / df, nanflag);	
+[delays, wn] = smoothdata(dphi, dim, method, winsz / df, nanflag);	
 
 delaysR = reshape(delays, size(delays, 1), numel(t), []);
 
