@@ -1,10 +1,8 @@
-close all
-
-toi = [1 10];
-% pat = 'MG49'; seizure = 43;
-pat = 'SIM'; seizure = 1;
-skipfactor = 1;
-clims = @(data) quantile(single(data(:)), [.01 .15]);
+% toi = [0 10];
+% pat = 'SIM'; seizure = 3;
+% skipfactor = 1;
+% clims = @(data) quantile(single(data(:)), [0 1]);
+% bands = [[1; 13] [20; 40]];
 
 addpath(pat);
 mea = load(sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure));
@@ -20,6 +18,7 @@ samplerate = mea.SamplingRate / skipfactor;
 doi(:, mea.BadChannels) = [];
 
 %%
+clear data
 N = length(doi);
 doiR = nan([max(position) N]);
 [tt, p1] = ndgrid(1:N, position(:, 1));
@@ -29,28 +28,16 @@ doiR(addy) = doi(:);
 data{1} = doi;
 ttl{1} = 'raw';
 
-passband = [2 7];
-b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
-data{2} = single(filtfilt(b, 1, double(doi)));
-ttl{2} = sprintf('Filtered to [%d %d]', passband);
-
-passband = [29 34];
-b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
-data{3} = single(filtfilt(b, 1, double(doi)));
-ttl{3} = sprintf('Filtered to [%d %d]', passband);
-
-% passband = [9 14];
-% b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
-% data{4} = single(filtfilt(b, 1, double(doi)));
-% ttl{4} = sprintf('Filtered to [%d %d]', passband);
-% 
-% passband = [15 20];
-% b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
-% data{5} = single(filtfilt(b, 1, double(doi)));
-% ttl{5} = sprintf('Filtered to [%d %d]', passband);
-
+ii = 2;
+for passband = bands
+    b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
+    data{ii} = single(filtfilt(b, 1, double(doi)));
+    ttl{ii} = sprintf('Filtered to [%d %d]', passband);
+    ii = ii + 1;
+end
 
 %%
+close all
 numplots = length(data);
 r = floor(sqrt(numplots)); c = ceil(numplots / r);
 h = figure(1); clf; set(1, 'Position', [0 0 300 * c 225 * r]); colormap(bone)
@@ -75,7 +62,8 @@ clear mov
 mov(N) = getframe(h);
 
 %%
-inds = find((time >= 42.5) & (time < 42.625));
+% inds = find((time >= 42.5) & (time < 42.625));
+inds = 1:N;
 for ii = inds  % 1:N
 	for p = 1:numplots
         ax(p).Children.CData = data{p}(ii, :);
@@ -84,8 +72,6 @@ for ii = inds  % 1:N
 	end
 	th.String = sprintf('%s Seizure %d\nT=%.2f\n', pat, seizure, time(ii));
 	drawnow
-	
-	
 	mov(ii) = getframe(h);
 end
 
