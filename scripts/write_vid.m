@@ -1,6 +1,6 @@
 close all
 
-toi = [45 85];
+toi = [45 50];
 % toi = [15 25];
 pat = 'MG49'; seizure = 43;
 % pat = 'c7'; seizure = 1;
@@ -19,7 +19,6 @@ samplerate = mea.SamplingRate / skipfactor;
 doi(:, mea.BadChannels) = [];
 
 %%
-clims = quantile(single(doi(:)), single([.01 .15]));
 N = length(doi);
 doiR = nan([max(position) N]);
 [tt, p1] = ndgrid(1:N, position(:, 1));
@@ -57,24 +56,27 @@ h = figure(1); clf; set(1, 'Position', [0 0 300 * c 225 * r]); colormap(bone)
 ax = gobjects(numplots, 1);
 for ii = 1:numplots
 	ax(ii) = subplot(r, c, ii); 
-	ax(ii).CLim = quantile(data{ii}(:), [.01 .99]);
+	ax(ii).CLim = quantile(single(data{ii}(:)), [.01 .15]);
 	title(ax(ii), ttl{ii})
 	ax(ii).XLim = [0 max(position(:, 1)) + 1];
 	ax(ii).YLim = [0 max(position(:, 2)) + 1];
 	ax(ii).NextPlot = 'replacechildren';
 	colorbar(ax(ii));
-% 	h.NextPlot = 'replacechildren';
+    scatter(ax(ii), ...
+        position(:, 1), position(:, 2), 225, data{ii}(1, :), ...
+        'filled', 'square')
 
 end
-sgtitle(h, sprintf('%s Seizure %d\nT=%.2f\n', pat, seizure, toi(1)));
-mov(N) = getframe(h);	
+% sgtitle(h, sprintf('%s Seizure %d\nT=%.2f\n', pat, seizure, toi(1)));
+th = annotation(h, 'textbox', [0 1 0 0], 'String', sprintf('%s Seizure %d\nT=%.2f\n', pat, seizure, toi(1)), 'FitBoxToText', 'on', 'LineStyle', 'none');
+mov(N) = getframe(h);
+
+%%
 for ii = 1:N
 	for p = 1:numplots
-	scatter(ax(p), ...
-		[position(:, 1)], [position(:, 2)], 225, [data{p}(ii, :)], ...
-		'filled', 'square')
+        ax(p).Children.CData = data{p}(ii, :);
 	end
-	h.Children(1).String = sprintf('%s Seizure %d\nT=%.2f\n', pat, seizure, time(ii));
+	th.String = sprintf('%s Seizure %d\nT=%.2f\n', pat, seizure, time(ii));
 	drawnow
 	
 	
