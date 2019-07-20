@@ -6,6 +6,7 @@ pat = 'MG49'; seizure = 43;
 % pat = 'c7'; seizure = 1;
 skipfactor = 1;
 
+addpath(pat);
 mea = load(sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure));
 disp(mea);
 % mea = exclude_channels(mea);
