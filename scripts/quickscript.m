@@ -21,7 +21,7 @@ mea = load(fname);
 basename = sprintf('%s_cohgram_ds_T%02d_W%02d', name, T, W);
 % basename = [name '_cohgram_ds_T' num2str(T, '%02d')];
 outfile = matfile(basename, 'writable', true);
-mea = exclude_channels(mea);
+% mea = exclude_channels(mea);
 
 skipfactor = floor(mea.SamplingRate / 1e3);  % Downsample data to ~1e3 Hz
 data = downsample(mea.Data, skipfactor);

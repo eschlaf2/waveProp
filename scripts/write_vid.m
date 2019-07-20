@@ -1,10 +1,11 @@
 close all
 
-toi = [25 30];
+toi = [1 10];
 % toi = [15 25];
-pat = 'MG49'; seizure = 43;
+% pat = 'MG49'; seizure = 43;
+pat = 'SIM'; seizure = 1;
 % pat = 'c7'; seizure = 1;
-skipfactor = 30;
+skipfactor = 1;
 
 addpath(pat);
 mea = load(sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure));
@@ -28,16 +29,16 @@ doiR(addy) = doi(:);
 data{1} = doi;
 ttl{1} = 'raw';
 
-passband = [13 40];
+passband = [2 7];
 b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
 data{2} = single(filtfilt(b, 1, double(doi)));
 ttl{2} = sprintf('Filtered to [%d %d]', passband);
 
-% passband = [20 50];
-% b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
-% data{3} = single(filtfilt(b, 1, double(doi)));
-% ttl{3} = sprintf('Filtered to [%d %d]', passband);
-% 
+passband = [29 34];
+b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
+data{3} = single(filtfilt(b, 1, double(doi)));
+ttl{3} = sprintf('Filtered to [%d %d]', passband);
+
 % passband = [9 14];
 % b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
 % data{4} = single(filtfilt(b, 1, double(doi)));
