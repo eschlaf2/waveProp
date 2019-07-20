@@ -1,16 +1,17 @@
 close all
 
-toi = [25 30];
-% toi = [15 25];
+toi = [40 44];
 pat = 'MG49'; seizure = 43;
-% pat = 'c7'; seizure = 1;
-skipfactor = 30;
+% pat = 'SIM'; seizure = 1;
+skipfactor = 1;
+clims = @(data) quantile(single(data(:)), [.01 .15]);
 
 addpath(pat);
 mea = load(sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure));
 disp(mea);
 % mea = exclude_channels(mea);
 
+%%
 position = mea.Position; position(mea.BadChannels, :) = [];
 time = mea.Time(); timeinds = time > toi(1) & time < toi(2);
 time = downsample(time(timeinds), skipfactor);
@@ -49,6 +50,7 @@ ttl{2} = sprintf('Filtered to [%d %d]', passband);
 % ttl{5} = sprintf('Filtered to [%d %d]', passband);
 
 
+%%
 numplots = length(data);
 r = floor(sqrt(numplots)); c = ceil(numplots / r);
 h = figure(1); clf; set(1, 'Position', [0 0 300 * c 225 * r]); colormap(bone)
@@ -56,7 +58,7 @@ h = figure(1); clf; set(1, 'Position', [0 0 300 * c 225 * r]); colormap(bone)
 ax = gobjects(numplots, 1);
 for ii = 1:numplots
 	ax(ii) = subplot(r, c, ii); 
-	ax(ii).CLim = quantile(single(data{ii}(:)), [.01 .15]);
+	ax(ii).CLim = clims(data{ii});
 	title(ax(ii), ttl{ii})
 	ax(ii).XLim = [0 max(position(:, 1)) + 1];
 	ax(ii).YLim = [0 max(position(:, 2)) + 1];
@@ -69,12 +71,16 @@ for ii = 1:numplots
 end
 % sgtitle(h, sprintf('%s Seizure %d\nT=%.2f\n', pat, seizure, toi(1)));
 th = annotation(h, 'textbox', [0 1 0 0], 'String', sprintf('%s Seizure %d\nT=%.2f\n', pat, seizure, toi(1)), 'FitBoxToText', 'on', 'LineStyle', 'none');
+clear mov
 mov(N) = getframe(h);
 
 %%
-for ii = 1:N
+inds = find((time >= 42.5) & (time < 42.625));
+for ii = inds  % 1:N
 	for p = 1:numplots
         ax(p).Children.CData = data{p}(ii, :);
+%         ax(p).CLim = [-1400 -250];
+%         ax(p).CLim = quantile(double(data{p}(ii, :)), [.01 .15]);
 	end
 	th.String = sprintf('%s Seizure %d\nT=%.2f\n', pat, seizure, time(ii));
 	drawnow
@@ -86,5 +92,5 @@ end
 v = VideoWriter(sprintf('%s_Seizure%d_Neuroport_10_10_time%03d_%03d', pat, seizure, toi(1), toi(2)));
 v.FrameRate = 30;
 open(v);
-writeVideo(v, mov);
+writeVideo(v, mov(inds));
 close(v);
