@@ -1,8 +1,8 @@
 close all
 
-toi = [40 44];
-pat = 'MG49'; seizure = 43;
-% pat = 'SIM'; seizure = 1;
+toi = [1 10];
+% pat = 'MG49'; seizure = 43;
+pat = 'SIM'; seizure = 1;
 skipfactor = 1;
 clims = @(data) quantile(single(data(:)), [.01 .15]);
 
@@ -29,16 +29,16 @@ doiR(addy) = doi(:);
 data{1} = doi;
 ttl{1} = 'raw';
 
-passband = [13 40];
+passband = [2 7];
 b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
 data{2} = single(filtfilt(b, 1, double(doi)));
 ttl{2} = sprintf('Filtered to [%d %d]', passband);
 
-% passband = [20 50];
-% b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
-% data{3} = single(filtfilt(b, 1, double(doi)));
-% ttl{3} = sprintf('Filtered to [%d %d]', passband);
-% 
+passband = [29 34];
+b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
+data{3} = single(filtfilt(b, 1, double(doi)));
+ttl{3} = sprintf('Filtered to [%d %d]', passband);
+
 % passband = [9 14];
 % b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
 % data{4} = single(filtfilt(b, 1, double(doi)));
