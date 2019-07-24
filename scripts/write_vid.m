@@ -1,12 +1,14 @@
 % toi = [0 10];
-% pat = 'SIM'; seizure = 3;
+% fname = 'MG49/MG49_Seizure43_Neuroport_10_10.mat';
 % skipfactor = 1;
 % clims = @(data) quantile(single(data(:)), [0 1]);
 % bands = [[1; 13] [20; 40]];
 
-addpath(pat);
-mea = load(sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure));
+mea = load(fname);
 disp(mea);
+[~, name, ~] = fileparts(fname);
+finfo = strsplit(name, {'_', filesep});
+pat = finfo{1}; seizure = str2double(finfo{2}(8:end));
 % mea = exclude_channels(mea);
 
 %%
