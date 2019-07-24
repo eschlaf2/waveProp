@@ -9,7 +9,7 @@ disp(mea);
 [~, name, ~] = fileparts(fname);
 finfo = strsplit(name, {'_', filesep});
 pat = finfo{1}; seizure = str2double(finfo{2}(8:end));
-climfun = @(data) quantile(single(data(:)), clims);
+climfun = @(data, ii) quantile(single(data{ii}(:)), clims);
 
 % mea = exclude_channels(mea);
 
@@ -49,7 +49,7 @@ h = figure(1); clf; set(1, 'Position', [0 0 300 * c 225 * r]); colormap(bone)
 ax = gobjects(numplots, 1);
 for ii = 1:numplots
 	ax(ii) = subplot(r, c, ii); 
-	ax(ii).CLim = climfun(data{ii});
+	ax(ii).CLim = climfun(data, ii);
 	title(ax(ii), ttl{ii})
 	ax(ii).XLim = [0 max(position(:, 1)) + 1];
 	ax(ii).YLim = [0 max(position(:, 2)) + 1];
