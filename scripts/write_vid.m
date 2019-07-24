@@ -80,8 +80,8 @@ for ii = inds  % 1:N
 	mov(ii) = getframe(h);
 end
 
-v = VideoWriter(sprintf('%s_time%03.0f_%03.0f_clims%03.0f_%03.0f', ...
-	name, toi(1), toi(2), clims(1)*100, clims(2)*100));
+v = VideoWriter(strrep(sprintf('%s_time%03.0f_%03.0f_clims%03.0f_%03.0f', ...
+	name, toi(1), toi(2), clims(1)*100, clims(2)*100), '-', 'M'));
 disp(['Saving ' v.Filename ' ...'])
 v.FrameRate = 30;
 open(v);
