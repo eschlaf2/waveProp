@@ -65,6 +65,7 @@ mov(N) = getframe(h);
 % inds = find((time >= 42.5) & (time < 42.625));
 inds = 1:N;
 for ii = inds  % 1:N
+	if ~mod(ii, 100), sprintf('Writing frame %d/%d', ii, inds(end)), end
 	for p = 1:numplots
         ax(p).Children.CData = data{p}(ii, :);
 %         ax(p).CLim = [-1400 -250];
