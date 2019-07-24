@@ -78,8 +78,10 @@ for ii = inds  % 1:N
 	mov(ii) = getframe(h);
 end
 
+disp('Saving movie ...')
 v = VideoWriter(sprintf('%s_Seizure%d_Neuroport_10_10_time%03d_%03d', pat, seizure, toi(1), toi(2)));
 v.FrameRate = 30;
 open(v);
 writeVideo(v, mov(inds));
 close(v);
+disp('Done.')
