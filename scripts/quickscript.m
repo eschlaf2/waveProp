@@ -43,7 +43,7 @@ movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = FS;  % sampling rate (Hz)
 params.fpass = [0 500];  % lfp filtered range
-params.tapers = [W T 1];  % [bandwidth time k] (numtapers = 2TW - k)
+params.tapers = [W T STEP];  % [bandwidth time k] (numtapers = 2TW - k)
 params.pad = -1;  % no padding
 
 mea.Position(mea.BadChannels, :) = [];  % Remove bad channels
