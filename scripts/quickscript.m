@@ -1,7 +1,7 @@
 % pat = 'c7'; seizure = 1; T = 10; W = 2;
 
-if isempty(T), T = 10; else, T = str2double(T); end
-if isempty(W), W = 2; else, W = str2double(W); end
+if isempty(T), T = 10; else, if ischar(T), T = str2double(T); end, end
+if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
 compute_coherograms(pat, seizure, T, W);
 
 function compute_coherograms(pat, seizure, T, W)
