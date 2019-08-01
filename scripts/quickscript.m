@@ -95,6 +95,9 @@ slicesize = 10;
 numslices = ceil(numpairs / slicesize);
 [C, phi, t, f, confC] = deal(cell(1, numslices));
 
+p = gcp;
+data = smoothdata(single(data));
+
 parfor ii = 1:numslices
     
     disp(ii)  % show progress
@@ -104,8 +107,8 @@ parfor ii = 1:numslices
     
     tic  % start timer
     [C{ii}, phi{ii}, ~, ~, ~, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
-            single(data(:, pairs(i0:iF, 1))), ...  % data1
-            single(data(:, pairs(i0:iF, 2))), ...  % data2
+            data(:, pairs(i0:iF, 1)), ...  % data1
+            data(:, pairs(i0:iF, 2)), ...  % data2
             movingwin, params);  % parameters
     toc  % end timer and display
     
@@ -132,6 +135,8 @@ outfile.confC = confC;
 disp('Done.')
 
 plotmean();
+
+delete(p);
 
 %% Nested plotting function
     function plotmean
