@@ -32,7 +32,7 @@ nCh = size(data, 2);
 
 %% Set some parameters
 % T = 10;  % Window (s)
-STEP = .5;  % Step (s)
+STEP = .01;  % Step (s)
 THRESH = 5e-3;  % significance threshold
 % W = 2;  % bandwidth (Hz)
 FS = Fs;  % sampling frequency (Hz)
