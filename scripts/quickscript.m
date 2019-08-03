@@ -32,7 +32,7 @@ nCh = size(data, 2);
 
 %% Set some parameters
 % T = 10;  % Window (s)
-STEP = .01;  % Step (s)
+STEP = .05;  % Step (s)
 THRESH = 5e-3;  % significance threshold
 % W = 2;  % bandwidth (Hz)
 FS = Fs;  % sampling frequency (Hz)
@@ -42,9 +42,9 @@ FS = Fs;  % sampling frequency (Hz)
 movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = FS;  % sampling rate (Hz)
-params.fpass = [0 500];  % lfp filtered range
+params.fpass = [0 300];  % lfp filtered range
 params.tapers = [W T 1];  % [bandwidth time k] (numtapers = 2TW - k)
-params.pad = -1;  % no padding
+% params.pad = -1;  % no padding
 
 mea.Position(mea.BadChannels, :) = [];  % Remove bad channels
 [~, center] = min(sum((mea.Position - mean(mea.Position)).^2, 2));
@@ -95,10 +95,11 @@ slicesize = 10;
 numslices = ceil(numpairs / slicesize);
 [C, phi, t, f, confC] = deal(cell(1, numslices));
 
-p = gcp;
+% p = gcp;
 data = smoothdata(single(data));
+data = data + randn(size(data)) * .005 * diff(quantile(data(:), [.01, .99]));
 
-parfor ii = 1:numslices
+for ii = 1:numslices
     
     disp(ii)  % show progress
     
@@ -106,14 +107,14 @@ parfor ii = 1:numslices
     iF = min(i0 + slicesize - 1, numpairs);  % index of final pair
     
     tic  % start timer
-    [C{ii}, phi{ii}, ~, ~, ~, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
+    [Ct, phit, ~, ~, ~, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
             data(:, pairs(i0:iF, 1)), ...  % data1
             data(:, pairs(i0:iF, 2)), ...  % data2
             movingwin, params);  % parameters
     toc  % end timer and display
     
-    C{ii} = int16(C{ii} * 1e4);  % convert to int16
-    phi{ii} = int16(phi{ii} * 1e4);
+    C{ii} = int16(Ct * 1e4);  % convert to int16
+    phi{ii} = int16(phit * 1e4);
     
     
 end
@@ -136,7 +137,7 @@ disp('Done.')
 
 plotmean();
 
-delete(p);
+% delete(p);
 
 %% Nested plotting function
     function plotmean

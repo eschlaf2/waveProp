@@ -3,7 +3,7 @@
 winsz = 3;  % Hz
 thresh = 5e-2; 
 df = f(2) - f(1); 
-fband = [1 50];
+fband = [0 50+winsz];
 % MASK = false;
 
 if isinteger(phi); phi = -single(phi) / 1e4; end
@@ -110,6 +110,7 @@ line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
 ylabel('Freq (Hz)')
 title(sprintf('%s Seizure %d', pat, seizure));
+ylim([fband(1) fband(2)-winsz]);
 
 %% Compare to measure
 % compareto = 'events';
