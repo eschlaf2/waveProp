@@ -82,7 +82,7 @@ end
 
 MIN_RATIO_FINITE = .25;
 [nf, nt, np] = size(delaysR);
-[Z, pdel] = deal(nan(nf, nt));
+[Z, pdel, pct] = deal(nan(nf, nt));
 pos = position(pairs(:, 2), :);
 
 warning('off', 'stats:statrobustfit:IterationLimit');
@@ -90,6 +90,7 @@ for ii = 1:nf
     for jj = 1:nt
         delays2fit = squeeze(delaysR(ii, jj, :));
         finite = sum(isfinite(delays2fit));
+		pct(ii, jj) = finite;
         if finite <= max(MIN_RATIO_FINITE * size(pos, 1), 3); continue; end  % check enough delay data is not NaN.
         [beta,stats] = robustfit(pos, delays2fit, 'fair');                     % fit the delay vs two-dimensional positions
         H = [0 1 0; 0 0 1];  
