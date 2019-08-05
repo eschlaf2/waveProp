@@ -1,8 +1,8 @@
-% toi = [0 10];
+% toi = [0 5];
 % fname = 'MG49/MG49_Seizure43_Neuroport_10_10.mat';
 % skipfactor = 1;
 % clims = [.01 .99];
-% bands = [[1; 13] [20; 40]];
+% bands = [[1; 10] [20; 40]];
 
 mea = load(fname);
 disp(mea);
