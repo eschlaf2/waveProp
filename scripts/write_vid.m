@@ -17,7 +17,7 @@ climfun = @(data, ii) quantile(single(data{ii}(:)), clims);
 position = mea.Position; position(mea.BadChannels, :) = [];
 time = mea.Time(); timeinds = time > toi(1) & time < toi(2);
 time = downsample(time(timeinds), skipfactor);
-doi = downsample(mea.Data(timeinds, :), skipfactor);
+doi = smoothdata(single(downsample(mea.Data(timeinds, :), skipfactor)));
 samplerate = mea.SamplingRate / skipfactor;
 doi(:, mea.BadChannels) = [];
 
