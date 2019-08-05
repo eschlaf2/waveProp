@@ -82,7 +82,7 @@ end
 
 MIN_RATIO_FINITE = .25;
 [nf, nt, np] = size(delaysR);
-Z = nan(nf, nt);
+[Z, pdel] = deal(nan(nf, nt));
 pos = position(pairs(:, 2), :);
 
 warning('off', 'stats:statrobustfit:IterationLimit');
@@ -94,10 +94,11 @@ for ii = 1:nf
         [beta,stats] = robustfit(pos, delays2fit, 'fair');                     % fit the delay vs two-dimensional positions
         H = [0 1 0; 0 0 1];  
         c = [0; 0];
-        pdel = linhyptest(beta, stats.covb, c, H, stats.dfe);  
-        if pdel > thresh || isnan(pdel); continue; end
+        ptemp = linhyptest(beta, stats.covb, c, H, stats.dfe);  
+        if ptemp > thresh || isnan(ptemp); continue; end
         V = pinv(beta(2:3));
         Z(ii, jj) = angle([1 1i] * V(:));
+		pdel(ii, jj) = ptemp;
     end
 end
 
