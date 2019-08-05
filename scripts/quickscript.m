@@ -33,7 +33,7 @@ nCh = size(data, 2);
 %% Set some parameters
 % T = 10;  % Window (s)
 STEP = .05;  % Step (s)
-THRESH = 5e-3;  % significance threshold
+THRESH = 5e-4;  % significance threshold
 % W = 2;  % bandwidth (Hz)
 FS = Fs;  % sampling frequency (Hz)
 % FPASS = [0 100];  % Frequencies of interest
