@@ -5,7 +5,7 @@ if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
 if isempty(DS), DS = 1e3; else, if ischar(DS), DS = str2double(DS); end, end
 compute_coherograms(pat, seizure, T, W);
 
-function compute_coherograms(pat, seizure, T, W)
+function compute_coherograms(pat, seizure, T, W, DS)
 
 if isempty(T); T = 10; end
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
