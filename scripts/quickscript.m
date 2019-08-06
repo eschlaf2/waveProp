@@ -99,7 +99,7 @@ numslices = ceil(numpairs / slicesize);
 % p = gcp;
 data = smoothdata(single(data));
 if any(strcmpi(pat, {'sim', 'waves'}))
-	data = data + randn(size(data)) * .03 * diff(quantile(data(:), [.01, .99]));
+	data = data + randn(size(data)) * .01 * diff(quantile(data(:), [.01, .99]));
 end
 
 for ii = 1:numslices
