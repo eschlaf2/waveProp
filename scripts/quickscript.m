@@ -1,7 +1,8 @@
-% pat = 'c7'; seizure = 1; T = 10; W = 2;
+% pat = 'c7'; seizure = 1; T = 10; W = 2; DS = 1e3;
 
 if isempty(T), T = 10; else, if ischar(T), T = str2double(T); end, end
 if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
+if isempty(DS), DS = 1e3; else, if ischar(DS), DS = str2double(DS); end, end
 compute_coherograms(pat, seizure, T, W);
 
 function compute_coherograms(pat, seizure, T, W)
@@ -23,7 +24,7 @@ basename = sprintf('%s_cohgram_ds_T%02d_W%02d', name, T, W);
 outfile = matfile(basename, 'writable', true);
 % mea = exclude_channels(mea);
 
-skipfactor = floor(mea.SamplingRate / 1e3);  % Downsample data to ~1e3 Hz
+skipfactor = floor(mea.SamplingRate / DS);  % Downsample data to ~DS Hz
 data = downsample(mea.Data, skipfactor);
 data(:, mea.BadChannels) = [];
 Fs = mea.SamplingRate / skipfactor;
