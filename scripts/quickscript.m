@@ -3,7 +3,7 @@
 if isempty(T), T = 10; else, if ischar(T), T = str2double(T); end, end
 if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
 if isempty(DS), DS = 1e3; else, if ischar(DS), DS = str2double(DS); end, end
-compute_coherograms(pat, seizure, T, W);
+compute_coherograms(pat, seizure, T, W, DS);
 
 function compute_coherograms(pat, seizure, T, W, DS)
 
