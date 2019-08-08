@@ -1,19 +1,23 @@
-% toi = [0 10];
-% pat = 'SIM'; seizure = 3;
+% toi = [0 5];
+% fname = 'MG49/MG49_Seizure43_Neuroport_10_10.mat';
 % skipfactor = 1;
-% clims = @(data) quantile(single(data(:)), [0 1]);
-% bands = [[1; 13] [20; 40]];
+% clims = [.01 .99];
+% bands = [[1; 10] [20; 40]];
 
-addpath(pat);
-mea = load(sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure));
+mea = load(fname);
 disp(mea);
+[~, name, ~] = fileparts(fname);
+finfo = strsplit(name, {'_', filesep});
+pat = finfo{1}; seizure = str2double(finfo{2}(8:end));
+climfun = @(data, ii) quantile(single(data{ii}(:)), clims);
+
 % mea = exclude_channels(mea);
 
 %%
 position = mea.Position; position(mea.BadChannels, :) = [];
 time = mea.Time(); timeinds = time > toi(1) & time < toi(2);
 time = downsample(time(timeinds), skipfactor);
-doi = downsample(mea.Data(timeinds, :), skipfactor);
+doi = smoothdata(single(downsample(mea.Data(timeinds, :), skipfactor)));
 samplerate = mea.SamplingRate / skipfactor;
 doi(:, mea.BadChannels) = [];
 
@@ -45,7 +49,7 @@ h = figure(1); clf; set(1, 'Position', [0 0 300 * c 225 * r]); colormap(bone)
 ax = gobjects(numplots, 1);
 for ii = 1:numplots
 	ax(ii) = subplot(r, c, ii); 
-	ax(ii).CLim = clims(data{ii});
+	ax(ii).CLim = climfun(data, ii);
 	title(ax(ii), ttl{ii})
 	ax(ii).XLim = [0 max(position(:, 1)) + 1];
 	ax(ii).YLim = [0 max(position(:, 2)) + 1];
@@ -65,6 +69,7 @@ mov(N) = getframe(h);
 % inds = find((time >= 42.5) & (time < 42.625));
 inds = 1:N;
 for ii = inds  % 1:N
+	if ~mod(ii, 100), fprintf('Writing frame %d/%d\n', ii, inds(end)), end
 	for p = 1:numplots
         ax(p).Children.CData = data{p}(ii, :);
 %         ax(p).CLim = [-1400 -250];
@@ -75,8 +80,11 @@ for ii = inds  % 1:N
 	mov(ii) = getframe(h);
 end
 
-v = VideoWriter(sprintf('%s_Seizure%d_Neuroport_10_10_time%03d_%03d', pat, seizure, toi(1), toi(2)));
+v = VideoWriter(strrep(sprintf('%s_time%03.0f_%03.0f_clims%03.0f_%03.0f', ...
+	name, toi(1), toi(2), clims(1)*100, clims(2)*100), '-', 'M'));
+disp(['Saving ' v.Filename ' ...'])
 v.FrameRate = 30;
 open(v);
 writeVideo(v, mov(inds));
 close(v);
+disp('Done.')
