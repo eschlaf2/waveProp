@@ -3,11 +3,12 @@
 if isempty(T), T = 10; else, if ischar(T), T = str2double(T); end, end
 if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
 if isempty(DS), DS = 1e3; else, if ischar(DS), DS = str2double(DS); end, end
-compute_coherograms(pat, seizure, T, W, DS);
+if isempty(units), units = 1; else, if ischar(units), units = str2double(units); end, end  % samples per 1/units sec (i.e. set units=1 for Hz)
 
-function compute_coherograms(pat, seizure, T, W, DS)
+compute_coherograms(pat, seizure, T, W, DS, units);
 
-if isempty(T); T = 10; end
+function compute_coherograms(pat, seizure, T, W, DS, units)
+%%
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
 addpath(datapath);  % ... add the original data path first
 patpath = genpath(pat);  % ... and then add the local patient path on top 
@@ -19,43 +20,49 @@ mea = load(fname);
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
-basename = sprintf('%s_cohgram_ds_T%02d_W%02d', name, T, W);
+basename = sprintf('temp%s_cohgram_ds_T%02d_W%02d', name, round(T), W);
 % basename = [name '_cohgram_ds_T' num2str(T, '%02d')];
 outfile = matfile(basename, 'writable', true);
 % mea = exclude_channels(mea);
+% skipfactor = mea.SamplingRate / DS;  % Downsample data to ~DS Hz
+[nT, nCh] = size(mea.Data);
+[X, Y] = meshgrid(1:nCh, (1:nT) / mea.SamplingRate);
+[Xq, Yq] = meshgrid(1:nCh, 1/DS:1/DS:nT/mea.SamplingRate);
+data = interp2(X, Y, single(mea.Data), Xq, Yq);
+% data = downsample(mea.Data, skipfactor);
 
-skipfactor = floor(mea.SamplingRate / DS);  % Downsample data to ~DS Hz
-data = downsample(mea.Data, skipfactor);
+data = data(1.5*DS:3.5*DS, :);
+
 data(:, mea.BadChannels) = [];
-Fs = mea.SamplingRate / skipfactor;
+Fs = DS / units;  % sampling frequency (Hz * units)
 
 nCh = size(data, 2);
 
 %% Set some parameters
-% T = 10;  % Window (s)
-STEP = .05;  % Step (s)
+STEP = .01;  % Step (1/units s)
 THRESH = 5e-4;  % significance threshold
-% W = 2;  % bandwidth (Hz)
-FS = Fs;  % sampling frequency (Hz)
+FS = Fs;  % sampling frequency (Hz * units)
 % FPASS = [0 100];  % Frequencies of interest
 
 %% Convert parameters to function input
 movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = FS;  % sampling rate (Hz)
-params.fpass = [0 300];  % lfp filtered range
+params.fpass = [0 100];  % lfp filtered range
 params.tapers = [W T 1];  % [bandwidth time k] (numtapers = 2TW - k)
 % params.pad = -1;  % no padding
 
-mea.Position(mea.BadChannels, :) = [];  % Remove bad channels
-[~, center] = min(sum((mea.Position - mean(mea.Position)).^2, 2));
+position = mea.Position;
+badchannels = mea.BadChannels;
+position(badchannels, :) = [];  % Remove bad channels
+[~, center] = min(sum((position - mean(position)).^2, 2));
 pairs = [repmat(center, 1, nCh); 1:nCh]';
 pairs(pairs(:, 1) - pairs(:, 2) == 0, :) = [];
 
 % Save information about the run
 outfile.data = data;
-outfile.position = mea.Position;
-outfile.badchannels = mea.BadChannels;
+outfile.position = position;
+outfile.badchannels = badchannels;
 % outfile.pairs = nchoosek(1:nCh, 2);  % generate all pairs of channels
 outfile.pairs = pairs;  % All pairs that include the central electrode
 outfile.center = center;
@@ -92,7 +99,7 @@ clear mea;  % free up memory
 % Initialize variables
 % numpairs = nchoosek(nCh, 2);
 numpairs = nCh - 1;
-slicesize = 10;
+slicesize = 100;
 numslices = ceil(numpairs / slicesize);
 [C, phi, t, f, confC] = deal(cell(1, numslices));
 
@@ -159,7 +166,7 @@ plotmean();
 %             end
 %             disp('Loaded')
             
-            strinfo = strsplit(basename, '_');
+            strinfo = strsplit(basename, {'_', '.'});
             pat = strinfo{1};
             seizure = str2double(strinfo{2}(8:end));
             T = str2double(strinfo{end}(2:end));

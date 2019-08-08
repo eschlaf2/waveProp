@@ -3,7 +3,7 @@
 winsz = 3;  % Hz
 thresh = 5e-2; 
 df = f(2) - f(1); 
-fband = [1 50];
+fband = params.fpass;
 % MASK = false;
 
 if isinteger(phi); phi = -single(phi) / 1e4; end
@@ -15,6 +15,7 @@ phif = transform(phi);  % ... same for phi
 % phif = smoothdata(unwrap(phif), 1, 'rlowess', winsz / df);  % ... unwrap
 % dphi = padarray(diff(unwrap(phif)), 1, 'pre');
 [~, dphi] = gradient(unwrap(phif), df);  % Compute the gradient of phi wrt freq
+% dphi = padarray(diff(unwrap(phif)), 1, 'pre') / df;
 dphi(Cf <= confC) = nan;  % set insignificant values to nan
 
 if exist('MASK', 'var') && MASK
@@ -90,7 +91,7 @@ for ii = 1:nf
     for jj = 1:nt
         delays2fit = squeeze(delaysR(ii, jj, :));
         finite = sum(isfinite(delays2fit));
-		pct(ii, jj) = finite;
+		pct(ii, jj) = finite / size(pos, 1);
         if finite <= max(MIN_RATIO_FINITE * size(pos, 1), 3); continue; end  % check enough delay data is not NaN.
         [beta,stats] = robustfit(pos, delays2fit, 'fair');                     % fit the delay vs two-dimensional positions
         H = [0 1 0; 0 0 1];  
