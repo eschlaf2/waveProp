@@ -108,7 +108,7 @@ h = pcolor(tt, ff, Z'); h.LineStyle = 'none'; colormap(cmap); colorbar;
 h.Parent.CLim = [-pi pi];
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
-ylabel('Freq (Hz)')
+ylabel(sprintf('Freq (%d Hz)', units))
 title(sprintf('%s Seizure %d', pat, seizure));
 
 %% Compare to measure
