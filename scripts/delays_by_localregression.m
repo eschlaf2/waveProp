@@ -105,13 +105,12 @@ for ii = 1:nf
 end
 
 %% Imagesc Z (angles computed using delays)
-[tt, ff] = ndgrid(t, f(finds));
+[tt, ff] = ndgrid(t, f(finds) * units);
 cmap = hsv(80);
-h = pcolor(tt, ff, Z'); h.LineStyle = 'none'; colormap(cmap); colorbar;
-h.Parent.CLim = [-pi pi];
+h = pcolor(tt, ff, Z'); h.LineStyle = 'none'; colormap(cmap); colorbar;h.Parent.CLim = [-pi pi];
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
-ylabel(sprintf('Freq (%d Hz)', units))
+ylabel('Freq (Hz)')
 title(sprintf('%s Seizure %d', pat, seizure));
 % ylim([fband(1) fband(2)-winsz]);
 
