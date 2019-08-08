@@ -3,7 +3,10 @@
 if isempty(T), T = 10; else, if ischar(T), T = str2double(T); end, end
 if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
 if isempty(DS), DS = 1e3; else, if ischar(DS), DS = str2double(DS); end, end
-if isempty(units), units = 1; else, if ischar(units), units = str2double(units); end, end  % samples per 1/units sec (i.e. set units=1 for Hz)
+if isempty(units), units = 1; else, if ischar(units), units = str2double(units); end, end  
+% units is samples per 1/units sec (i.e. set units=1 for Hz, units=1e3 for
+% kHz). Note that if units is 10, for example, then T is in tenths of
+% seconds while W is in deca(?)Hz.
 
 compute_coherograms(pat, seizure, T, W, DS, units);
 
@@ -29,9 +32,8 @@ outfile = matfile(basename, 'writable', true);
 [X, Y] = meshgrid(1:nCh, (1:nT) / mea.SamplingRate);
 [Xq, Yq] = meshgrid(1:nCh, 1/DS:1/DS:nT/mea.SamplingRate);
 data = interp2(X, Y, single(mea.Data), Xq, Yq);
-% data = downsample(mea.Data, skipfactor);
 
-data = data(1.5*DS:3.5*DS, :);
+% data = data(1.5*DS:3.5*DS, :);
 
 data(:, mea.BadChannels) = [];
 Fs = DS / units;  % sampling frequency (Hz * units)
@@ -41,13 +43,11 @@ nCh = size(data, 2);
 %% Set some parameters
 STEP = .01;  % Step (1/units s)
 THRESH = 5e-4;  % significance threshold
-FS = Fs;  % sampling frequency (Hz * units)
-% FPASS = [0 100];  % Frequencies of interest
 
 %% Convert parameters to function input
 movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
-params.Fs = FS;  % sampling rate (Hz)
+params.Fs = Fs;  % sampling rate (Hz)
 params.fpass = [0 100];  % lfp filtered range
 params.tapers = [W T 1];  % [bandwidth time k] (numtapers = 2TW - k)
 % params.pad = -1;  % no padding
@@ -63,7 +63,7 @@ pairs(pairs(:, 1) - pairs(:, 2) == 0, :) = [];
 outfile.data = data;
 outfile.position = position;
 outfile.badchannels = badchannels;
-% outfile.pairs = nchoosek(1:nCh, 2);  % generate all pairs of channels
+outfile.units = units;
 outfile.pairs = pairs;  % All pairs that include the central electrode
 outfile.center = center;
 outfile.params = params;
@@ -99,7 +99,7 @@ clear mea;  % free up memory
 % Initialize variables
 % numpairs = nchoosek(nCh, 2);
 numpairs = nCh - 1;
-slicesize = 100;
+slicesize = 10;
 numslices = ceil(numpairs / slicesize);
 [C, phi, t, f, confC] = deal(cell(1, numslices));
 
