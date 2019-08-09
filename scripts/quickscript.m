@@ -24,6 +24,11 @@ mea = load(fname);
 [~, name, ~] = fileparts(fname);
 time = mea.Time();
 mask = time < toi(1) | time > toi(2);
+if 2*T > diff(toi)
+	pad = (2*T - diff(toi)) / 2 + .1;
+	mea.Data(mask, :) = 0;
+	mask = time < (toi(1) - pad) | time > (toi(2) + pad);
+end
 mea.Data(mask, :) = [];
 time(mask) = [];
 
@@ -47,7 +52,7 @@ Fs = DS / units;  % sampling frequency (Hz * units)
 nCh = size(data, 2);
 
 %% Set some parameters
-STEP = .05;  % Step (1/units s)
+STEP = .01 * units;  % Step (s)
 THRESH = 5e-3;  % significance threshold
 
 %% Convert parameters to function input
