@@ -1,4 +1,4 @@
-% pat = 'c7'; seizure = 1; T = 10; W = 2; DS = 1e3;
+% pat = 'c7'; seizure = 1; T = 10; W = 2; DS = 1e3; units = 1;
 
 if isempty(T), T = 10; else, if ischar(T), T = str2double(T); end, end
 if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
@@ -34,7 +34,10 @@ time(mask) = [];
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
-basename = sprintf('temp%s_cohgram_ds_T%02d_W%02d', name, round(T), W);
+basename = sprintf('%s_cohgram_ds%s_T%02d_W%02d_Hz%d', ...
+	name, ...
+	strrep(num2str(DS, '%0.0g'), '+', ''), ...
+	round(T), W, units);
 % basename = [name '_cohgram_ds_T' num2str(T, '%02d')];
 outfile = matfile(basename, 'writable', true);
 % mea = exclude_channels(mea);
