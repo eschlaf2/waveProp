@@ -4,13 +4,15 @@ if isempty(T), T = 10; else, if ischar(T), T = str2double(T); end, end
 if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
 if isempty(DS), DS = 1e3; else, if ischar(DS), DS = str2double(DS); end, end
 if isempty(units), units = 1; else, if ischar(units), units = str2double(units); end, end  
+if ~exist('toi', 'var') || isempty(toi), toi = [-Inf Inf]; end
+
 % units is samples per 1/units sec (i.e. set units=1 for Hz, units=1e3 for
 % kHz). Note that if units is 10, for example, then T is in tenths of
 % seconds while W is in deca(?)Hz.
 
-compute_coherograms(pat, seizure, T, W, DS, units);
+compute_coherograms(pat, seizure, T, W, DS, units, toi);
 
-function compute_coherograms(pat, seizure, T, W, DS, units)
+function compute_coherograms(pat, seizure, T, W, DS, units, toi)
 %%
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
 addpath(datapath);  % ... add the original data path first
@@ -20,6 +22,10 @@ addpath(patpath);  % ... so that it is searched first
 fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
 mea = load(fname);
 [~, name, ~] = fileparts(fname);
+time = mea.Time();
+mask = time < toi(1) | time > toi(2);
+mea.Data(mask, :) = [];
+time(mask) = [];
 
 % mea = load('SIM/seizing_cortical_field_sim.mat');
 % name = mea.Name;
@@ -31,7 +37,7 @@ outfile = matfile(basename, 'writable', true);
 [nT, nCh] = size(mea.Data);
 [X, Y] = meshgrid(1:nCh, (1:nT) / mea.SamplingRate);
 [Xq, Yq] = meshgrid(1:nCh, 1/DS:1/DS:nT/mea.SamplingRate);
-data = interp2(X, Y, single(mea.Data), Xq, Yq);
+data = interp2(X, Y, single(mea.Data), Xq, Yq, 'cubic');
 
 % data = data(1.5*DS:3.5*DS, :);
 
@@ -41,8 +47,8 @@ Fs = DS / units;  % sampling frequency (Hz * units)
 nCh = size(data, 2);
 
 %% Set some parameters
-STEP = .01;  % Step (1/units s)
-THRESH = 5e-4;  % significance threshold
+STEP = .05;  % Step (1/units s)
+THRESH = 5e-3;  % significance threshold
 
 %% Convert parameters to function input
 movingwin = [T STEP];  % [window step] seconds
@@ -50,7 +56,7 @@ params.err = [1 THRESH];  % [type threshold]
 params.Fs = Fs;  % sampling rate (Hz)
 params.fpass = [0 100];  % lfp filtered range
 params.tapers = [W T 1];  % [bandwidth time k] (numtapers = 2TW - k)
-% params.pad = -1;  % no padding
+params.pad = max(ceil(log2(20 / T)), 0);  % pad fft filter such that df < .05
 
 position = mea.Position;
 badchannels = mea.BadChannels;
@@ -70,7 +76,7 @@ outfile.params = params;
 outfile.movingwin = movingwin;
 outfile.basename = basename;
 
-padding = mea.Padding;  % Store to correct t later
+% padding = mea.Padding;  % Store to correct t later
 clear mea;  % free up memory
 
 %% Initialize arrays
@@ -130,7 +136,7 @@ for ii = 1:numslices
 end
 disp('Saving result.')
 f = f{1};
-t = t{1} - padding(1);  % correct for padding
+t = t{1} / units + time(1);  % correct for padding
 confC = int16(confC{1}(1) * 1e4);
 C = cat(3, C{:});
 phi = cat(3, phi{:});
