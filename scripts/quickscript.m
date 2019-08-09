@@ -23,9 +23,10 @@ fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
 mea = load(fname);
 [~, name, ~] = fileparts(fname);
 time = mea.Time();
+if 1.1*T >= diff(toi); toi = (toi - mean(toi)) * 1.1*T + mean(toi); end
 mask = time < toi(1) | time > toi(2);
-if 2*T > diff(toi)
-	pad = (2*T - diff(toi)) / 2 + .1;
+if 2.1*T > diff(toi)
+	pad = (2.1*T - diff(toi)) / 2;
 	mea.Data(mask, :) = 0;
 	mask = time < (toi(1) - pad) | time > (toi(2) + pad);
 end
