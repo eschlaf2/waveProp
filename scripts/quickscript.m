@@ -10,9 +10,9 @@ if ~exist('toi', 'var') || isempty(toi), toi = [-Inf Inf]; end
 % kHz). Note that if units is 10, for example, then T is in tenths of
 % seconds while W is in deca(?)Hz.
 
-compute_coherograms(pat, seizure, T, W, DS, units, toi);
+basename = compute_coherograms(pat, seizure, T, W, DS, units, toi);
 
-function compute_coherograms(pat, seizure, T, W, DS, units, toi)
+function basename = compute_coherograms(pat, seizure, T, W, DS, units, toi)
 %%
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
 addpath(datapath);  % ... add the original data path first
