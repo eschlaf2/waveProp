@@ -4,14 +4,18 @@ winsz = 3;  % Hz
 thresh = 5e-2; 
 df = f(2) - f(1); 
 fband = params.fpass;
+if ~exist('toi', 'var'); toi = [-Inf Inf]; end
 % MASK = false;
 
 if isinteger(phi); phi = -single(phi) / 1e4; end
 finds = (f >= fband(1)) & (f <= fband(2));
+tinds = (t >= toi(1)) & (t <= toi(2));
+t = t(tinds); f = f(finds);
 
-transform = @(A) reshape(permute(A(:, finds, :), [2 1 3]), sum(finds), []);
+transform = @(A) reshape(permute(A(tinds, finds, :), [2 1 3]), sum(finds), []);
 Cf = transform(C);  % limit to band of interest
 phif = transform(phi);  % ... same for phi
+clear C phi
 % phif = smoothdata(unwrap(phif), 1, 'rlowess', winsz / df);  % ... unwrap
 % dphi = padarray(diff(unwrap(phif)), 1, 'pre');
 [~, dphi] = gradient(unwrap(phif), df);  % Compute the gradient of phi wrt freq
@@ -42,6 +46,8 @@ end
 % dphi = diff(phif) / df;
 
 %% Delays
+disp('Computing delays')
+
 dim = 1;  % frequency dimension
 nanflag = 'includenan';  % don't interpolate nans
 degree = 1;  % constant
@@ -52,34 +58,36 @@ method = 'movmed';
 [delays, wn] = smoothdata(dphi, dim, method, winsz / df, nanflag);	
 
 delaysR = reshape(delays, size(delays, 1), numel(t), []);
+clear delays
 
 %% Imagesc delays
 
 if 0
     
-clims = quantile(delays(:), [.025 .975]);
-for ii = 1:10
-	inds = (ii - 1) * numel(t) + 1: ii * numel(t);
-    temp = delays(:, inds);
-    imagesc(t, f(finds), temp, clims);
-	line(t, ones(size(t)) * 13, 'color', 'green', 'linewidth', 2);
-    axis xy; colorbar; ylim(fband); drawnow(); pause();
-end 
+    clims = quantile(delays(:), [.025 .975]);
+    for ii = 1:10
+        inds = (ii - 1) * numel(t) + 1: ii * numel(t);
+        temp = delays(:, inds);
+        imagesc(t, f(finds), temp, clims);
+        line(t, ones(size(t)) * 13, 'color', 'green', 'linewidth', 2);
+        axis xy; colorbar; ylim(fband); drawnow(); pause();
+    end 
 
 end
 %% Imagesc delaysR
 
 if 0
     
-for ii = 1:10
-    imagesc(t, f(finds), delaysR(:, :, ii), clims);
-    line(t, ones(size(t)) * 13, 'color', 'green', 'linewidth', 2);
-    axis xy; colorbar; ylim(fband); drawnow(); pause();
-end
+    for ii = 1:10
+        imagesc(t, f(finds), delaysR(:, :, ii), clims);
+        line(t, ones(size(t)) * 13, 'color', 'green', 'linewidth', 2);
+        axis xy; colorbar; ylim(fband); drawnow(); pause();
+    end
 
 end
 
 %% All wave directions
+disp('Computing directions')
 
 MIN_RATIO_FINITE = .25;
 [nf, nt, np] = size(delaysR);
@@ -87,7 +95,7 @@ MIN_RATIO_FINITE = .25;
 pos = position(pairs(:, 2), :);
 
 warning('off', 'stats:statrobustfit:IterationLimit');
-for ii = 1:nf
+parfor ii = 1:nf
     for jj = 1:nt
         delays2fit = squeeze(delaysR(ii, jj, :));
 		if numel(unique(delays2fit(isfinite(delays2fit)))) < 3, continue; end  % check that there are enough unique points to fit a plane
@@ -106,7 +114,7 @@ for ii = 1:nf
 end
 
 %% Imagesc Z (angles computed using delays)
-[tt, ff] = ndgrid(t, f(finds) * units);
+[tt, ff] = ndgrid(t, f * units);
 cmap = hsv(80);
 h = pcolor(tt, ff, Z'); h.LineStyle = 'none'; colormap(cmap); colorbar;h.Parent.CLim = [-pi pi];
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
