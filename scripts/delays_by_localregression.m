@@ -18,7 +18,10 @@ phif = transform(phi);  % ... same for phi
 clear C phi
 % phif = smoothdata(unwrap(phif), 1, 'rlowess', winsz / df);  % ... unwrap
 % dphi = padarray(diff(unwrap(phif)), 1, 'pre');
+
+disp('Computing gradient')
 [~, dphi] = gradient(unwrap(phif), df);  % Compute the gradient of phi wrt freq
+clear phif
 % dphi = padarray(diff(unwrap(phif)), 1, 'pre') / df;
 dphi(Cf <= confC) = nan;  % set insignificant values to nan
 
@@ -43,7 +46,6 @@ if exist('MASK', 'var') && MASK
 	dphi(~mask) = nan;
 end
 
-% dphi = diff(phif) / df;
 
 %% Delays
 disp('Computing delays')
@@ -96,6 +98,7 @@ pos = position(pairs(:, 2), :);
 
 warning('off', 'stats:statrobustfit:IterationLimit');
 parfor ii = 1:nf
+    if ~mod(ii, 10), fprintf('ii=%d/%d\n', ii, nf), end
     for jj = 1:nt
         delays2fit = squeeze(delaysR(ii, jj, :));
 		if numel(unique(delays2fit(isfinite(delays2fit)))) < 3, continue; end  % check that there are enough unique points to fit a plane
@@ -121,7 +124,6 @@ line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
 ylabel('Freq (Hz)')
 title(sprintf('%s Seizure %d', pat, seizure));
-% ylim([fband(1) fband(2)-winsz]);
 
 %% Compare to measure
 % compareto = 'events';
