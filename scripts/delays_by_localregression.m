@@ -93,27 +93,58 @@ disp('Computing directions')
 
 MIN_RATIO_FINITE = .25;
 [nf, nt, np] = size(delaysR);
-[Z, pdel, pct] = deal(nan(nf, nt));
 pos = position(pairs(:, 2), :);
 
+% p = gcp();
 warning('off', 'stats:statrobustfit:IterationLimit');
-parfor ii = 1:nf
-    if ~mod(ii, 10), fprintf('ii=%d/%d\n', ii, nf), end
-    for jj = 1:nt
-        delays2fit = squeeze(delaysR(ii, jj, :));
-		if numel(unique(delays2fit(isfinite(delays2fit)))) < 3, continue; end  % check that there are enough unique points to fit a plane
-        finite = sum(isfinite(delays2fit));
-		pct(ii, jj) = finite / size(pos, 1);
-        if finite <= max(MIN_RATIO_FINITE * size(pos, 1), 3); continue; end  % check enough delay data is not NaN.
-        [beta,stats] = robustfit(pos, delays2fit, 'fair');                     % fit the delay vs two-dimensional positions
-        H = [0 1 0; 0 0 1];  
-        c = [0; 0];
-        ptemp = linhyptest(beta, stats.covb, c, H, stats.dfe);  
-        if ptemp > thresh || isnan(ptemp); continue; end
-        V = pinv(beta(2:3));
-        Z(ii, jj) = angle([1 1i] * V(:));
-		pdel(ii, jj) = ptemp;
+H = [0 1 0; 0 0 1];  
+c = [0; 0];
+
+arrayfun_is_faster = false;
+
+if arrayfun_is_faster
+
+    tic %#ok<*UNRCH>
+    delaysR2 = reshape(delaysR, [], np)';  % reshape the delays so that each column is a single time-freq point and rows are pairs
+    num_unique = arrayfun(@(ii) ...  % Number of unique, non-nan values in each column
+        numel(unique(delaysR2(isfinite(delaysR2(:, ii)), ii))), 1:length(delaysR2));
+    finite = sum(isfinite(delaysR2));  % number of non-nan, non-inf delays in each column
+    Z = nan * num_unique;  % Initialize Z with nans
+    inds = ...  % Need at least 3 unique values and MIN_RATIO_FINITE finite values
+        find((finite >= max(MIN_RATIO_FINITE * np, 3)) & (num_unique >= 3));  
+
+    [beta, stats] = ...  % Compute fits
+        arrayfun(@(ii) robustfit(pos, delaysR2(:, ii), 'fair'), ...
+        inds, 'uni', 0);  
+    pdel = ...  % ... and significance
+        cellfun(@(A, B) linhyptest(A, B.covb, c, H, B.dfe), beta, stats);  
+    indsB = find(pdel < thresh);  % Keep significant fits
+    Z(inds(indsB)) = ...  % Fill in wave directions for good fits
+        arrayfun(@(ii) angle(pinv(beta{ii}([2 3])) * [1; 1i]), indsB);
+    Z = reshape(Z, nf, nt);
+    toc
+else
+
+    tic
+    [Z, pdel, pct] = deal(nan(nf, nt));
+    for ii = 1:nf  % For each frequency
+        if ~mod(ii, 100), fprintf('ii=%d/%d\n', ii, nf), end
+        for jj = 1:nt  % ... and time point
+            delays2fit = squeeze(delaysR(ii, jj, :));  % ... collect the delays for each pair
+            num_unique = numel(unique(delays2fit(isfinite(delays2fit))));  % ... calculate the number of finite unique values
+            if num_unique < 3, continue; end  % check that there are enough unique points to fit a plane
+            finite = sum(isfinite(delays2fit));  % Calculate the number of finite delays
+            pct(ii, jj) = finite / np;  % (FYI only)
+            if finite <= max(MIN_RATIO_FINITE * np, 3); continue; end  % check enough delay data is not NaN.
+            [beta,stats] = robustfit(pos, delays2fit, 'fair');  % fit the delay vs two-dimensional positions
+            ptemp = linhyptest(beta, stats.covb, c, H, stats.dfe);  % Compute significance of fit
+            if ptemp >= thresh || isnan(ptemp); continue; end  % Stop if fit is not significant
+            V = pinv(beta(2:3));  % velocity is the pseudoinvervse of the fitted wave
+            Z(ii, jj) = angle([1 1i] * V(:));  % Z is the angle of the velocity
+            pdel(ii, jj) = ptemp;  % Store p-value
+        end
     end
+    toc
 end
 
 %% Imagesc Z (angles computed using delays)
@@ -152,7 +183,7 @@ end
 if 0
 
 	predictors = [ones(size(f)); f; f.^2; f.^3]';
-	predictors = [ones(size(f))]';
+	predictors = ones(size(f))';
 	% delaysR = reshape(delays, length(f), []);
 	% delaysR = delaysR .* mask;
 	[polyfit, ~, ~, ~, stats] = arrayfun(@(ii) regress(delays(:, ii), predictors(finds, :)), 1:size(delays, 2), 'uni', 0);
