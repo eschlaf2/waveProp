@@ -100,7 +100,9 @@ warning('off', 'stats:statrobustfit:IterationLimit');
 H = [0 1 0; 0 0 1];  
 c = [0; 0];
 
-arrayfun_is_faster = false;
+packages = ver;
+arrayfun_is_faster = ...  % Use parfor if possible
+    any(cellfun(@(n) strcmpi(n, 'parallel computing toolbox'), {packages.Name}));
 
 if arrayfun_is_faster
 
@@ -127,7 +129,7 @@ else
 
     tic
     [Z, pdel, pct] = deal(nan(nf, nt));
-    for ii = 1:nf  % For each frequency
+    parfor ii = 1:nf  % For each frequency
         if ~mod(ii, 100), fprintf('ii=%d/%d\n', ii, nf), end
         for jj = 1:nt  % ... and time point
             delays2fit = squeeze(delaysR(ii, jj, :));  % ... collect the delays for each pair
