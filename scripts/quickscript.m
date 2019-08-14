@@ -116,7 +116,7 @@ clear mea;  % free up memory
 numpairs = nCh - 1;
 slicesize = 10;
 numslices = ceil(numpairs / slicesize);
-[C, phi, t, f, confC] = deal(cell(1, numslices));
+[C, phi, t, f, confC, S12, S1, S2] = deal(cell(1, numslices));
 
 % p = gcp;
 data = smoothdata(single(data));
@@ -132,7 +132,7 @@ for ii = 1:numslices
     iF = min(i0 + slicesize - 1, numpairs);  % index of final pair
     
     tic  % start timer
-    [Ct, phit, ~, ~, ~, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
+    [Ct, phit, S12t, S1t, S2t, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
             data(:, pairs(i0:iF, 1)), ...  % data1
             data(:, pairs(i0:iF, 2)), ...  % data2
             movingwin, params);  % parameters
@@ -140,6 +140,9 @@ for ii = 1:numslices
     
     C{ii} = int16(Ct * 1e4);  % convert to int16
     phi{ii} = int16(phit * 1e4);
+    S12{ii} = S12t;
+    S1{ii} = S1t(:, :, 1);
+    S2{ii} = S2t;
     
     
 end
@@ -156,6 +159,9 @@ outfile.phi = phi;
 outfile.t = t;
 outfile.f = f;
 outfile.confC = confC;
+outfile.S12 = S12;
+outfile.S1 = S1;
+outfile.S2 = S2;
 % outfile.phistd = phistd;
 
 disp('Done.')
