@@ -3,7 +3,7 @@
 % skipfactor = 10;
 % clims = [.01 .99];
 % bands = [1; 10];
-% T = 2; step = .5;
+T = 2; step = .5;
 
 mea = load(fname);
 disp(mea);
@@ -91,8 +91,15 @@ for ii = inds  % 1:N
 	mov(ii) = getframe(h);
 end
 
-v = VideoWriter(strrep(sprintf('%s_time%03.0f_%03.0f_clims%03.0f_%03.0f', ...
-	name, toi(1), toi(2), clims(1)*100, clims(2)*100), '-', 'M'));
+if isempty(clims)
+    filename = strrep(sprintf('%s_time%03.0f_%03.0f_climsAuto', ...
+	name, toi(1), toi(2)), '-', 'M');
+else
+    filename = strrep(sprintf('%s_time%03.0f_%03.0f_clims%03.0f_%03.0f', ...
+        name, toi(1), toi(2), clims(1)*100, clims(2)*100), '-', 'M');
+end
+
+v = VideoWriter();
 disp(['Saving ' v.Filename ' ...'])
 v.FrameRate = 30;
 open(v);
