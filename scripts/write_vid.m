@@ -1,5 +1,5 @@
 % toi = [0 5];
-% fname = 'MG49/MG49_Seizure43_Neuroport_10_10.mat';
+% fname = 'SIM_Seizure7_Neuroport_10_10.mat';
 % skipfactor = 1;
 % clims = [.01 .99];
 % bands = [[1; 10] [20; 40]];
@@ -9,15 +9,15 @@ disp(mea);
 [~, name, ~] = fileparts(fname);
 finfo = strsplit(name, {'_', filesep});
 pat = finfo{1}; seizure = str2double(finfo{2}(8:end));
-climfun = @(data, ii) quantile(single(data{ii}(:)), clims);
+if ~isempty(clims), climfun = @(data, ii) quantile(single(data{ii}(:)), clims); end
 
 % mea = exclude_channels(mea);
 
 %%
 position = mea.Position; position(mea.BadChannels, :) = [];
 time = mea.Time(); timeinds = time > toi(1) & time < toi(2);
-time = downsample(time(timeinds), skipfactor);
-doi = smoothdata(single(downsample(mea.Data(timeinds, :), skipfactor)));
+time = time(timeinds(1:skipfactor:end));
+doi = smoothdata(single(mea.Data(timeinds(1:skipfactor:end), :)));
 samplerate = mea.SamplingRate / skipfactor;
 doi(:, mea.BadChannels) = [];
 
@@ -49,12 +49,12 @@ h = figure(1); clf; set(1, 'Position', [0 0 300 * c 225 * r]); colormap(bone)
 ax = gobjects(numplots, 1);
 for ii = 1:numplots
 	ax(ii) = subplot(r, c, ii); 
-	ax(ii).CLim = climfun(data, ii);
+    if ~isempty(clims), ax(ii).CLim = climfun(data, ii); end
 	title(ax(ii), ttl{ii})
 	ax(ii).XLim = [0 max(position(:, 1)) + 1];
 	ax(ii).YLim = [0 max(position(:, 2)) + 1];
 	ax(ii).NextPlot = 'replacechildren';
-	colorbar(ax(ii));
+	if ~isempty(clims), colorbar(ax(ii)); end
     scatter(ax(ii), ...
         position(:, 1), position(:, 2), 225, data{ii}(1, :), ...
         'filled', 'square')
