@@ -1,8 +1,12 @@
 % delays_by_localregression
+% basename = compute_coherograms(pat, seizure, T, W, DS, units, toi);  %
+% (See quickscript)
+load(basename, ...  % Load the following from basename
+    'f', 'params', 'toi', 'phi', 'C', 't', 'confC', 'pat', 'seizure')
 
 winsz = 3;  % Hz
 thresh = 5e-2; 
-df = f(2) - f(1); 
+df = diff(f(1:2)); 
 fband = params.fpass;
 if ~exist('toi', 'var'); toi = [-Inf Inf]; end
 % MASK = false;
@@ -25,25 +29,8 @@ clear phif
 % dphi = padarray(diff(unwrap(phif)), 1, 'pre') / df;
 dphi(Cf <= confC) = nan;  % set insignificant values to nan
 
-if exist('MASK', 'var') && MASK
-	temp = padarray(Cf, [1 0], 'both');  % Pad with 0s
-	starts = arrayfun(@(ii) ...  % find where streaks of significant coherence start
-		find((temp(:, ii) <= confC) & (circshift(temp(:, ii), [-1 0]) > confC)), ...
-		1:size(temp, 2), 'uni', 0);
-	ends = arrayfun(@(ii) ...  % ... and where they end
-		find((temp(:, ii) > confC) & (circshift(temp(:, ii), [-1 0]) <= confC)), ...
-		1:size(temp, 2), 'uni', 0);
-	[~, streak] = cellfun(@(s, e) max(e - s), starts, ends, 'uni', 0);  % Isolate the longest streak
-	startinds = cellfun(@(s, ii) s(ii), starts, streak, 'uni', 0);  % Get the start ind for each streak
-	endinds = cellfun(@(e, ii) e(ii), ends, streak, 'uni', 0);   % ... and the end ind
-	mask = false(size(temp));  % Initialize a mask of longest streak of significant values
-	for ii = 1:size(temp, 2)
-		if endinds{ii} - startinds{ii} < winsz / df; continue; end
-		mask(startinds{ii}:endinds{ii}, ii) = true;
-	end
-	mask([1 end], :) = [];  % unpad
-
-	dphi(~mask) = nan;
+if exist('MASK', 'var') && MASK  % Keep only the longest streak of significant data points
+	dphi = keep_streak(dphi, winsz / df);
 end
 
 
@@ -105,7 +92,7 @@ arrayfun_is_faster = ...  % Use parfor if possible
     any(cellfun(@(n) strcmpi(n, 'parallel computing toolbox'), {packages.Name}));
 
 if arrayfun_is_faster
-
+    disp('Using arrayfun ...')
     tic %#ok<*UNRCH>
     delaysR2 = reshape(delaysR, [], np)';  % reshape the delays so that each column is a single time-freq point and rows are pairs
     num_unique = arrayfun(@(ii) ...  % Number of unique, non-nan values in each column
@@ -126,7 +113,7 @@ if arrayfun_is_faster
     Z = reshape(Z, nf, nt);
     toc
 else
-
+    disp('Using parfor ...')
     tic
     [Z, pdel, pct] = deal(nan(nf, nt));
     parfor ii = 1:nf  % For each frequency
