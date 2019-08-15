@@ -23,32 +23,33 @@ fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
 mea = load(fname);
 [~, name, ~] = fileparts(fname);
 time = mea.Time();
-if 1.1*T >= diff(toi); toi = (toi - mean(toi)) * 1.1*T + mean(toi); end
-mask = time < toi(1) | time > toi(2);
-if 2.1*T > diff(toi)
-	pad = (2.1*T - diff(toi)) / 2;
-	mea.Data(mask, :) = 0;
-	mask = time < (toi(1) - pad) | time > (toi(2) + pad);
-end
+toi(1) = max(toi(1), time(1)); toi(2) = min(toi(2), time(end));
+
+if T >= range(toi); T = floor(range(toi)); fprintf('Using T=%d\n', T); end  % ensure T is not longer than toi
+mask = time < toi(1) | time > toi(2);  % Remove datapoints outside of toi
 mea.Data(mask, :) = [];
 time(mask) = [];
 
-% mea = load('SIM/seizing_cortical_field_sim.mat');
-% name = mea.Name;
+if 2.1*T >= range(time)  % Pad short datasets to ensure multiple time points
+    dt = diff(time(1:2));
+    pad = (2.1 * T - range(time)) / 2;
+    time = time(1) - pad : dt : time(end) + pad;
+    if mod(length(time), 2); time = time(1:end-1); end
+    mea.Data = padarray(mea.Data, ...  % pad data
+        [(length(time) - length(mea.Data)) / 2, 0], ...  % to match length of time
+        'both', 'rep');  % by repeating the last value on the beginning and end
+end
+
 basename = strrep(sprintf('%s_cohgram_ds%s_T%02d_W%02d_Hz%d_t%d_%d', ...
 	name, ...
 	strrep(num2str(DS, '%0.0g'), '+', ''), ...
 	round(T), W, units, round(toi)), '-', 'M');
-% basename = [name '_cohgram_ds_T' num2str(T, '%02d')];
 outfile = matfile(basename, 'writable', true);
 % mea = exclude_channels(mea);
-% skipfactor = mea.SamplingRate / DS;  % Downsample data to ~DS Hz
 [nT, nCh] = size(mea.Data);
 [X, Y] = meshgrid(1:nCh, (1:nT) / mea.SamplingRate);
 [Xq, Yq] = meshgrid(1:nCh, 1/DS:1/DS:nT/mea.SamplingRate);
 data = interp2(X, Y, single(mea.Data), Xq, Yq, 'cubic');
-
-% data = data(1.5*DS:3.5*DS, :);
 
 data(:, mea.BadChannels) = [];
 Fs = DS / units;  % sampling frequency (Hz * units)
@@ -116,11 +117,11 @@ clear mea;  % free up memory
 numpairs = nCh - 1;
 slicesize = 10;
 numslices = ceil(numpairs / slicesize);
-[C, phi, t, f, confC, S12, S1, S2] = deal(cell(1, numslices));
+[C, phi, t, f, confC, S12m, S12a, S1, S2] = deal(cell(1, numslices));
 
-% p = gcp;
 data = smoothdata(single(data));
 if any(strcmpi(pat, {'sim', 'waves'}))
+    disp('Adding noise to simulated data')
 	data = data + randn(size(data)) * .01 * diff(quantile(data(:), [.01, .99]));
 end
 
@@ -138,11 +139,13 @@ for ii = 1:numslices
             movingwin, params);  % parameters
     toc  % end timer and display
     
+    
     C{ii} = int16(Ct * 1e4);  % convert to int16
     phi{ii} = int16(phit * 1e4);
-    S12{ii} = S12t;
-    S1{ii} = S1t(:, :, 1);
-    S2{ii} = S2t;
+    S12m{ii} = int16(1e3 * log10(abs(S12t) ./ max(abs(S12t), 2)));
+    S12a{ii} = int16(1e4 * angle(S12t));
+    S1{ii} = int16(1e3 * log10(S1t(:, :, 1) ./ max(S1t(:, :, 1), 2)));
+    S2{ii} = int16(1e3 * log10(S2t ./ max(S2t, 2)));
     
     
 end
@@ -152,6 +155,7 @@ t = t{1} / units + time(1);  % correct for padding
 confC = int16(confC{1}(1) * 1e4);
 C = cat(3, C{:});
 phi = cat(3, phi{:});
+S12m = cat(3, S12m{:});
 
 % Save results
 outfile.C = C;
@@ -159,72 +163,11 @@ outfile.phi = phi;
 outfile.t = t;
 outfile.f = f;
 outfile.confC = confC;
-outfile.S12 = S12;
+outfile.S12 = cat(3, S12m;
 outfile.S1 = S1;
 outfile.S2 = S2;
 % outfile.phistd = phistd;
 
 disp('Done.')
-
-plotmean();
-
-% delete(p);
-
-%% Nested plotting function
-    function plotmean
-        
-%         files = dir('*cohgram*ds*.mat');
-        
-%         close all
-%         for file = {files.name}
-%             [~, basename, ~] = fileparts(file{:});
-%             disp(basename);
-%             try
-%                 load(basename);
-%             catch ME
-%                 disp(['Error loading ' basename])
-%                 continue
-%             end
-%             disp('Loaded')
-            
-            strinfo = strsplit(basename, {'_', '.'});
-            pat = strinfo{1};
-            seizure = str2double(strinfo{2}(8:end));
-            T = str2double(strinfo{end}(2:end));
-        
-            figure(); fullwidth(true)
-            
-            mn = single(quantile(C, .9, 3));
-            mn(mn <= confC) = nan;
-            phimn = single(phi) / 1e4;
-            phimn(C <= confC) = nan;
-            phistd = std(phimn, [], 3, 'omitnan');
-            phimn = mean(phimn, 3, 'omitnan');
-
-            subplot(2,2,1)
-            imagesc(t, f, mn'); colorbar; axis xy;
-            title(sprintf('%s Seizure %d\nT=%0.1f\nMean coherence', pat, seizure, T))
-            xlabel('Time (s)'); ylabel('Frequency (Hz)')
-            ylim([0 50])
-
-            subplot(2, 2, 2);
-            imagesc(t, f, phimn'); colorbar; axis xy;
-            title(sprintf('%s Seizure %d\nT=%0.1f\nMean phi', pat, seizure, T))
-            xlabel('Time (s)'); ylabel('Frequency (Hz)')
-            ylim([0 50])
-
-    %         print([fid '_mean_phi'], '-dpng')
-
-            subplot(2, 2, 4);
-            imagesc(t, f, phistd'); colorbar; axis xy;
-            title(sprintf('%s Seizure %d\nT=%0.1f\nstd phi', pat, seizure, T))
-            xlabel('Time (s)'); ylabel('Frequency (Hz)')
-            ylim([0 50])
-
-            print(basename, '-dpng')
-
-            close(gcf)
-%         end
-    end
 
 end
