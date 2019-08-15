@@ -2,7 +2,7 @@
 % fname = 'SIM_Seizure7_Neuroport_10_10.mat';
 % skipfactor = 10;
 % clims = [];
-% bands = [1; 10];
+% bands = [[2; 5] [11.5; 13]];
 T = 2; step = .5;
 
 mea = load(fname);
@@ -46,7 +46,7 @@ for passband = bands
         t0 = t0 + step; tf = t0 + T;
     end
     data{ii} = single(filtfilt(b, 1, double(doi)));
-    ttl{ii} = sprintf('Filtered to [%d %d]', passband);
+    ttl{ii} = sprintf('Filtered to [%.1f %.1f]', passband);
     ii = ii + 1;
 end
 
@@ -98,7 +98,7 @@ else
         name, toi(1), toi(2), clims(1)*100, clims(2)*100), '-', 'M');
 end
 
-v = VideoWriter();
+v = VideoWriter(filename);
 disp(['Saving ' v.Filename ' ...'])
 v.FrameRate = 30;
 open(v);
