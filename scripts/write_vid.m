@@ -1,8 +1,9 @@
 % toi = [0 5];
 % fname = 'SIM_Seizure7_Neuroport_10_10.mat';
-% skipfactor = 1;
+% skipfactor = 10;
 % clims = [.01 .99];
-% bands = [[1; 10] [20; 40]];
+% bands = [1; 10];
+% T = 2; step = .5;
 
 mea = load(fname);
 disp(mea);
@@ -32,9 +33,19 @@ doiR(addy) = doi(:);
 data{1} = doi;
 ttl{1} = 'raw';
 
+b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
+
+    
 ii = 2;
+t0 = time(1); tf = t0 + T;
 for passband = bands
-    b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
+    tempdat = zeros(size(doi));
+    while tf <= time(end)
+        inds = (time >= t0) & (time <= tf);
+        tempf = single(filtfilt(b, 1, double(doi(inds, :))));
+        tempdat(inds, :) = (tempdat(inds, :) + tempf) / 2;
+        t0 = t0 + step; tf = t0 + T;
+    end
     data{ii} = single(filtfilt(b, 1, double(doi)));
     ttl{ii} = sprintf('Filtered to [%d %d]', passband);
     ii = ii + 1;
