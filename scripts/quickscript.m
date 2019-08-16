@@ -85,6 +85,8 @@ outfile.center = center;
 outfile.params = params;
 outfile.movingwin = movingwin;
 outfile.basename = basename;
+outfile.pat = pat;
+outfile.seizure = seizure;
 
 % padding = mea.Padding;  % Store to correct t later
 clear mea;  % free up memory
