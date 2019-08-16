@@ -92,7 +92,7 @@ packages = ver;
 arrayfun_is_faster = ...  % Use parfor if possible
     any(cellfun(@(n) strcmpi(n, 'parallel computing toolbox'), {packages.Name}));
 
-if arrayfun_is_faster
+if ~arrayfun_is_faster
     disp('Using arrayfun ...')
     tic %#ok<*UNRCH>
     delaysR2 = reshape(delaysR, [], np)';  % reshape the delays so that each column is a single time-freq point and rows are pairs
