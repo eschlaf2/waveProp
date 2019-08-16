@@ -1,4 +1,4 @@
-% pat = 'SIM'; seizure = 7; T = 2; W = 2; DS = 1e3; units = 1;
+% pat = 'SIM'; seizure = 7; T = 2; W = 2; DS = 1e3; units = 1; type = 'pb';
 
 if isempty(T), T = 10; else, if ischar(T), T = str2double(T); end, end
 if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
@@ -48,11 +48,19 @@ basename = strrep(sprintf('%s_cohgram_ds%s_T%02d_W%02d_Hz%d_t%d_%d_%s', ...
 outfile = matfile(basename, 'writable', true);
 % mea = exclude_channels(mea);
 [nT, nCh] = size(mea.Data);
+%%
 if strcmpi(type, 'pb')
-	[event_inds, artefact_inds, mea] = mua_events(mea);
 	
+	[~, ~, mea] = mua_events(mea);
+	data = false(size(mea.Data));
+	data(event_inds) = true;
+	binsz = round(mea.SamplingRate / DS);
+	nT = floor(nT / binsz);  % new data length
+	data = squeeze(sum(reshape(data(1:nT * binsz, :), nT, binsz, nCh), 2));
+	time = time(1:binsz:nT*binsz);
+	DS = 1 / (diff(time(1:2)));
 else
-
+	
 	[X, Y] = meshgrid(1:nCh, (1:nT) / mea.SamplingRate);
 	[Xq, Yq] = meshgrid(1:nCh, 1/DS:1/DS:nT/mea.SamplingRate);
 	data = interp2(X, Y, single(mea.Data), Xq, Yq, 'cubic');
@@ -104,13 +112,20 @@ numpairs = nCh - 1;
 slicesize = 10;
 numslices = ceil(numpairs / slicesize);
 [C, phi, t, f, confC, S12m, S12a, S1, S2] = deal(cell(1, numslices));
+if strcmpi(type, 'pb'), zerosp = cell(1, numslices); end
+if strcmpi(type, 'c'), data = smoothdata(single(data)); end
 
-data = smoothdata(single(data));
 if any(strcmpi(pat, {'sim', 'waves'}))
     disp('Adding noise to simulated data')
-	data = data + randn(size(data)) * .01 * diff(quantile(data(:), [.01, .99]));
+	if strcmpi(type, 'c')
+		data = data + randn(size(data)) * .01 * diff(quantile(data(:), [.01, .99]));
+	else
+		noise = .2 * randn(size(data));
+		data = round(noise) + data; data(data < 0) = 0;
+	end
 end
 
+%%
 for ii = 1:numslices
     
     disp(ii)  % show progress
@@ -119,10 +134,17 @@ for ii = 1:numslices
     iF = min(i0 + slicesize - 1, numpairs);  % index of final pair
     
     tic  % start timer
+	if strcmpi(type, 'c')
     [Ct, phit, S12t, S1t, S2t, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
             data(:, pairs(i0:iF, 1)), ...  % data1
             data(:, pairs(i0:iF, 2)), ...  % data2
             movingwin, params);  % parameters
+	else
+		[Ct,phit,S12t,S1t,S2t,t{ii},f{ii},zerosp{ii},confC{ii}, ~] = cohgrampb(...
+			data(:, pairs(i0:iF, 1)), ...  % data1
+            data(:, pairs(i0:iF, 2)), ...  % data2
+            movingwin, params);  % parameters
+	end
     toc  % end timer and display
     
     
@@ -130,7 +152,6 @@ for ii = 1:numslices
     phi{ii} = int16(phit * 1e4);
     S12m{ii} = int16(1e3 * log10(abs(S12t) ./ max(abs(S12t), 2)));
     S12a{ii} = int16(1e4 * angle(S12t));
-    S1{ii} = int16(1e3 * log10(S1t(:, :, 1) ./ max(S1t(:, :, 1), 2)));
     S2{ii} = int16(1e3 * log10(S2t ./ max(S2t, 2)));
     
     
@@ -143,8 +164,9 @@ C = cat(3, C{:});
 phi = cat(3, phi{:});
 S12m = cat(3, S12m{:});
 S12a = cat(3, S12a{:});
-S1 = cat(3, S1{:});
+S1 = int16(1e3 * log10(S1t(:, :, 1) ./ max(S1t(:, :, 1), 2)));
 S2 = cat(3, S2{:});
+if strcmpi(type, 'pb'), outfile.zerosp = logical(cat(2, zerosp{:})); end
 
 % Save results
 outfile.C = C;
