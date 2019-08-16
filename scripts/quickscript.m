@@ -5,15 +5,15 @@ if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
 if isempty(DS), DS = 1e3; else, if ischar(DS), DS = str2double(DS); end, end
 if isempty(units), units = 1; else, if ischar(units), units = str2double(units); end, end  
 if ~exist('toi', 'var') || isempty(toi), toi = [-Inf Inf]; end
-if ~exist('type', 'var') || isempty(type), type = 'c'; end
+if ~exist('cohfun', 'var') || isempty(cohfun), cohfun = 'c'; end
 
 % units is samples per 1/units sec (i.e. set units=1 for Hz, units=1e3 for
 % kHz). Note that if units is 10, for example, then T is in tenths of
 % seconds while W is in deca(?)Hz.
 
-basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, type);
+basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, cohfun);
 
-function basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, type)
+function basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, cohfun)
 %%
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
 addpath(datapath);  % ... add the original data path first
@@ -44,12 +44,12 @@ end
 basename = strrep(sprintf('%s_cohgram_ds%s_T%02d_W%02d_Hz%d_t%d_%d_%s', ...
 	name, ...
 	strrep(num2str(DS, '%0.0g'), '+', ''), ...
-	round(T), W, units, round(toi), type), '-', 'M');
+	round(T), W, units, round(toi), cohfun), '-', 'M');
 outfile = matfile(basename, 'writable', true);
 % mea = exclude_channels(mea);
 [nT, nCh] = size(mea.Data);
 %%
-if strcmpi(type, 'pb')
+if strcmpi(cohfun, 'pb')
 	
 	[~, ~, mea] = mua_events(mea);
 	data = false(size(mea.Data));
@@ -112,12 +112,12 @@ numpairs = nCh - 1;
 slicesize = 10;
 numslices = ceil(numpairs / slicesize);
 [C, phi, t, f, confC, S12m, S12a, S1, S2] = deal(cell(1, numslices));
-if strcmpi(type, 'pb'), zerosp = cell(1, numslices); end
-if strcmpi(type, 'c'), data = smoothdata(single(data)); end
+if strcmpi(cohfun, 'pb'), zerosp = cell(1, numslices); end
+if strcmpi(cohfun, 'c'), data = smoothdata(single(data)); end
 
 if any(strcmpi(pat, {'sim', 'waves'}))
     disp('Adding noise to simulated data')
-	if strcmpi(type, 'c')
+	if strcmpi(cohfun, 'c')
 		data = data + randn(size(data)) * .01 * diff(quantile(data(:), [.01, .99]));
 	else
 		noise = .2 * randn(size(data));
@@ -134,7 +134,7 @@ for ii = 1:numslices
     iF = min(i0 + slicesize - 1, numpairs);  % index of final pair
     
     tic  % start timer
-	if strcmpi(type, 'c')
+	if strcmpi(cohfun, 'c')
     [Ct, phit, S12t, S1t, S2t, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
             data(:, pairs(i0:iF, 1)), ...  % data1
             data(:, pairs(i0:iF, 2)), ...  % data2
@@ -166,7 +166,7 @@ S12m = cat(3, S12m{:});
 S12a = cat(3, S12a{:});
 S1 = int16(1e3 * log10(S1t(:, :, 1) ./ max(S1t(:, :, 1), 2)));
 S2 = cat(3, S2{:});
-if strcmpi(type, 'pb'), outfile.zerosp = logical(cat(2, zerosp{:})); end
+if strcmpi(cohfun, 'pb'), outfile.zerosp = logical(cat(2, zerosp{:})); end
 
 % Save results
 outfile.C = C;
