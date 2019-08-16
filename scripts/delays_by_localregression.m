@@ -27,16 +27,7 @@ clear C phi
 % phif = smoothdata(unwrap(phif), 1, 'rlowess', winsz / df);  % ... unwrap
 % dphi = padarray(diff(unwrap(phif)), 1, 'pre');
 
-disp('Computing gradient')
-[~, dphi] = gradient(unwrap(phif), df);  % Compute the gradient of phi wrt freq
-
 % dphi = padarray(diff(unwrap(phif)), 1, 'pre') / df;
-dphi(Cf <= confC) = nan;  % set insignificant values to nan
-
-if exist('MASK', 'var') && MASK  % Keep only the longest streak of significant data points
-	dphi = keep_streak(dphi, winsz / df);
-end
-
 
 %% Delays
 disp('Computing delays')
@@ -46,17 +37,13 @@ nanflag = 'includenan';  % don't interpolate nans
 degree = 1;  % constant
 method = 'movmed';
 
-% delays = matlab.internal.math.localRegression(dphi, winsz / df, dim, ...
-%             nanflag, degree, method, f);
-switch delaytype
-	case 'phase'
-		delays = smoothdata(phif ./ f', dim, method, winsz / df, nanflag);
-	otherwise
-		delaytype = 'group';
-		delays = smoothdata(dphi, dim, method, winsz / df, nanflag);
+delays = dblr(phif, f, delaytype, Cf, confC);
+
+if exist('MASK', 'var') && MASK  % Keep only the longest streak of significant data points
+	delays = keep_streak(delays, winsz / df);
 end
 
-delaysR = reshape(delays, nf, numel(t), []);
+delaysR = reshape(delays, nf, nt, []);
 clear delays phif
 
 %% Imagesc delays
@@ -158,6 +145,7 @@ else
 end
 
 %% Imagesc Z (angles computed using delays)
+figure();
 emilys_pcolor(t, f * units, Z', 'cmap', hsv(80), 'clim', [-pi,pi]);
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
