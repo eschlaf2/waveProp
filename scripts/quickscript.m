@@ -156,6 +156,9 @@ confC = int16(confC{1}(1) * 1e4);
 C = cat(3, C{:});
 phi = cat(3, phi{:});
 S12m = cat(3, S12m{:});
+S12a = cat(3, S12a{:});
+S1 = cat(3, S1{:});
+S2 = cat(3, S2{:});
 
 % Save results
 outfile.C = C;
@@ -163,7 +166,8 @@ outfile.phi = phi;
 outfile.t = t;
 outfile.f = f;
 outfile.confC = confC;
-outfile.S12 = cat(3, S12m;
+outfile.S12m = S12m;
+outfile.S12a = S12a;
 outfile.S1 = S1;
 outfile.S2 = S2;
 % outfile.phistd = phistd;
