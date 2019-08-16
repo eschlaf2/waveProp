@@ -49,13 +49,14 @@ method = 'movmed';
 % delays = matlab.internal.math.localRegression(dphi, winsz / df, dim, ...
 %             nanflag, degree, method, f);
 switch type
-	case 'group'
-		delays = smoothdata(dphi, dim, method, winsz / df, nanflag);
 	case 'phase'
 		delays = smoothdata(phif ./ f', dim, method, winsz / df, nanflag);
+	otherwise
+		type = 'group';
+		delays = smoothdata(dphi, dim, method, winsz / df, nanflag);
 end
 
-delaysR = reshape(delays, size(delays, 1), numel(t), []);
+delaysR = reshape(delays, nf, numel(t), []);
 clear delays phif
 
 %% Imagesc delays
@@ -128,7 +129,7 @@ if ~arrayfun_is_faster
     tic
     Z(inds(indsB)) = ...  % Fill in wave directions for good fits
         arrayfun(@(ii) angle(pinv(beta{ii}([2 3])) * [1; 1i]), indsB);
-    Z = reshape(Z, nf, nt);
+    Z = reshape(Z, nf, nt, np);
     toc
     
     toc
