@@ -102,16 +102,28 @@ if ~arrayfun_is_faster
     Z = nan * num_unique;  % Initialize Z with nans
     inds = ...  % Need at least 3 unique values and MIN_RATIO_FINITE finite values
         find((finite >= max(MIN_RATIO_FINITE * np, 3)) & (num_unique >= 3));  
-
+    
+    disp('Computing fits')
+    tic
     [beta, stats] = ...  % Compute fits
         arrayfun(@(ii) robustfit(pos, delaysR2(:, ii), 'fair'), ...
         inds, 'uni', 0);  
+    toc
+    
+    disp('Computing significance')
+    tic
     pdel = ...  % ... and significance
         cellfun(@(A, B) linhyptest(A, B.covb, c, H, B.dfe), beta, stats);  
+    toc
+    
     indsB = find(pdel < thresh);  % Keep significant fits
+    disp('Computing Z')
+    tic
     Z(inds(indsB)) = ...  % Fill in wave directions for good fits
         arrayfun(@(ii) angle(pinv(beta{ii}([2 3])) * [1; 1i]), indsB);
     Z = reshape(Z, nf, nt);
+    toc
+    
     toc
 else
     disp('Using parfor ...')
