@@ -10,7 +10,7 @@ thresh = 5e-2;
 df = diff(f(1:2)); 
 fband = params.fpass;
 if ~exist('toi', 'var'); toi = [-Inf Inf]; end
-if ~exist('delaytype', 'var'); delaytype = 'group'; end  % 'group' or 'phase'
+if ~exist('tau', 'var'); tau = 'group'; end  % 'group' or 'phase'
 % MASK = false;
 
 if isinteger(phi); phi = -single(phi) / 1e4; end
@@ -37,7 +37,7 @@ nanflag = 'includenan';  % don't interpolate nans
 degree = 1;  % constant
 method = 'movmed';
 
-delays = dblr(phif, f, delaytype, Cf, confC);
+delays = dblr(phif, f, tau, Cf, confC);
 
 if exist('MASK', 'var') && MASK  % Keep only the longest streak of significant data points
 	delays = keep_streak(delays, winsz / df);
@@ -150,7 +150,7 @@ emilys_pcolor(t, f * units, Z', 'cmap', hsv(80), 'clim', [-pi,pi]);
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
 ylabel('Freq (Hz)')
-title(sprintf('%s Seizure %d\n%s delays', pat, seizure, delaytype));
+title(sprintf('%s Seizure %d\n%s delays', pat, seizure, tau));
 
 %% Compare to measure
 % compareto = 'events';
