@@ -2,7 +2,7 @@
 % basename = compute_coherograms(pat, seizure, T, W, DS, units, toi);  %
 % (See quickscript)
 load(basename, ...  % Load the following from basename
-    'f', 'params', 'toi', 'phi', 'C', 't', 'confC', 'pat', 'seizure')
+    'f', 'params', 'toi', 'phi', 'C', 't', 'confC', 'pat', 'seizure', 'position')
 
 winsz = 3;  % Hz
 thresh = 5e-2; 
