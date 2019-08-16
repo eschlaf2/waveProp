@@ -1,4 +1,4 @@
-% pat = 'c7'; seizure = 1; T = 10; W = 2; DS = 1e3; units = 1;
+% pat = 'SIM'; seizure = 7; T = 2; W = 2; DS = 1e3; units = 1;
 
 if isempty(T), T = 10; else, if ischar(T), T = str2double(T); end, end
 if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
@@ -47,10 +47,15 @@ basename = strrep(sprintf('%s_cohgram_ds%s_T%02d_W%02d_Hz%d_t%d_%d', ...
 outfile = matfile(basename, 'writable', true);
 % mea = exclude_channels(mea);
 [nT, nCh] = size(mea.Data);
-[X, Y] = meshgrid(1:nCh, (1:nT) / mea.SamplingRate);
-[Xq, Yq] = meshgrid(1:nCh, 1/DS:1/DS:nT/mea.SamplingRate);
-data = interp2(X, Y, single(mea.Data), Xq, Yq, 'cubic');
+if strcmpi(type, 'pb')
+	[event_inds, artefact_inds, mea] = mua_events(mea);
+	
+else
 
+	[X, Y] = meshgrid(1:nCh, (1:nT) / mea.SamplingRate);
+	[Xq, Yq] = meshgrid(1:nCh, 1/DS:1/DS:nT/mea.SamplingRate);
+	data = interp2(X, Y, single(mea.Data), Xq, Yq, 'cubic');
+end
 data(:, mea.BadChannels) = [];
 Fs = DS / units;  % sampling frequency (Hz * units)
 
@@ -91,31 +96,9 @@ outfile.seizure = seizure;
 % padding = mea.Padding;  % Store to correct t later
 clear mea;  % free up memory
 
-%% Initialize arrays
-% ii = length(pairs);
-% disp('Initializing arrays with last pair...')
-% [C{ii}, phi{ii}, ~, ~, ~, ...
-% 		t, f, confC{ii}, phistd{ii}] = ...
-% 		cohgramc(data1(:, ii), data2(:, ii), movingwin, params);
-% disp('Arrays initialized.')
-%%	
-% Compute coherence and spectrograms for each pair of channels
-% parfor ii = 1:length(pairs) - 1
-% 	[C{ii}, phi{ii}, ~, ~, ~, ...
-% 		~, ~, confC{ii}, phistd{ii}] = ...
-% 		cohgramc(data1(:, ii), data2(:, ii), movingwin, params);
-% 	save(sprintf('%s_%d', basename, ii), 'C', 'phi', 
-% 	disp(['ii=' num2str(ii)]);
-% end
-
-% [C, phi, ~, ~, ~, t, f, confC, ~] = ...
-%         cohgramc(...
-%             data(:, pairs(1, 1)), data(:, pairs(1, 2)), ...
-%             movingwin, params);
-        
 %%
 % Initialize variables
-% numpairs = nchoosek(nCh, 2);
+
 numpairs = nCh - 1;
 slicesize = 10;
 numslices = ceil(numpairs / slicesize);
@@ -175,5 +158,6 @@ outfile.S2 = S2;
 % outfile.phistd = phistd;
 
 disp('Done.')
+disp(basename);
 
 end
