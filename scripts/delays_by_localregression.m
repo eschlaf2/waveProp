@@ -3,7 +3,7 @@
 % (See quickscript)
 load(basename, ...  % Load the following from basename
     'f', 'params', 'phi', 'C', 't', 'confC', 'pat', ...
-    'seizure', 'position', 'pairs')
+    'seizure', 'position', 'pairs', 'units')
 
 winsz = 3;  % Hz
 thresh = 5e-2; 
@@ -129,7 +129,7 @@ if ~arrayfun_is_faster
     tic
     Z(inds(indsB)) = ...  % Fill in wave directions for good fits
         arrayfun(@(ii) angle(pinv(beta{ii}([2 3])) * [1; 1i]), indsB);
-    Z = reshape(Z, nf, nt, np);
+    Z = reshape(Z, nf, nt);
     toc
     
     toc
@@ -158,11 +158,11 @@ else
 end
 
 %% Imagesc Z (angles computed using delays)
-emilys_pcolor(t, f * units, Z_gpdelays', 'cmap', hsv(80), 'clim', [-pi,pi]);
+emilys_pcolor(t, f * units, Z', 'cmap', hsv(80), 'clim', [-pi,pi]);
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
 ylabel('Freq (Hz)')
-title(sprintf('%s Seizure %d\%s delays', pat, seizure, type));
+title(sprintf('%s Seizure %d\n%s delays', pat, seizure, type));
 
 %% Compare to measure
 % compareto = 'events';
