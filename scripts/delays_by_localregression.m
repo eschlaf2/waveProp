@@ -2,7 +2,7 @@
 % basename = compute_coherograms(pat, seizure, T, W, DS, units, toi);  %
 % (See quickscript)
 load(basename, ...  % Load the following from basename
-    'f', 'params', 'toi', 'phi', 'C', 't', 'confC', 'pat', ...
+    'f', 'params', 'phi', 'C', 't', 'confC', 'pat', ...
     'seizure', 'position', 'pairs')
 
 winsz = 3;  % Hz
@@ -10,12 +10,15 @@ thresh = 5e-2;
 df = diff(f(1:2)); 
 fband = params.fpass;
 if ~exist('toi', 'var'); toi = [-Inf Inf]; end
+if ~exist('type', 'var'); type = 'group'; end
 % MASK = false;
 
 if isinteger(phi); phi = -single(phi) / 1e4; end
 finds = (f >= fband(1)) & (f <= fband(2));
 tinds = (t >= toi(1)) & (t <= toi(2));
 t = t(tinds); f = f(finds);
+
+[nt, nf, np] = size(C);
 
 transform = @(A) reshape(permute(A(tinds, finds, :), [2 1 3]), sum(finds), []);
 Cf = transform(C);  % limit to band of interest
@@ -26,7 +29,7 @@ clear C phi
 
 disp('Computing gradient')
 [~, dphi] = gradient(unwrap(phif), df);  % Compute the gradient of phi wrt freq
-clear phif
+
 % dphi = padarray(diff(unwrap(phif)), 1, 'pre') / df;
 dphi(Cf <= confC) = nan;  % set insignificant values to nan
 
@@ -45,10 +48,15 @@ method = 'movmed';
 
 % delays = matlab.internal.math.localRegression(dphi, winsz / df, dim, ...
 %             nanflag, degree, method, f);
-[delays, wn] = smoothdata(dphi, dim, method, winsz / df, nanflag);	
+switch type
+	case 'group'
+		delays = smoothdata(dphi, dim, method, winsz / df, nanflag);
+	case 'phase'
+		delays = smoothdata(phif ./ f', dim, method, winsz / df, nanflag);
+end
 
 delaysR = reshape(delays, size(delays, 1), numel(t), []);
-clear delays
+clear delays phif
 
 %% Imagesc delays
 
@@ -80,7 +88,6 @@ end
 disp('Computing directions')
 
 MIN_RATIO_FINITE = .25;
-[nf, nt, np] = size(delaysR);
 pos = position(pairs(:, 2), :);
 
 % p = gcp();
@@ -150,13 +157,11 @@ else
 end
 
 %% Imagesc Z (angles computed using delays)
-[tt, ff] = ndgrid(t, f * units);
-cmap = hsv(80);
-h = pcolor(tt, ff, Z'); h.LineStyle = 'none'; colormap(cmap); colorbar;h.Parent.CLim = [-pi pi];
+emilys_pcolor(t, f * units, Z_gpdelays', 'cmap', hsv(80), 'clim', [-pi,pi]);
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
 ylabel('Freq (Hz)')
-title(sprintf('%s Seizure %d', pat, seizure));
+title(sprintf('%s Seizure %d\%s delays', pat, seizure, type));
 
 %% Compare to measure
 % compareto = 'events';
