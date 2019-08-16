@@ -34,7 +34,7 @@ if 2.1*T >= range(time)  % Pad short datasets to ensure multiple time points
     dt = diff(time(1:2));
     pad = (2.1 * T - range(time)) / 2;
     time = time(1) - pad : dt : time(end) + pad;
-    if mod(length(time), 2); time = time(1:end-1); end
+    if mod(length(time) - length(mea.Data), 2); time = time(1:end-1); end
     mea.Data = padarray(mea.Data, ...  % pad data
         [(length(time) - length(mea.Data)) / 2, 0], ...  % to match length of time
         'both', 'rep');  % by repeating the last value on the beginning and end
