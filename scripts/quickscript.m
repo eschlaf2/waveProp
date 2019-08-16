@@ -53,7 +53,7 @@ if strcmpi(cohfun, 'pb')
 	
 	[~, ~, mea] = mua_events(mea);
 	data = false(size(mea.Data));
-	data(event_inds) = true;
+	data(mea.event_inds) = true;
 	binsz = round(mea.SamplingRate / DS);
 	nT = floor(nT / binsz);  % new data length
 	data = squeeze(sum(reshape(data(1:nT * binsz, :), nT, binsz, nCh), 2));
