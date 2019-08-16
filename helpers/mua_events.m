@@ -26,8 +26,13 @@ artefacts = (abs(zscore(data)) > ARTEFACT_THRESH);
 data(artefacts) = nan;
 
 intervalM = mea.SamplingRate / 1e3 * MIN_DIST;  % samples per MIN_DIST
-mn = mean(data(time < 0, :), 1, 'omitnan');     % get the mean of the preictal baseline
-sd = std(data(time < 0, :), 'omitnan');            % ... and the sd
+if ~any(time < 0) 
+	mn = 0; 
+	sd = .01 * range(data);
+else
+	mn = mean(data(time < 0, :), 1, 'omitnan');     % get the mean of the preictal baseline
+	sd = std(data(time < 0, :), 'omitnan');            % ... and the sd
+end
 data = (data - mn) ./ sd;                       % zscore based on preictal state
 
 % find events on each channel
