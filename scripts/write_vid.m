@@ -1,9 +1,9 @@
-% toi = [0 5];
-% fname = 'SIM_Seizure7_Neuroport_10_10.mat';
-% skipfactor = 10;
+% toi = [50 60];
+% fname = 'MG49_Seizure43_Neuroport_10_10.mat';
+% skipfactor = 30;
 % clims = [];
-% bands = [[2; 5] [11.5; 13]];
-T = 2; step = .5;
+% bands = [[2; 2.2] [12; 12.2] [22; 22.2]];
+% T = 5; step = .1;
 
 mea = load(fname);
 disp(mea);
@@ -16,7 +16,7 @@ if ~isempty(clims), climfun = @(data, ii) quantile(single(data{ii}(:)), clims); 
 
 %%
 position = mea.Position; position(mea.BadChannels, :) = [];
-time = mea.Time(); timeinds = time > toi(1) & time < toi(2);
+time = mea.Time(); timeinds = find(time > toi(1) & time < toi(2));
 time = time(timeinds(1:skipfactor:end));
 doi = smoothdata(single(mea.Data(timeinds(1:skipfactor:end), :)));
 samplerate = mea.SamplingRate / skipfactor;
