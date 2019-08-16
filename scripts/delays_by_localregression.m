@@ -10,7 +10,7 @@ thresh = 5e-2;
 df = diff(f(1:2)); 
 fband = params.fpass;
 if ~exist('toi', 'var'); toi = [-Inf Inf]; end
-if ~exist('type', 'var'); type = 'group'; end
+if ~exist('delaytype', 'var'); delaytype = 'group'; end  % 'group' or 'phase'
 % MASK = false;
 
 if isinteger(phi); phi = -single(phi) / 1e4; end
@@ -48,11 +48,11 @@ method = 'movmed';
 
 % delays = matlab.internal.math.localRegression(dphi, winsz / df, dim, ...
 %             nanflag, degree, method, f);
-switch type
+switch delaytype
 	case 'phase'
 		delays = smoothdata(phif ./ f', dim, method, winsz / df, nanflag);
 	otherwise
-		type = 'group';
+		delaytype = 'group';
 		delays = smoothdata(dphi, dim, method, winsz / df, nanflag);
 end
 
@@ -162,7 +162,7 @@ emilys_pcolor(t, f * units, Z', 'cmap', hsv(80), 'clim', [-pi,pi]);
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
 ylabel('Freq (Hz)')
-title(sprintf('%s Seizure %d\n%s delays', pat, seizure, type));
+title(sprintf('%s Seizure %d\n%s delays', pat, seizure, delaytype));
 
 %% Compare to measure
 % compareto = 'events';
