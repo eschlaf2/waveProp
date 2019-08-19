@@ -1,4 +1,4 @@
-function [delays] = dblr(phif, f, delaytype, Cf, confC)
+function [delays] = dblr(phif, f, delaytype, Cf, confC, winsz)
 
 dim = 1;  % frequency dimension
 nanflag = 'includenan';  % don't interpolate nans

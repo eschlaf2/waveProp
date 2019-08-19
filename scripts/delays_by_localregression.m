@@ -32,12 +32,7 @@ clear C phi
 %% Delays
 disp('Computing delays')
 
-dim = 1;  % frequency dimension
-nanflag = 'includenan';  % don't interpolate nans
-degree = 1;  % constant
-method = 'movmed';
-
-delays = dblr(phif, f, tau, Cf, confC);
+delays = dblr(phif, f, tau, Cf, confC, winsz);
 
 if exist('MASK', 'var') && MASK  % Keep only the longest streak of significant data points
 	delays = keep_streak(delays, winsz / df);
