@@ -73,13 +73,13 @@ nCh = size(data, 2);
 
 %% Set some parameters
 STEP = .01 * units;  % Step (s)
-THRESH = 5e-3;  % significance threshold
+THRESH = 5e-2;  % significance threshold
 
 %% Convert parameters to function input
 movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = Fs;  % sampling rate (Hz)
-params.fpass = [0 10];  % lfp filtered range
+params.fpass = [0 500];  % lfp filtered range
 params.tapers = [W T 1];  % [bandwidth time k] (numtapers = 2TW - k)
 params.pad = max(ceil(log2(20 / T)), 0);  % pad fft filter such that df < .05
 
@@ -112,7 +112,7 @@ clear mea;  % free up memory
 numpairs = nCh - 1;
 slicesize = 10;
 numslices = ceil(numpairs / slicesize);
-[C, phi, t, f, confC, S12m, S12a, S1, S2] = deal(cell(1, numslices));
+[C, phi, t, f, confC, S12m, S12a, S2] = deal(cell(1, numslices));
 if strcmpi(cohfun, 'pb'), zerosp = cell(1, numslices); end
 if strcmpi(cohfun, 'c'), data = smoothdata(single(data)); end
 
