@@ -26,20 +26,21 @@ mea = load(fname);
 time = mea.Time();
 toi(1) = max(toi(1), time(1)); toi(2) = min(toi(2), time(end));
 
-if T >= range(toi); T = floor(range(toi)); fprintf('Using T=%d\n', T); end  % ensure T is not longer than toi
+if T/units >= range(toi); T = floor(range(toi) * units); fprintf('Using T=%d\n', T); end  % ensure T is not longer than toi
 mask = time < toi(1) | time > toi(2);  % Remove datapoints outside of toi
 mea.Data(mask, :) = [];
 time(mask) = [];
 
-if 2.1*T >= range(time)  % Pad short datasets to ensure multiple time points
+if 2.1*T/units >= range(time)  % Pad short datasets to ensure multiple time points
     dt = diff(time(1:2));
-    pad = (2.1 * T - range(time)) / 2;
+    pad = (2.1 * T/units - range(time)) / 2;
     time = time(1) - pad : dt : time(end) + pad;
     if mod(length(time) - length(mea.Data), 2); time = time(1:end-1); end
     mea.Data = padarray(mea.Data, ...  % pad data
         [(length(time) - length(mea.Data)) / 2, 0], ...  % to match length of time
         'both', 'rep');  % by repeating the last value on the beginning and end
 end
+mea.Time = time;
 
 basename = strrep(sprintf('%s_cohgram_ds%s_T%02d_W%02d_Hz%d_t%d_%d_%s', ...
 	name, ...
@@ -78,7 +79,7 @@ THRESH = 5e-3;  % significance threshold
 movingwin = [T STEP];  % [window step] seconds
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = Fs;  % sampling rate (Hz)
-params.fpass = [0 100];  % lfp filtered range
+params.fpass = [0 10];  % lfp filtered range
 params.tapers = [W T 1];  % [bandwidth time k] (numtapers = 2TW - k)
 params.pad = max(ceil(log2(20 / T)), 0);  % pad fft filter such that df < .05
 

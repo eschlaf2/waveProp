@@ -5,9 +5,9 @@ load(basename, ...  % Load the following from basename
     'f', 'params', 'phi', 'C', 't', 'confC', 'pat', ...
     'seizure', 'position', 'pairs', 'units')
 
-winsz = 3;  % Hz
-thresh = 5e-2; 
 df = diff(f(1:2)); 
+winsz = df;  % Hz
+thresh = 5e-2; 
 fband = params.fpass;
 if ~exist('toi', 'var'); toi = [-Inf Inf]; end
 if ~exist('tau', 'var'); tau = 'group'; end  % 'group' or 'phase'
@@ -18,12 +18,12 @@ finds = (f >= fband(1)) & (f <= fband(2));
 tinds = (t >= toi(1)) & (t <= toi(2));
 t = t(tinds); f = f(finds);
 
-[nt, nf, np] = size(C);
+[nt, nf, np] = size(C(tinds, finds, :));
 
-transform = @(A) reshape(permute(A(tinds, finds, :), [2 1 3]), sum(finds), []);
+transform = @(A) reshape(permute(A(tinds, finds, :), [2 1 3]), nf, []);
 Cf = transform(C);  % limit to band of interest
 phif = transform(phi);  % ... same for phi
-clear C phi
+% clear C phi
 
 %% Delays
 disp('Computing delays')
@@ -41,7 +41,7 @@ clear delays phif
 %% All wave directions
 disp('Computing directions')
 
-MIN_RATIO_FINITE = .25;
+MIN_RATIO_FINITE = 0;
 pos = position(pairs(:, 2), :);
 
 % p = gcp();
@@ -50,10 +50,10 @@ H = [0 1 0; 0 0 1];
 c = [0; 0];
 
 packages = ver;
-arrayfun_is_faster = ...  % Use parfor if possible
-    any(cellfun(@(n) strcmpi(n, 'parallel computing toolbox'), {packages.Name}));
+arrayfun_is_faster = true % ...  % Use parfor if possible
+%    ~any(cellfun(@(n) strcmpi(n, 'parallel computing toolbox'), {packages.Name}));
 
-if ~arrayfun_is_faster
+if arrayfun_is_faster
     disp('Using arrayfun ...')
     tic %#ok<*UNRCH>
     delaysR2 = reshape(delaysR, [], np)';  % reshape the delays so that each column is a single time-freq point and rows are pairs
@@ -62,7 +62,7 @@ if ~arrayfun_is_faster
     finite = sum(isfinite(delaysR2));  % number of non-nan, non-inf delays in each column
     Z = nan * num_unique;  % Initialize Z with nans
     inds = ...  % Need at least 3 unique values and MIN_RATIO_FINITE finite values
-        find((finite >= max(MIN_RATIO_FINITE * np, 3)) & (num_unique >= 3));  
+        find((finite > max(MIN_RATIO_FINITE * np, 3)) & (num_unique >= 3));  
     
     disp('Computing fits')
     tic
@@ -90,7 +90,7 @@ else
     disp('Using parfor ...')
     tic
     [Z, pdel, pct] = deal(nan(nf, nt));
-    parfor ii = 1:nf  % For each frequency
+    for ii = 1:nf  % For each frequency
         if ~mod(ii, 100), fprintf('ii=%d/%d\n', ii, nf), end
         for jj = 1:nt  % ... and time point
             delays2fit = squeeze(delaysR(ii, jj, :));  % ... collect the delays for each pair
