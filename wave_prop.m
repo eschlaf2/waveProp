@@ -127,16 +127,17 @@ switch metric
 		[computeTimes, mea] = get_waveTimes(mea);  % Get discharge times
 		
 		% Get band appropriate lfp
-        filterband = ceil(band + [-.5 .5] .* band);
+		filterband = ceil(band + [-.5 .5] .* band);
+		if filterband(2) >= round(mea.SamplingRate / 2)
+			filterband(2) = round(mea.SamplingRate / 2) - 1; 
+		end
+		b = fir1(150, 2 * filterband / mea.SamplingRate);  % lo-pass to just over upper band
+		lfp = single(filtfilt(b, 1, double(mea.Data)));
 		skipfactor = round(mea.SamplingRate / max(1e3, 2*filterband(2)));
-		lfp = downsample(mea.Data, skipfactor);
+		lfp = downsample(lfp, skipfactor);
 		lfp(:, mea.BadChannels) = [];
 		Time = downsample(Time, skipfactor);
-		samplingRate = 1 / mean(diff(Time));
-        if filterband(2) >= round(samplingRate / 2); filterband(2) = filterband(2) - 1; end
-		b = fir1(150, 2 * filterband / samplingRate);  % lo-pass to just over upper band
-		lfp = single(filtfilt(b, 1, double(lfp)));
-		
+		mea.lfp = lfp; mea.skipfactor = skipfactor;
 		TimeMs = Time * 1e3;
 % 		compute_inds = arrayfun(@(t) find([TimeMs(:); Inf] >= t, 1), computeTimes);
 		[params, ~] = set_coherence_params(Time, T, band);
