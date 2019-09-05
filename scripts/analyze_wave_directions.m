@@ -33,12 +33,12 @@ outfile = matfile(outname, 'writable', true);
 
 %%
 
-disp('Computing wave directions from events ...')
-[events, mea] = wave_prop(mea, 'events', ...
-	'exclude', false, 'showplots', showplots);
-plot_wave_directions(mea, events);
-print(gcf, events.Name, '-dpng');
-outfile.events = events;
+% disp('Computing wave directions from events ...')
+% [events, mea] = wave_prop(mea, 'events', ...
+% 	'exclude', false, 'showplots', showplots);
+% plot_wave_directions(mea, events);
+% print(gcf, events.Name, '-dpng');
+% outfile.events = events;
 
 disp('Computing wave directions from maxdescent ...')
 [maxdescent, mea] = wave_prop(mea, 'maxdescent', ...
@@ -59,7 +59,7 @@ outfile.maxdescent = maxdescent;
 % print(gcf, falling.Name, '-dpng');
 % outfile.falling = falling;
 
-band = [0 50];
+band = [1 50];
 disp('Computing wave directions from delays ...')
 [delays, mea] = wave_prop(mea, 'delays', ...
 	'exclude', false, 'showplots', showplots, 'T', T, 'band', band);
@@ -86,4 +86,5 @@ outfile.(sprintf('delays_T%02d_fband%d_%d', T, band)) = delays;
 
 
 disp('Done.')
+disp(outname)
 
