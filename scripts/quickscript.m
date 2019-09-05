@@ -7,8 +7,8 @@ if isempty(units), units = 1; else, if ischar(units), units = str2double(units);
 if ~exist('toi', 'var') || isempty(toi), toi = [-Inf Inf]; end
 if ~exist('cohfun', 'var') || isempty(cohfun), cohfun = 'c'; end
 
-% units is samples per 1/units sec (i.e. set units=1 for Hz, units=1e3 for
-% kHz). Note that if units is 10, for example, then T is in tenths of
+% units is in Hz (samples per 1/units sec)--i.e. set units=1 for Hz, units=1e3 for
+% kHz. Note that if units is 10, for example, then T is in tenths of
 % seconds while W is in deca(?)Hz.
 
 basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, cohfun);
@@ -136,7 +136,7 @@ for ii = 1:numslices
     
     tic  % start timer
 	if strcmpi(cohfun, 'c')
-    [Ct, phit, S12t, S1t, S2t, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
+		[Ct, phit, S12t, S1t, S2t, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
             data(:, pairs(i0:iF, 1)), ...  % data1
             data(:, pairs(i0:iF, 2)), ...  % data2
             movingwin, params);  % parameters
