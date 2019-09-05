@@ -412,7 +412,7 @@ function [params, compute_inds] = set_coherence_params(Time, T, band)
 	
 	params.tapers = [T * W, NTAPERS];  % ... time-bandwidth product and tapers.
 	params.Fs = samplingRate; % ... sampling rate
-	params.pad = -1;                % ... no zero padding.
+	params.pad = 4;                 % ... 2^(ceil(log2(T)) + pad)
 	params.fpass = band;            % ... freq range to pass
 	params.err = [1 0.05];          % ... theoretical error bars, p=0.05.
 	params.T = T;
