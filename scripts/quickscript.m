@@ -7,9 +7,10 @@ if isempty(units), units = 1; else, if ischar(units), units = str2double(units);
 if ~exist('toi', 'var') || isempty(toi), toi = [-Inf Inf]; end
 if ~exist('cohfun', 'var') || isempty(cohfun), cohfun = 'c'; end
 
-% units is in Hz (samples per 1/units sec)--i.e. set units=1 for Hz, units=1e3 for
-% kHz. Note that if units is 10, for example, then T is in tenths of
-% seconds while W is in deca(?)Hz.
+% units refers to time as seconds/units (frequency as units*samples/sec).
+% I.e. set units=1 for seconds (Hz), units=1e3 for ms (kHz).
+% Note that if units is 10, for example, then T is in tenths of seconds
+% while W is in deca(?)Hz.
 
 basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, cohfun);
 
@@ -72,16 +73,16 @@ Fs = DS / units;  % sampling frequency (Hz * units)
 nCh = size(data, 2);
 
 %% Set some parameters
-STEP = .01 * units;  % Step (s)
+STEP = .01;  % Step (s)
 THRESH = 5e-2;  % significance threshold
 
 %% Convert parameters to function input
-movingwin = [T STEP];  % [window step] seconds
+movingwin = [T/units STEP];  % [window step] seconds/units
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = Fs;  % sampling rate (Hz)
 params.fpass = [0 500];  % lfp filtered range
 params.tapers = [W T 1];  % [bandwidth time k] (numtapers = 2TW - k)
-params.pad = max(ceil(log2(20 / T)), 0);  % pad fft filter such that df < .05
+params.pad = max(ceil(log2(20 / T * units)), 0);  % pad fft filter such that df < .05
 
 position = mea.Position;
 badchannels = mea.BadChannels;
@@ -159,7 +160,7 @@ for ii = 1:numslices
 end
 disp('Saving result.')
 f = f{1};
-t = t{1} / units + time(1);  % correct for padding
+t = t{1} + time(1);  % correct for padding
 confC = int16(confC{1}(1) * 1e4);
 C = cat(3, C{:});
 phi = cat(3, phi{:});
