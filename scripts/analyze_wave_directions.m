@@ -28,7 +28,7 @@ end
 % name = mea.Name;
 outname = sprintf('%s_wave_prop_%d', name, computetimesmethod);
 outfile = matfile(outname, 'writable', true);
-mea = exclude_channels(mea);
+% mea = exclude_channels(mea);
 [~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
 
 %%
