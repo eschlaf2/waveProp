@@ -48,7 +48,7 @@ function [res, ax1, ax2] = plot_wave_polar(res, sig, ax1, ax2)
 	axis tight;
     title(strrep(res.name, '_', ''));
     
-	polarplot(ax2, res.Z(:, whichfields), time, '.', ...
+	polarplot(ax2, res.Z, time, '.', ...
 		'markersize', 10);
 	hold off;
 	axis tight
