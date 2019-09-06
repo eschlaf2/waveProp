@@ -38,7 +38,7 @@ switch plotnum
             [res(ii), ax(ii), ax(ii + nF)] = plot_wave_polar(res(ii), sig, ax(ii), ax(ii + nF));
 
         end
-        legend(strrep(fields(whichfields), '_', ' '), 'position', [.9 .55 0 0])
+        legend(strrep(fields, '_', ' '), 'position', [.9 .55 0 0])
         rlim = arrayfun(@(a) a.RLim(2), ax);
         for kk = 1:numel(ax)
             ax(kk).RLim = [0 max(rlim)];
