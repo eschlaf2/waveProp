@@ -303,7 +303,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 	
 end
 Z = angle([1 1i] * V);
-Zu = unwrap(Z);
+% Zu = unwrap(Z);
 
 if showPlots, close(v); end
 
@@ -311,7 +311,7 @@ wave_fit.beta = beta;
 wave_fit.V = V;
 wave_fit.p = p;
 wave_fit.Z = Z;
-wave_fit.Zu = Zu;
+% wave_fit.Zu = Zu;
 wave_fit.computeTimes = computeTimes;
 wave_fit.Name = Name;
 wave_fit.data = dataout;
@@ -404,7 +404,7 @@ end
 function [params, compute_inds] = set_coherence_params(Time, T, band)
 
 % 	band = [1 13];                  % Select a frequency range to analyze
-	W = 2;                          % Bandwidth
+	W = 5;                          % Bandwidth
 	NTAPERS = 2*(T * W) - 1;        % Choose the # of tapers.
 	OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
 	
