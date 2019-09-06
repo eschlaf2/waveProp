@@ -1,6 +1,7 @@
 % pat = 'c7';
 if ~exist('files', 'var'); files = dir([pat '_Seizure*10_wave_prop_1.mat']); end
-if ~exist('metrics', 'var'); metrics = {'delays', 'events', 'delays_T02_fband25_50'}; end
+if ~exist('metrics', 'var'); metrics = {'maxdescent', 'events', 'delays_T02_fband1_50'}; end
+if ~exist('plotnum', 'var'); plotnum = 1; end
 
 switch plotnum
     case 1
@@ -71,7 +72,7 @@ switch plotnum
 
         metricpairs = nchoosek(1:numel(metrics), 2);  % Get each pair of metrics
         nP = size(metricpairs, 1);
-        r = floor(sqrt(nP)); c = ceil(nP / r);  % Create an appropriate number of subplots
+        r = ceil(sqrt(nP)); c = ceil(nP / r);  % Create an appropriate number of subplots
         figure(2); clf; fullwidth(r > 1);
         for dd = 1:nP  % For each pair
             ax2 = polaraxes();  % Create a polar axis,
@@ -132,7 +133,7 @@ end
     whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
     p = res(seizure).p(:, whichfields);
     p(p > thresh) = nan;
-    stem(res(seizure).time, p, 'filled', 'linewidth', 2)
+    stem(res(seizure).time, -log(p), 'filled', 'linewidth', 2)
 
     legend(metrics)
     title('p-values')
