@@ -63,6 +63,7 @@ hold(ax, 'on');
 cmapDir = hsv;  % scatter color corresponds to direction
 colormap(ax, cmapDir);
 ax.CLim = [-pi pi];
+% scatter(ax, computeTimes, b(1) + b(2) * Z, 40, 'filled', 'MarkerFaceAlpha', 1);
 	
 for i = 1:numWaves  % Overlay colored data points each discharge
 	if waveFit.p(i) >= sig
@@ -78,4 +79,8 @@ hold(ax, 'off')
 
 
 %% return
-output = ax;
+if nargout > 0
+	output.ax = ax;
+	output.meanFr = meanFr;
+	output.b = b;
+end
