@@ -4,7 +4,7 @@ addpath(datapath);  % ... add the original data path first
 patpath = genpath(pat);  % ... and then add the local patient path on top 
 addpath(patpath);  % ... so that it is searched first
 computetimesmethod = 1;
-T = 2;
+T = 1;
 showplots = false;
 
 fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
@@ -33,12 +33,12 @@ outfile = matfile(outname, 'writable', true);
 
 %%
 
-% disp('Computing wave directions from events ...')
-% [events, mea] = wave_prop(mea, 'events', ...
-% 	'exclude', false, 'showplots', showplots);
-% plot_wave_directions(mea, events);
-% print(gcf, events.Name, '-dpng');
-% outfile.events = events;
+disp('Computing wave directions from events ...')
+[events, mea] = wave_prop(mea, 'events', ...
+	'exclude', false, 'showplots', showplots);
+plot_wave_directions(mea, events);
+print(gcf, events.Name, '-dpng');
+outfile.events = events;
 
 disp('Computing wave directions from maxdescent ...')
 [maxdescent, mea] = wave_prop(mea, 'maxdescent', ...
