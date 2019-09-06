@@ -82,7 +82,7 @@ params.err = [1 THRESH];  % [type threshold]
 params.Fs = Fs;  % sampling rate (Hz)
 params.fpass = [0 500];  % lfp filtered range
 params.tapers = [W*units T/units 1];  % [bandwidth time k] (numtapers = 2TW - k)
-params.pad = max(ceil(log2(20 / T * units)), 0);  % pad fft filter such that df < .05
+params.pad = min(max(ceil(log2(20 / T * units)), 0), 5);  % pad fft filter such that df < .05
 
 position = mea.Position;
 badchannels = mea.BadChannels;
