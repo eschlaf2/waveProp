@@ -1,6 +1,6 @@
 % pat = 'c7';
 if ~exist('files', 'var'); files = dir([pat '_Seizure*10_wave_prop_1.mat']); end
-if ~exist('metrics', 'var'); metrics = {'maxdescent', 'events', 'delays_T02_fband1_50'}; end
+if ~exist('metrics', 'var'); metrics = {'maxdescent', 'events', 'delays_T01_fband1_50'}; end
 if ~exist('plotnum', 'var'); plotnum = 1; end
 
 switch plotnum
@@ -22,14 +22,20 @@ switch plotnum
         ax = gobjects(2*nF, 1);
         for ii = 1:nF
             res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');
-            res(ii).data = load(fullfile(files(ii).folder, files(ii).name));
-
+			temp = load(fullfile(files(ii).folder, files(ii).name));
+			for m = metrics
+				res(ii).data.(m{:}) = temp.(m{:});
+			end
             fields = fieldnames(res(ii).data);
-            whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
-            res(ii).time = res(ii).data.(fields{whichfields(1)}).computeTimes / 1e3;
+%             whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
+			alltimes = cellfun(@(f) ...
+				res(ii).data.(f).computeTimes(:), ...
+				fields, 'uni', 0);
+			alltimes = unique(cat(1, alltimes{:}));
+            res(ii).time = alltimes / 1e3;
             ax(ii) = subplot(2, nF, ii, polaraxes());
             ax(ii + nF) = subplot(2, nF, ii + nF, polaraxes());
-            [res(ii), ax(ii), ax(ii + nF)] = plot_wave_polar(res(ii), metrics, sig, ax(ii), ax(ii + nF));
+            [res(ii), ax(ii), ax(ii + nF)] = plot_wave_polar(res(ii), sig, ax(ii), ax(ii + nF));
 
         end
         legend(strrep(fields(whichfields), '_', ' '), 'position', [.9 .55 0 0])
