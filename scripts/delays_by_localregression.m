@@ -50,8 +50,8 @@ H = [0 1 0; 0 0 1];
 c = [0; 0];
 
 packages = ver;
-arrayfun_is_faster = true % ...  % Use parfor if possible
-%    ~any(cellfun(@(n) strcmpi(n, 'parallel computing toolbox'), {packages.Name}));
+arrayfun_is_faster = ...  % Use parfor if possible
+   ~any(cellfun(@(n) strcmpi(n, 'parallel computing toolbox'), {packages.Name}));
 
 if arrayfun_is_faster
     disp('Using arrayfun ...')
