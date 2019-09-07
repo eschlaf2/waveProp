@@ -1,10 +1,11 @@
 % pat = 'SIM'; seizure = 7; T = 2; W = 2; DS = 1e3; units = 1; type = 'pb';
+% fpass = [0 50];
 
 if isempty(T), T = 10; else, if ischar(T), T = str2double(T); end, end
 if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
 if isempty(DS), DS = 1e3; else, if ischar(DS), DS = str2double(DS); end, end
 if isempty(units), units = 1; else, if ischar(units), units = str2double(units); end, end  
-if isempty(fpass), fpass = [0 500] / T * units; else, if ischar(fpass), fpass=str2double(fpass); end, end
+if ~exist('fpass', 'var') || isempty(fpass), fpass = [0 500] / T * units; end
 if ~exist('toi', 'var') || isempty(toi), toi = [-Inf Inf]; end
 if ~exist('cohfun', 'var') || isempty(cohfun), cohfun = 'c'; end
 
