@@ -32,13 +32,14 @@ fband(2) = min(fband(2), round(mea.SamplingRate / 2) - 1);
 b = fir1(150, 2 * fband / mea.SamplingRate);  % band-pass to just over upper band
 mea.Data = single(filtfilt(b, 1, double(mea.Data)));
 [~, name, ~] = fileparts(fname);
-time = mea.Time();
+time = single(mea.Time());
 toi(1) = max(toi(1), time(1)); toi(2) = min(toi(2), time(end));
 
 if T/units >= range(toi); T = floor(range(toi) * units); fprintf('Using T=%d\n', T); end  % ensure T is not longer than toi
 mask = time < toi(1) | time > toi(2);  % Remove datapoints outside of toi
 mea.Data(mask, :) = [];
 time(mask) = [];
+clear mask
 
 if 2.1*T/units >= range(time)  % Pad short datasets to ensure multiple time points
     dt = diff(time(1:2));
@@ -74,6 +75,7 @@ else
 	[X, Y] = meshgrid(1:nCh, (1:nT) / mea.SamplingRate);
 	[Xq, Yq] = meshgrid(1:nCh, 1/DS:1/DS:nT/mea.SamplingRate);
 	data = interp2(X, Y, single(mea.Data), Xq, Yq, 'cubic');
+    clear X* Y*
 end
 data(:, mea.BadChannels) = [];
 Fs = DS / units;  % sampling frequency (Hz * units)
@@ -151,7 +153,7 @@ for ii = 1:numslices
             data(:, pairs(i0:iF, 2)), ...  % data2
             movingwin, params);  % parameters
 	else
-		[Ct,phit,S12t,S1t,S2t,t{ii},f{ii},zerosp{ii},confC{ii}, ~] = cohgrampb(...
+		[Ct,phit,~,~,~,t{ii},f{ii},zerosp{ii},confC{ii}, ~] = cohgrampb(...
 			data(:, pairs(i0:iF, 1)), ...  % data1
             data(:, pairs(i0:iF, 2)), ...  % data2
             movingwin, params);  % parameters
