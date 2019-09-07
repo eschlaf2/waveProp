@@ -4,6 +4,7 @@ if isempty(T), T = 10; else, if ischar(T), T = str2double(T); end, end
 if isempty(W), W = 2; else, if ischar(W), W = str2double(W); end, end
 if isempty(DS), DS = 1e3; else, if ischar(DS), DS = str2double(DS); end, end
 if isempty(units), units = 1; else, if ischar(units), units = str2double(units); end, end  
+if isempty(fpass), fpass = [0 500] / T * units; else, if ischar(fpass), fpass=str2double(fpass); end, end
 if ~exist('toi', 'var') || isempty(toi), toi = [-Inf Inf]; end
 if ~exist('cohfun', 'var') || isempty(cohfun), cohfun = 'c'; end
 
@@ -12,9 +13,9 @@ if ~exist('cohfun', 'var') || isempty(cohfun), cohfun = 'c'; end
 % Note that if units is 10, for example, then T is in tenths of seconds
 % while W is in deca(?)Hz.
 
-basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, cohfun);
+basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, fpass, cohfun);
 
-function basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, cohfun)
+function basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, fpass, cohfun)
 %%
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
 addpath(datapath);  % ... add the original data path first
@@ -23,6 +24,12 @@ addpath(patpath);  % ... so that it is searched first
 
 fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
 mea = load(fname);
+% Filter data before downsampling to avoid aliasing
+fband = 1.05*(fpass - mean(fpass)) + fpass(1);
+fband(1) = max(fband(1), 1e-4);
+fband(2) = min(fband(2), round(mea.SamplingRate / 2) - 1);
+b = fir1(150, 2 * fband / mea.SamplingRate);  % band-pass to just over upper band
+mea.Data = single(filtfilt(b, 1, double(mea.Data)));
 [~, name, ~] = fileparts(fname);
 time = mea.Time();
 toi(1) = max(toi(1), time(1)); toi(2) = min(toi(2), time(end));
@@ -80,7 +87,7 @@ THRESH = 5e-2;  % significance threshold
 movingwin = [T/units STEP];  % [window step] seconds/units
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = Fs;  % sampling rate (Hz)
-params.fpass = [0 500];  % lfp filtered range
+params.fpass = fpass;  % lfp filtered range
 params.tapers = [W*units T/units 1];  % [bandwidth time k] (numtapers = 2TW - k)
 params.pad = min(max(ceil(log2(20 / T * units)), 0), 5);  % pad fft filter such that df < .05
 
