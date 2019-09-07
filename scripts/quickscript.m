@@ -121,7 +121,8 @@ clear mea;  % free up memory
 numpairs = nCh - 1;
 slicesize = 10;
 numslices = ceil(numpairs / slicesize);
-[C, phi, t, f, confC, S12m, S12a, S2] = deal(cell(1, numslices));
+% [C, phi, t, f, confC, S12m, S12a, S2] = deal(cell(1, numslices));
+[C, phi, t, f, confC] = deal(cell(1, numslices));
 if strcmpi(cohfun, 'pb'), zerosp = cell(1, numslices); end
 if strcmpi(cohfun, 'c'), data = smoothdata(single(data)); end
 
@@ -145,7 +146,7 @@ for ii = 1:numslices
     
     tic  % start timer
 	if strcmpi(cohfun, 'c')
-		[Ct, phit, S12t, S1t, S2t, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
+		[Ct, phit, ~, ~, ~, t{ii}, f{ii}, confC{ii}, ~] = cohgramc(...
             data(:, pairs(i0:iF, 1)), ...  % data1
             data(:, pairs(i0:iF, 2)), ...  % data2
             movingwin, params);  % parameters
@@ -160,9 +161,9 @@ for ii = 1:numslices
     
     C{ii} = int16(Ct * 1e4);  % convert to int16
     phi{ii} = int16(phit * 1e4);
-    S12m{ii} = int16(1e3 * log10(abs(S12t) ./ max(abs(S12t), 2)));
-    S12a{ii} = int16(1e4 * angle(S12t));
-    S2{ii} = int16(1e3 * log10(S2t ./ max(S2t, 2)));
+%     S12m{ii} = int16(1e3 * log10(abs(S12t) ./ max(abs(S12t), 2)));
+%     S12a{ii} = int16(1e4 * angle(S12t));
+%     S2{ii} = int16(1e3 * log10(S2t ./ max(S2t, 2)));
     
     
 end
@@ -172,10 +173,10 @@ t = t{1} + time(1);  % correct for padding
 confC = int16(confC{1}(1) * 1e4);
 C = cat(3, C{:});
 phi = cat(3, phi{:});
-S12m = cat(3, S12m{:});
-S12a = cat(3, S12a{:});
-S1 = int16(1e3 * log10(S1t(:, :, 1) ./ max(S1t(:, :, 1), 2)));
-S2 = cat(3, S2{:});
+% S12m = cat(3, S12m{:});
+% S12a = cat(3, S12a{:});
+% S1 = int16(1e3 * log10(S1t(:, :, 1) ./ max(S1t(:, :, 1), 2)));
+% S2 = cat(3, S2{:});
 if strcmpi(cohfun, 'pb'), outfile.zerosp = logical(cat(2, zerosp{:})); end
 
 % Save results
@@ -184,10 +185,10 @@ outfile.phi = phi;
 outfile.t = t;
 outfile.f = f;
 outfile.confC = confC;
-outfile.S12m = S12m;
-outfile.S12a = S12a;
-outfile.S1 = S1;
-outfile.S2 = S2;
+% outfile.S12m = S12m;
+% outfile.S12a = S12a;
+% outfile.S1 = S1;
+% outfile.S2 = S2;
 % outfile.phistd = phistd;
 
 disp('Done.')
