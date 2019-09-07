@@ -139,7 +139,10 @@ if any(strcmpi(pat, {'sim', 'waves'}))
 end
 
 %%
-for ii = 1:numslices
+packages = ver;
+useparfor = any(cellfun(@(n) strcmpi(n, 'parallel computing toolbox'), {packages.Name}));
+if useparfor, parpool(8), else, parpool(1), end
+parfor ii = 1:numslices
     
     disp(ii)  % show progress
     
