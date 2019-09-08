@@ -22,10 +22,10 @@ switch plotnum
         ax = gobjects(2*nF, 1);
         for ii = 1:nF
             res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');
-			temp = load(fullfile(files(ii).folder, files(ii).name));
-			for m = metrics
-				res(ii).data.(m{:}) = temp.(m{:});
-			end
+			res(ii).data = load(fullfile(files(ii).folder, files(ii).name), metrics{:});
+% 			for m = metrics
+% 				res(ii).data.(m{:}) = temp.(m{:});
+% 			end
             fields = fieldnames(res(ii).data);
 %             whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
 			alltimes = cellfun(@(f) ...
