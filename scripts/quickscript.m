@@ -26,10 +26,7 @@ addpath(patpath);  % ... so that it is searched first
 fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
 mea = load(fname);
 % Filter data before downsampling to avoid aliasing
-fband = 1.05*(fpass - mean(fpass)) + fpass(1);
-fband(1) = max(fband(1), 1e-4);
-fband(2) = min(fband(2), round(mea.SamplingRate / 2) - 1);
-b = fir1(150, 2 * fband / mea.SamplingRate);  % band-pass to just over upper band
+b = fir1(150, 2 * DS / 2 / mea.SamplingRate);  % low-pass Nyquist freq
 mea.Data = single(filtfilt(b, 1, double(mea.Data)));
 [~, name, ~] = fileparts(fname);
 time = single(mea.Time());
