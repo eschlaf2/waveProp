@@ -80,7 +80,7 @@ Fs = DS / units;  % sampling frequency (Hz * units)
 nCh = size(data, 2);
 
 %% Set some parameters
-STEP = .1;  % Step (s)
+STEP = max(min(.1 * T / units, .5), .01);  % Step (s)
 THRESH = 5e-2;  % significance threshold
 
 %% Convert parameters to function input
