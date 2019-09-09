@@ -93,15 +93,18 @@ if strcmpi(cohfun, 'pb')
 	nT = floor(nT / binsz);  % new data length
 	data = squeeze(sum(reshape(data(1:nT * binsz, :), nT, binsz, nCh), 2));
 	time = time(1:binsz:nT*binsz);
-	DS = 1 / (diff(time(1:2)));
+	DS = 1 / mean(diff(time));
 else
 	
-	[X, Y] = meshgrid(1:nCh, time);
-	[Xq, Yq] = meshgrid(1:nCh, time(1):1/DS:time(end));
+    [X, Y] = meshgrid(single(1:nCh), time);
+    [Xq, Yq] = meshgrid(single(1:nCh), time(1):1/DS:time(end));
     if DS > mea.SamplingRate
         data = interp2(X, Y, single(mea.Data), Xq, Yq, 'cubic');
     else
-        data = interp2(X, Y, single(mea.Data), Xq, Yq, 'nearest');
+        skipfactor = round(mea.SamplingRate / DS);
+        data = downsample(single(mea.Data), skipfactor);
+        time = downsample(time, skipfactor);
+        DS = 1 / mean(diff(time));
     end
     clear X* Y*
 end
