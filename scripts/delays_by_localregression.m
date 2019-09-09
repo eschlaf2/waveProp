@@ -44,11 +44,12 @@ disp('Computing directions')
 MIN_RATIO_FINITE = 0;
 pos = position(pairs(:, 2), :);
 
+nslots = str2double(getenv('NSLOTS'));  % Check for parpool
+if ~isnan(nslots), p = parpool(nslots); end
+
 warning('off', 'stats:statrobustfit:IterationLimit');
 H = [0 1 0; 0 0 1];  
 c = [0; 0];
-
-nslots = str2double(getenv('NSLOTS'));  % Check for parpool
 
 if isnan(nslots)
     disp('Using arrayfun ...')
@@ -85,7 +86,6 @@ if isnan(nslots)
     toc
 else
     disp('Using parfor ...')
-    p = parpool(nslots);
     tic
     [Z, pdel, pct] = deal(nan(nf, nt));
     parfor ii = 1:nf  % For each frequency
