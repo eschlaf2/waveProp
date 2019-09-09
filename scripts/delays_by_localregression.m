@@ -5,8 +5,8 @@ load(basename, ...  % Load the following from basename
     'f', 'params', 'phi', 'C', 't', 'confC', 'pat', ...
     'seizure', 'position', 'pairs', 'units')
 
-df = diff(f(1:2)); 
-winsz = df;  % Hz
+df = mean(diff(f)); 
+winsz = 3;  % Hz
 thresh = 5e-2; 
 fband = params.fpass;
 if ~exist('toi', 'var'); toi = [-Inf Inf]; end
