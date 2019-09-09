@@ -23,12 +23,12 @@ t = t(tinds); f = f(finds);
 transform = @(A) reshape(permute(A(tinds, finds, :), [2 1 3]), nf, []);
 Cf = transform(C);  % limit to band of interest
 phif = transform(phi);  % ... same for phi
-% clear C phi
+clear C phi
 
 %% Delays
 disp('Computing delays')
 
-delays = dblr(phif, f, tau, Cf, confC, winsz);
+delays = dblr(phif, f, tau, Cf, confC);
 
 if exist('MASK', 'var') && MASK  % Keep only the longest streak of significant data points
 	delays = keep_streak(delays, winsz / df);
@@ -41,7 +41,7 @@ clear delays phif
 %% All wave directions
 disp('Computing directions')
 
-MIN_RATIO_FINITE = 0;
+MIN_RATIO_FINITE = 0.2;
 pos = position(pairs(:, 2), :);
 
 nslots = str2double(getenv('NSLOTS'));  % Check for parpool
