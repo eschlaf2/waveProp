@@ -56,8 +56,10 @@ time(mask) = [];
 clear mask
 
 % Filter data before downsampling to avoid aliasing
-b = fir1(150, DS / mea.SamplingRate);  % low-pass Nyquist freq
-mea.Data = single(filtfilt(b, 1, double(mea.Data)));
+if DS < mea.SamplingRate
+    b = fir1(150, DS / mea.SamplingRate);  % low-pass Nyquist freq
+    mea.Data = single(filtfilt(b, 1, double(mea.Data)));
+end
 
 % Pad short datasets to ensure multiple time points
 if 2.1*T/units >= range(time)  
@@ -78,6 +80,7 @@ basename = strrep(strrep(...
     ), '-', 'M'), '+', '');
 outfile = matfile(basename, 'writable', true);
 % mea = exclude_channels(mea);
+mea.Data(:, mea.BadChannels) = [];
 [nT, nCh] = size(mea.Data);
 
 %%
@@ -93,14 +96,16 @@ if strcmpi(cohfun, 'pb')
 	DS = 1 / (diff(time(1:2)));
 else
 	
-	[X, Y] = meshgrid(1:nCh, (1:nT) / mea.SamplingRate);
-	[Xq, Yq] = meshgrid(1:nCh, 1/DS:1/DS:nT/mea.SamplingRate);
-	data = interp2(X, Y, single(mea.Data), Xq, Yq, 'cubic');
+	[X, Y] = meshgrid(1:nCh, time);
+	[Xq, Yq] = meshgrid(1:nCh, time(1):1/DS:time(end));
+    if DS > mea.SamplingRate
+        data = interp2(X, Y, single(mea.Data), Xq, Yq, 'cubic');
+    else
+        data = interp2(X, Y, single(mea.Data), Xq, Yq, 'nearest');
+    end
     clear X* Y*
 end
-data(:, mea.BadChannels) = [];
 Fs = DS;
-nCh = size(data, 2);
 
 %% Set some parameters
 STEP = dt;  % Step (s)
