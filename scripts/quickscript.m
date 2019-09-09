@@ -8,8 +8,8 @@ if isempty(units), units = 1; else, if ischar(units), units = str2double(units);
 if ~exist('fpass', 'var') || isempty(fpass), fpass = [0 500] / T * units; end
 if ~exist('toi', 'var') || isempty(toi), toi = [-Inf Inf]; end
 if ~exist('cohfun', 'var') || isempty(cohfun), cohfun = 'c'; end
-if ~exist('dt', 'var') || isemtpy(dt), dt = max(min(.1 * T / units, .5), .01); end
-if ~exist('df', 'var') || isemtpy(df), df = .05; end
+if ~exist('dt', 'var') || isempty(dt), dt = max(min(.1 * T / units, .5), .01); end
+if ~exist('df', 'var') || isempty(df), df = .05; end
 
 % units refers to time as seconds/units (frequency as units*samples/sec).
 % I.e. set units=1 for seconds (Hz), units=1e3 for ms (kHz).
