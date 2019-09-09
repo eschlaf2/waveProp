@@ -99,7 +99,7 @@ else
     clear X* Y*
 end
 data(:, mea.BadChannels) = [];
-
+Fs = DS;
 nCh = size(data, 2);
 
 %% Set some parameters
