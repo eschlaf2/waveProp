@@ -200,6 +200,8 @@ parfor ii = 1:numslices
     
     
 end
+delete(gcp('nocreate'));
+
 disp('Saving result.')
 f = f{1};
 t = t{1} + time(1);  % correct for padding
