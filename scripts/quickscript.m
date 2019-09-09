@@ -8,37 +8,58 @@ if isempty(units), units = 1; else, if ischar(units), units = str2double(units);
 if ~exist('fpass', 'var') || isempty(fpass), fpass = [0 500] / T * units; end
 if ~exist('toi', 'var') || isempty(toi), toi = [-Inf Inf]; end
 if ~exist('cohfun', 'var') || isempty(cohfun), cohfun = 'c'; end
+if ~exist('dt', 'var') || isemtpy(dt), dt = max(min(.1 * T / units, .5), .01); end
+if ~exist('df', 'var') || isemtpy(df), df = .05; end
 
 % units refers to time as seconds/units (frequency as units*samples/sec).
 % I.e. set units=1 for seconds (Hz), units=1e3 for ms (kHz).
 % Note that if units is 10, for example, then T is in tenths of seconds
 % while W is in deca(?)Hz.
 
+% ensure T is not longer than toi
+if T/units >= range(toi)
+    T = floor(range(toi) * units); 
+    fprintf('Using T=%d\n', T); 
+end  
+
+% Warn if excessive fft padding
+if ceil(log2( (1/df) / T * units)) > 5
+    pad = ceil(log2( (1/df) / T * units));
+    warning('df=%.0g will create 2^%d fft points', ...
+        df, nextpow2(T/units*DS) + pad);
+end
+
 basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, fpass, cohfun);
 
-function basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, fpass, cohfun)
+function basename = compute_coherograms(...
+    pat, seizure, T, W, DS, units, toi, fpass, cohfun, dt, df)
 %%
-datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
-addpath(datapath);  % ... add the original data path first
+
+% *** I think I got rid of symlinks so this is probably not necessary ***
+% datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
+% addpath(datapath);  % ... add the original data path first
+
 patpath = genpath(pat);  % ... and then add the local patient path on top 
 addpath(patpath);  % ... so that it is searched first
 
 fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
 mea = load(fname);
-% Filter data before downsampling to avoid aliasing
-b = fir1(150, 2 * DS / 2 / mea.SamplingRate);  % low-pass Nyquist freq
-mea.Data = single(filtfilt(b, 1, double(mea.Data)));
 [~, name, ~] = fileparts(fname);
 time = single(mea.Time());
 toi(1) = max(toi(1), time(1)); toi(2) = min(toi(2), time(end));
 
-if T/units >= range(toi); T = floor(range(toi) * units); fprintf('Using T=%d\n', T); end  % ensure T is not longer than toi
-mask = time < toi(1) | time > toi(2);  % Remove datapoints outside of toi
+% Remove datapoints outside of toi
+mask = time < toi(1) | time > toi(2);
 mea.Data(mask, :) = [];
 time(mask) = [];
 clear mask
 
-if 2.1*T/units >= range(time)  % Pad short datasets to ensure multiple time points
+% Filter data before downsampling to avoid aliasing
+b = fir1(150, DS / mea.SamplingRate);  % low-pass Nyquist freq
+mea.Data = single(filtfilt(b, 1, double(mea.Data)));
+
+% Pad short datasets to ensure multiple time points
+if 2.1*T/units >= range(time)  
     dt = diff(time(1:2));
     pad = (2.1 * T/units - range(time)) / 2;
     time = time(1) - pad : dt : time(end) + pad;
@@ -49,13 +70,15 @@ if 2.1*T/units >= range(time)  % Pad short datasets to ensure multiple time poin
 end
 mea.Time = time;
 
-basename = strrep(sprintf('%s_cohgram_ds%s_T%02d_W%02d_Hz%d_t%d_%d_%s', ...
-	name, ...
-	strrep(num2str(DS, '%0.0g'), '+', ''), ...
-	round(T), W, units, round(toi), cohfun), '-', 'M');
+basename = strrep(strrep(...
+    sprintf(...
+        '%s_cohgram_ds%.0e_T%02d_W%02d_Hz%d_t%d_%d_f%d_%d_dt%.0e_df%.0e_%s', ...
+        name, DS, round(T), W, units, round(toi), round(fpass), dt, df, cohfun ...
+    ), '-', 'M'), '+', '');
 outfile = matfile(basename, 'writable', true);
 % mea = exclude_channels(mea);
 [nT, nCh] = size(mea.Data);
+
 %%
 if strcmpi(cohfun, 'pb')
 	
@@ -75,21 +98,20 @@ else
     clear X* Y*
 end
 data(:, mea.BadChannels) = [];
-Fs = DS / units;  % sampling frequency (Hz * units)
 
 nCh = size(data, 2);
 
 %% Set some parameters
-STEP = max(min(.1 * T / units, .5), .01);  % Step (s)
+STEP = dt;  % Step (s)
 THRESH = 5e-2;  % significance threshold
 
 %% Convert parameters to function input
 movingwin = [T/units STEP];  % [window step] seconds/units
 params.err = [1 THRESH];  % [type threshold]
 params.Fs = Fs;  % sampling rate (Hz)
-params.fpass = fpass;  % lfp filtered range
+params.fpass = fpass;  % band of interest
 params.tapers = [W*units T/units 1];  % [bandwidth time k] (numtapers = 2TW - k)
-params.pad = min(max(ceil(log2(20 / T * units)), 0), 5);  % pad fft filter such that df < .05
+params.pad = max(ceil(log2( (1/df) / T * units)), 0);  % pad fft filter such that df < .05
 
 position = mea.Position;
 badchannels = mea.BadChannels;
