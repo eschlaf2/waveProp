@@ -44,16 +44,13 @@ disp('Computing directions')
 MIN_RATIO_FINITE = 0;
 pos = position(pairs(:, 2), :);
 
-% p = gcp();
 warning('off', 'stats:statrobustfit:IterationLimit');
 H = [0 1 0; 0 0 1];  
 c = [0; 0];
 
-packages = ver;
-arrayfun_is_faster = ...  % Use parfor if possible
-   ~any(cellfun(@(n) strcmpi(n, 'parallel computing toolbox'), {packages.Name}));
+nslots = str2double(getenv('NSLOTS'));  % Check for parpool
 
-if arrayfun_is_faster
+if isnan(nslots)
     disp('Using arrayfun ...')
     tic %#ok<*UNRCH>
     delaysR2 = reshape(delaysR, [], np)';  % reshape the delays so that each column is a single time-freq point and rows are pairs
@@ -88,6 +85,7 @@ if arrayfun_is_faster
     toc
 else
     disp('Using parfor ...')
+    p = parpool(nslots);
     tic
     [Z, pdel, pct] = deal(nan(nf, nt));
     parfor ii = 1:nf  % For each frequency
@@ -108,6 +106,7 @@ else
         end
     end
     toc
+    delete(p)
 end
 
 %% Imagesc Z (angles computed using delays)

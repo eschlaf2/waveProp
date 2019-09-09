@@ -167,9 +167,9 @@ if any(strcmpi(pat, {'sim', 'waves'}))
 end
 
 %%
-packages = ver;
-useparfor = any(cellfun(@(n) strcmpi(n, 'parallel computing toolbox'), {packages.Name}));
-if useparfor, parpool(8), else, parpool(1), end
+
+nslots = str2double(getenv('NSLOTS'));  % Check for parallel nodes
+if ~isnan(nslots), p = parpool(nslots); end
 parfor ii = 1:numslices
     
     disp(ii)  % show progress
@@ -200,7 +200,7 @@ parfor ii = 1:numslices
     
     
 end
-delete(gcp('nocreate'));
+if ~isnan(nslots), delete(p); end
 
 disp('Saving result.')
 f = f{1};
