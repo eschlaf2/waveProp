@@ -6,7 +6,7 @@ load(basename, ...  % Load the following from basename
     'seizure', 'position', 'pairs', 'units')
 
 df = mean(diff(f)); 
-winsz = 3;  % Hz
+winsz = 3 * units;  % Hz
 thresh = 5e-2; 
 fband = params.fpass;
 if ~exist('toi', 'var'); toi = [-Inf Inf]; end
@@ -28,7 +28,7 @@ clear C phi
 %% Delays
 disp('Computing delays')
 
-delays = dblr(phif, f, tau, Cf, confC);
+delays = dblr(phif, f, tau, Cf, confC, winsz);
 
 if exist('MASK', 'var') && MASK  % Keep only the longest streak of significant data points
 	delays = keep_streak(delays, winsz / df);
