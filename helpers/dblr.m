@@ -3,7 +3,7 @@ function [delays] = dblr(phif, f, delaytype, Cf, confC, winsz)
 dim = 1;  % frequency dimension
 nanflag = 'includenan';  % don't interpolate nans
 method = 'movmean';
-df = diff(f(1:2));
+df = mean(diff(f));
 
 switch lower(delaytype)
 	case 'phase'
