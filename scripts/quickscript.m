@@ -29,7 +29,8 @@ if ceil(log2( (1/df) / T * units)) > 5
         df, nextpow2(T/units*DS) + pad);
 end
 
-basename = compute_coherograms(pat, seizure, T, W, DS, units, toi, fpass, cohfun);
+basename = compute_coherograms( ...
+    pat, seizure, T, W, DS, units, toi, fpass, cohfun, dt, df);
 
 function basename = compute_coherograms(...
     pat, seizure, T, W, DS, units, toi, fpass, cohfun, dt, df)
