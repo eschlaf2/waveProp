@@ -105,9 +105,9 @@ else
             V(ii, jj) = abs([1 1i] * Vt(:));
             pdel(ii, jj) = ptemp;  % Store p-value
         end
+    [msg,msgID] = lastwarn
     end
     toc
-    [msg,msgID] = lastwarn
     delete(p)
 end
 
