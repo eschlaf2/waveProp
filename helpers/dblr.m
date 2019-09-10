@@ -1,7 +1,7 @@
 function [delays] = dblr(phif, f, delaytype, Cf, confC, winsz)
 
 dim = 1;  % frequency dimension
-nanflag = 'omitnan';  % don't interpolate nans
+nanflag = 'omitnan';  % interpolate nans ('includenan' to not interpolate them)
 method = 'movmean';
 df = mean(diff(f));
 if ~exist('winsz', 'var') || isempty(winsz); winsz = 20; end  % winsz in samples to smooth over
