@@ -87,7 +87,7 @@ if isnan(nslots)
 else
     disp('Using parfor ...')
     tic
-    [Z, pdel, pct] = deal(nan(nf, nt));
+    [Z, pdel, pct, V] = deal(nan(nf, nt));
     parfor ii = 1:nf  % For each frequency
         if ~mod(ii, 100), fprintf('ii=%d/%d\n', ii, nf), end
         for jj = 1:nt  % ... and time point
@@ -100,18 +100,20 @@ else
             [beta,stats] = robustfit(pos, delays2fit, 'fair');  % fit the delay vs two-dimensional positions
             ptemp = linhyptest(beta, stats.covb, c, H, stats.dfe);  % Compute significance of fit
             if ptemp >= thresh || isnan(ptemp); continue; end  % Stop if fit is not significant
-            V = pinv(beta(2:3));  % velocity is the pseudoinvervse of the fitted wave
-            Z(ii, jj) = angle([1 1i] * V(:));  % Z is the angle of the velocity
+            Vt = pinv(beta(2:3));  % velocity is the pseudoinvervse of the fitted wave
+            Z(ii, jj) = angle([1 1i] * Vt(:));  % Z is the angle of the velocity
+            V(ii, jj) = abs([1 1i] * Vt(:));
             pdel(ii, jj) = ptemp;  % Store p-value
         end
     end
     toc
+    [msg,msgID] = lastwarn
     delete(p)
 end
 
 %% Imagesc Z (angles computed using delays)
 figure();
-emilys_pcolor(t, f * units, Z', 'cmap', hsv(80), 'clim', [-pi,pi]);
+emilys_pcolor(t, units, Z', 'cmap', hsv(80), 'clim', [-pi,pi]);
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
 ylabel('Freq (Hz)')
