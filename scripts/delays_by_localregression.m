@@ -105,15 +105,15 @@ else
             V(ii, jj) = abs([1 1i] * Vt(:));
             pdel(ii, jj) = ptemp;  % Store p-value
         end
+    [msg,msgID] = lastwarn
     end
     toc
-    [msg,msgID] = lastwarn
     delete(p)
 end
 
 %% Imagesc Z (angles computed using delays)
 figure();
-emilys_pcolor(t, f, Z', 'cmap', hsv(80), 'clim', [-pi,pi]);
+emilys_pcolor(t, f, V', 'cmap', hsv(80), 'clim', [-pi,pi]);
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
 ylabel('Freq (Hz)')
