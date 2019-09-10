@@ -113,7 +113,7 @@ end
 
 %% Imagesc Z (angles computed using delays)
 figure();
-emilys_pcolor(t, units, Z', 'cmap', hsv(80), 'clim', [-pi,pi]);
+emilys_pcolor(t, f, Z', 'cmap', hsv(80), 'clim', [-pi,pi]);
 line(t, 13 * ones(size(t)), 'color', 'black', 'linewidth', 2)
 xlabel('Time (s)');
 ylabel('Freq (Hz)')

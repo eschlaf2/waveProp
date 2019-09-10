@@ -108,7 +108,6 @@ else
     end
     clear X* Y*
 end
-Fs = DS;
 
 %% Set some parameters
 STEP = dt;  % Step (s)
@@ -117,7 +116,7 @@ THRESH = 5e-2;  % significance threshold
 %% Convert parameters to function input
 movingwin = [T/units STEP];  % [window step] seconds/units
 params.err = [1 THRESH];  % [type threshold]
-params.Fs = Fs;  % sampling rate (Hz)
+params.Fs = DS;  % sampling rate (Hz)
 params.fpass = fpass;  % band of interest
 params.tapers = [W*units T/units 1];  % [bandwidth time k] (numtapers = 2TW - k)
 params.pad = max(ceil(log2( (1/df) / T * units)), 0);  % pad fft filter such that df < .05
