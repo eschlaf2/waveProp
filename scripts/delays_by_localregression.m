@@ -3,10 +3,10 @@
 % (See quickscript)
 load(basename, ...  % Load the following from basename
     'f', 'params', 'phi', 'C', 't', 'confC', 'pat', ...
-    'seizure', 'position', 'pairs', 'units')
+    'seizure', 'position', 'pairs', 'units', 'movingwin')
 
 df = mean(diff(f)); 
-winsz = max(3, 10/params.movingwin(1));  % Hz (this makes sure you get at least 10 points at frequency res)
+winsz = max(3, 10/movingwin(1));  % Hz (this makes sure you get at least 10 points at frequency res)
 thresh = 5e-2; 
 fband = params.fpass;
 if ~exist('toi', 'var'); toi = [-Inf Inf]; end
