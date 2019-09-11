@@ -2,11 +2,11 @@
 if ~exist('files', 'var'); files = dir([pat '_Seizure*10_wave_prop_1.mat']); end
 if ~exist('metrics', 'var'); metrics = {'maxdescent', 'events', 'delays_T01_fband1_50'}; end
 if ~exist('plotnum', 'var'); plotnum = 1; end
+if ~exist('sig', 'var'); sig = 5e-2; end
 
 switch plotnum
     case 1
         nF = numel(files);
-        sig = 5e-2;
 
         clear res;
         res(nF) = struct(...
