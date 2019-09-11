@@ -6,7 +6,7 @@ load(basename, ...  % Load the following from basename
     'seizure', 'position', 'pairs', 'units')
 
 df = mean(diff(f)); 
-winsz = 3 * units;  % Hz
+winsz = max(3, 10/params.movingwin(1));  % Hz (this makes sure you get at least 10 points at frequency res)
 thresh = 5e-2; 
 fband = params.fpass;
 if ~exist('toi', 'var'); toi = [-Inf Inf]; end
