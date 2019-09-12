@@ -89,6 +89,7 @@ else
     tic
     [Z, pdel, pct, V] = deal(nan(nf, nt));
     parfor ii = 1:nf  % For each frequency
+        warning('off', 'stats:statrobustfit:IterationLimit');
         if ~mod(ii, 100), fprintf('ii=%d/%d\n', ii, nf), end
         for jj = 1:nt  % ... and time point
             delays2fit = squeeze(delaysR(ii, jj, :));  % ... collect the delays for each pair
@@ -106,6 +107,7 @@ else
             pdel(ii, jj) = ptemp;  % Store p-value
         end
     [msg,msgID] = lastwarn
+    disp(msgID)
     end
     toc
     delete(p)
