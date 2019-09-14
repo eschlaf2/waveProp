@@ -404,7 +404,7 @@ end
 function [params, compute_inds] = set_coherence_params(Time, T, band)
 
 % 	band = [1 13];                  % Select a frequency range to analyze
-	W = 5;                          % Bandwidth
+	W = 3/T;                          % Bandwidth
 	NTAPERS = 2*(T * W) - 1;        % Choose the # of tapers.
 	OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
 	
