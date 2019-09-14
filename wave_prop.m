@@ -131,7 +131,7 @@ switch metric
 		if filterband(2) >= round(mea.SamplingRate / 2)
 			filterband(2) = round(mea.SamplingRate / 2) - 1; 
 		end
-		b = fir1(150, 2 * filterband / mea.SamplingRate);  % lo-pass to just over upper band
+		b = fir1(150, 2 * filterband(2) / mea.SamplingRate);  % lo-pass to just over upper band
 		lfp = single(filtfilt(b, 1, double(mea.Data)));
 		skipfactor = round(mea.SamplingRate / max(1e3, 2*filterband(2)));
 		lfp = downsample(lfp, skipfactor);
