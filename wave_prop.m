@@ -131,7 +131,7 @@ switch metric
 		if filterband(2) >= round(mea.SamplingRate / 2)
 			filterband(2) = round(mea.SamplingRate / 2) - 1; 
 		end
-		b = fir1(150, 2 * filterband / mea.SamplingRate);  % lo-pass to just over upper band
+		b = fir1(150, 2 * filterband(2) / mea.SamplingRate);  % lo-pass to just over upper band
 		lfp = single(filtfilt(b, 1, double(mea.Data)));
 		skipfactor = round(mea.SamplingRate / max(1e3, 2*filterband(2)));
 		lfp = downsample(lfp, skipfactor);
@@ -404,7 +404,7 @@ end
 function [params, compute_inds] = set_coherence_params(Time, T, band)
 
 % 	band = [1 13];                  % Select a frequency range to analyze
-	W = 5;                          % Bandwidth
+	W = 3/T;                          % Bandwidth
 	NTAPERS = 2*(T * W) - 1;        % Choose the # of tapers.
 	OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
 	
