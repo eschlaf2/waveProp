@@ -1,33 +1,50 @@
-k = 1000;
-t0 = find(mea.Time >= 2, 1);
+function [] = group_velocity(mea, wavetimes, halfwin)
+% Input: wavetimes and halfwin in ms
+
+% k = 1000;
+% t0 = find(mea.Time >= 2, 1);
+nW = numel(wavetimes);
+time = mea.Time() * 1e3;  % time in ms
+k = 2 * round(halfwin / mea.SamplingRate * 1e3) + 1;
+position = mea.Position;
+data = data2grid(mea.Data, position);
+ddims = diff(size(data));
+if ddims(1) < 0, data = [data data(:, 1:-ddims(1), :) * 0]; end
+if ddims(1) > 0, data = [data data(1:ddims(1), :, :) * 0]; end
 params.pad = 1;
 params.tapers = [3 5];
-[samples, trials, ~] = size(data);
-direction = 'rows'; 
+samples = size(data, 1);
+% samples = size(data, 1);
+% direction = {'rows', 'cols'}; 
 
-r = nextpow2(samples-1) + params.pad;
-[C, phi, S12, S1, s2, phistd] = deal(nan(2^r+1,8,k));
+	r = nextpow2(samples-1) + params.pad;
+	[C, phi, S12, S1, s2, phistd] = deal(nan(2^r+1,8,k,nW));
+for w = 1:length(wavetimes)
+	t0 = find(time >= wavetimes(w), 1);
+	for ii = -halfwin:halfwin
+		if rem(ii, 1e4) == 0
+			fprintf('ii=%d/%d\n', ii, k)
+		end
+		sub = squeeze(data(:, :, t0+ii));  % - mean(data(:, :, t0 + (1:k)), 3);;
+% 		switch d
+% 			case 'columns'
+				% columns
+				refc = sub(:, 1) * ones(1, trials-1); 
+				testc = sub(:, 2:end);
+% 			case 'rows'
+				% rows
+				refr = sub(1, :)' * ones(1, trials-1);
+				testr = sub(2:end, :)';
+% 		end
 
-for ii = 1:k
-	if rem(ii, 1e4) == 0
-		fprintf('ii=%d/%d\n', ii, k)
+		[C(:, :, ii, w), phi(:, :, ii, w), S12(:, :, ii, w), S1(:, :, ii, w), ...
+			s2(:, :, ii, w), f, confC, phistd(:, :, ii, w)] = ...
+			coherencyc([refc refr], [testc testr], params);
 	end
-	sub = squeeze(data(:, :, t0+ii));  % - mean(data(:, :, t0 + (1:k)), 3);;
-	switch direction
-		case 'columns'
-			% columns
-			ref = sub(:, 1) * ones(1, 8); 
-			test = sub(:, 2:end);
-		case 'rows'
-			% rows
-			ref = sub(1, :)' * ones(1, 8);
-			test = sub(2:end, :)';
-	end
-	
-	[C(:, :, ii), phi(:, :, ii), S12(:, :, ii), S1(:, :, ii), ...
-		s2(:, :, ii), f, confC, phistd(:, :, ii)] = ...
-		coherencyc(ref, test, params);
 end
+
+%%
+phi = unwrap(phi, [], 3);  % unwrap phi 
 %%	
 pcolor = @emilys_pcolor;
 unwrapZ = @(X) unwrap(2.2*X)/2.2;
