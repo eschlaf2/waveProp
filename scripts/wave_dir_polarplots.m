@@ -53,6 +53,45 @@ switch plotnum
             'LineStyle', 'none');
         ttl(pat)
 
+%% quantify distributions		
+	case 6 
+		nF = numel(files);
+		metricpairs = nchoosek(metrics, 2);
+		nM = size(metricpairs, 1);
+		
+% 		h = figure(); 
+		nrows = nM * nF;
+		filename = cell(nrows, 1);
+		whichpair = zeros(nrows, 1, 'uint16');
+		dZ = cell(nrows, 1);
+		[m1, R, theta] = deal(zeros(nrows, 1));
+		
+		idx = 0;
+		for f = 1:nF % for each file
+			
+			
+			[~, name, ~] = fileparts(files(f).name);
+			data = load(name);
+			
+			for m = metricpairs'  % and each pair of metrics
+				idx = idx + 1;
+				tt = data.(m{1}).computeTimes;
+				d1 = data.(m{1}).Z(:);
+				d2 = interp1(data.(m{2}).computeTimes, data.(m{2}).Z, tt(:), ...
+					'nearest');
+				
+				dZ{idx} = exp(1j * (d2 - d1));
+				m1(idx) = mean(dZ{idx}, 'omitnan');
+				R(idx) = abs(m1(idx));  % recall circular variance is 1 - R
+				theta(idx) = angle(m1(idx));
+				whichpair(idx) = mod(idx-1, nM) + 1;
+				filename{idx} = name;
+				
+			end
+			
+		end
+		
+
 %% Comparison of metrics
 
     case 2
@@ -168,5 +207,7 @@ end
 
 %        print(2, [pat '_polarhist'], '-dpng');
 %        print(5, [pat '_Seizure' res(seizure).name '_diff'], '-dpng')
+
+
 end
 
