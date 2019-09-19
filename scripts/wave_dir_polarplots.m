@@ -96,7 +96,7 @@ switch plotnum
                 R(idx) = abs(m1(idx));
 %                 R2e(idx) = N(idx) / (N(idx)-1) * (R2 - 1/N(idx));
                 K(idx) = R(idx) * (2 - R(idx)^2) / (1 - R(idx)^2);
-                d(idx) = 1 - mean(angle(dZ{idx}).^2, 'omitnan');
+                d(idx) = 1 - mean(dZ{idx}.^2, 'omitnan');
                 sigma(idx) = sqrt(d(idx)/N(idx)/R(idx)^2);
                 q(idx) = asin(sqrt(-log(sig))*sigma(idx));
 % 				R(idx) = abs(m1(idx));  % recall circular variance is 1 - R
