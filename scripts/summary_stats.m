@@ -3,12 +3,13 @@
 
 % Load the table with comparison data
 load('direction_stats.mat');  % This should have the stats and a variable with the metrics
-pairs = [1 2 4];  % Ignore very short delay windows for now
+pairs = [2 3];  % Ignore very short delay windows for now
 
 % Extract variables from table
 theta = stats.theta;
 % cvar = 1 - stats.R;
-cvar = sqrt(-2 * log(stats.R));  % circular standard deviation
+cstd = asin(stats.r / sqrt(stats.N) / stats.R);
+% cvar = sqrt(-2 * log(stats.R));  % circular standard deviation
 whichpair = stats.whichpair;
 
 % ... including variables for patient and seizure
@@ -24,7 +25,7 @@ mask = strcmpi(patient, 'sim');
 patient = [patient(~mask); patient(mask)];
 seizure = [seizure(~mask); seizure(mask)];
 theta = [theta(~mask); theta(mask)];
-cvar = [cvar(~mask); cvar(mask)];
+cstd = [cstd(~mask); cstd(mask)];
 whichpair = [whichpair(~mask); whichpair(mask)];
 
 % Add a nan row between patients
@@ -33,13 +34,13 @@ for uu = sort(u, 'descend')'
 	patient = [patient(1:uu-1); {''}; patient(uu:end)];
 	seizure = [seizure(1:uu-1); {''}; seizure(uu:end)];
 	theta = [theta(1:uu-1); nan; theta(uu:end)];
-	cvar = [cvar(1:uu-1); nan; cvar(uu:end)];
+	cstd = [cstd(1:uu-1); nan; cstd(uu:end)];
 	whichpair = [whichpair(1:uu-1); 0; whichpair(uu:end)];
 end
 
 % Compute lower and upper bounds (circular variance)
-lowCI = theta - cvar;
-hiCI = theta + cvar;
+lowCI = theta - 2*cstd;
+hiCI = theta + 2*cstd;
 toolow = lowCI < -pi;
 toohi = hiCI > pi;
 
