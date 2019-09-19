@@ -93,7 +93,7 @@ switch plotnum
                 N(idx) = sum(isfinite(dd));
                 
 				m1(idx) = mean(dZ{idx}, 'omitnan');
-                R(idx) = abs(m1);
+                R(idx) = abs(m1(idx));
 %                 R2e(idx) = N(idx) / (N(idx)-1) * (R2 - 1/N(idx));
                 K(idx) = R(idx) * (2 - R(idx)^2) / (1 - R(idx)^2);
                 d(idx) = 1 - mean(angle(dZ{idx})^2);
