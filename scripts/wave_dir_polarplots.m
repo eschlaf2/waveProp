@@ -77,7 +77,10 @@ switch plotnum
 				idx = idx + 1;
 				tt = data.(m{1}).computeTimes;
 				d1 = data.(m{1}).Z(:);
-				d2 = interp1(data.(m{2}).computeTimes, data.(m{2}).Z, tt(:), ...
+                d1(data.(m{1}).p(:) < sig) = nan;
+                d2 = data.(m{2}).Z(:);
+                d2(data.(m{2}).p(:) < sig) = nan;
+				d2 = interp1(data.(m{2}).computeTimes, d2, tt(:), ...
 					'nearest');
 				
 				dZ{idx} = exp(1j * (d2 - d1));
