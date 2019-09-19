@@ -101,7 +101,9 @@ switch plotnum
 				
 			end
 			
-		end
+        end
+        stats = table(filename, whichpair, R, theta, r, N, ...
+            Cmu, Csig, Smu, Ssig, m1, dZ);
 		
 
 %% Comparison of metrics

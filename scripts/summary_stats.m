@@ -8,7 +8,7 @@ pairs = [2 3];  % Ignore very short delay windows for now
 % Extract variables from table
 theta = stats.theta;
 % cvar = 1 - stats.R;
-cstd = asin(stats.r / sqrt(stats.N) / stats.R);
+cstd = asin(stats.r ./ sqrt(stats.N) ./ stats.R);
 % cvar = sqrt(-2 * log(stats.R));  % circular standard deviation
 whichpair = stats.whichpair;
 
