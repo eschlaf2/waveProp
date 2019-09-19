@@ -55,6 +55,7 @@ switch plotnum
 
 %% quantify distributions		
 	case 6 
+
 		nF = numel(files);
 		metricpairs = nchoosek(metrics, 2);
 		nM = size(metricpairs, 1);
@@ -64,7 +65,7 @@ switch plotnum
 		filename = cell(nrows, 1);
 		whichpair = zeros(nrows, 1, 'uint16');
 		dZ = cell(nrows, 1);
-		[m1, R, theta, Cmu, Smu, Csig, Ssig, r, N] = ...
+		[m1, R, theta, K, d, sigma, q, N] = ...
             deal(zeros(nrows, 1));
 		
 		idx = 0;
@@ -85,16 +86,21 @@ switch plotnum
 					'nearest');
 				dd = d2 - d1;
 				dZ{idx} = exp(1j * (dd));
-                Cmu(idx) = mean(cos(dd), 'omitnan');
-                Csig(idx) = std(cos(dd), 'omitnan');
-                Smu(idx) = mean(sin(dd), 'omitnan');
-                Ssig(idx) = std(sin(dd), 'omitnan');
+%                 Cmu(idx) = mean(cos(dd), 'omitnan');
+%                 Csig(idx) = std(cos(dd), 'omitnan');
+%                 Smu(idx) = mean(sin(dd), 'omitnan');
+%                 Ssig(idx) = std(sin(dd), 'omitnan');
                 N(idx) = sum(isfinite(dd));
                 
 				m1(idx) = mean(dZ{idx}, 'omitnan');
-                R(idx) = mean(sqrt(Cmu(idx)^2 + Smu(idx)^2));
+                R(idx) = abs(m1);
+%                 R2e(idx) = N(idx) / (N(idx)-1) * (R2 - 1/N(idx));
+                K(idx) = R(idx) * (2 - R(idx)^2) / (1 - R(idx)^2);
+                d(idx) = 1 - mean(angle(dZ{idx})^2);
+                sigma(idx) = sqrt(d/N(idx)/R(idx)^2);
+                q(idx) = asin(sqrt(-log(sig))*sigma(idx));
 % 				R(idx) = abs(m1(idx));  % recall circular variance is 1 - R
-                r(idx) = sqrt(Csig(idx)^2 + Ssig(idx)^2);
+%                 r(idx) = sqrt(Csig(idx)^2 + Ssig(idx)^2);
 				theta(idx) = angle(m1(idx));
 				whichpair(idx) = mod(idx-1, nM) + 1;
 				filename{idx} = name;
