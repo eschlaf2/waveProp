@@ -37,12 +37,12 @@ function [res, ax1, ax2] = plot_wave_polar(res, sig, ax1, ax2)
 % 	ax = axes();
 	tt = (time(1): 1e-3: time(end));
 % 	data = interp1(res.time, smoothdata(unwrap(res.Z(:, whichvars)), 'movmean', 20), tt);
-    Zu = unwrap(res.Z);
+%     Zu = unwrap(res.Z);
 %     valid = ~isnan(Zu);
 %     f = fit(res.time(valid)', Zu(valid), 'smoothingspline', 'smoothing', .05);
 	data = smoothdata(...
 		interp1(res.time, exp(1j*res.Z), tt), ...
-		'movmean', 5 / (tt(2) - tt(1)), 'omitnan');
+		'gaussian', 5 / (tt(2) - tt(1)), 'omitnan');
 % 	data = cumsum(interp1(res.time, exp(1j*res.Z), tt), 'omitnan');
     
 	polarplot(ax1, angle(data), tt, '-', 'linewidth', 2);
