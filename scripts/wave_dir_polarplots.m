@@ -99,7 +99,7 @@ switch plotnum
 %                 R2e(idx) = N(idx) / (N(idx)-1) * (R2 - 1/N(idx));
                 kappa(idx) = circ_kappa(dd(finite));
                 conf(idx) = circ_confmean(dd(finite));
-                sigma(idx) = circ;
+                sigma(idx) = circ_std(dd(finite));
 % 				R(idx) = abs(m1(idx));  % recall circular variance is 1 - R
 %                 r(idx) = sqrt(Csig(idx)^2 + Ssig(idx)^2);
 				theta(idx) = angle(m1(idx));
