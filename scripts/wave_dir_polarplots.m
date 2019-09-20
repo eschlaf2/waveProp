@@ -93,21 +93,14 @@ switch plotnum
 				dd = d2 - d1;
 				dZ{idx} = exp(1j * (dd));
 				finite = isfinite(dd);
-%                 Cmu(idx) = mean(cos(dd), 'omitnan');
-%                 Csig(idx) = std(cos(dd), 'omitnan');
-%                 Smu(idx) = mean(sin(dd), 'omitnan');
-%                 Ssig(idx) = std(sin(dd), 'omitnan');
                 N(idx) = sum(finite);
 				if N(idx) == 0, continue, end
                 
 				m1(idx) = mean(dZ{idx}, 'omitnan');
                 R(idx) = abs(m1(idx));
-%                 R2e(idx) = N(idx) / (N(idx)-1) * (R2 - 1/N(idx));
                 kappa(idx) = circ_kappa(dd(finite));
                 conf(idx) = circ_confmean(dd(finite));
                 sigma(idx) = circ_std(dd(finite));
-% 				R(idx) = abs(m1(idx));  % recall circular variance is 1 - R
-%                 r(idx) = sqrt(Csig(idx)^2 + Ssig(idx)^2);
 				theta(idx) = angle(m1(idx));
 				
 			end
