@@ -45,7 +45,7 @@ function [res, ax1, ax2] = plot_wave_polar(res, sig, ax1, ax2)
 % 		'movmean', 5 / (tt(2) - tt(1)), 'omitnan');
 	data = cumsum(interp1(res.time, exp(1j*res.Z), tt), 'omitnan');
     
-	polarplot(ax1, data, tt, '-', 'linewidth', 2);
+	polarplot(ax1, angle(data), tt, '-', 'linewidth', 2);
 	axis tight;
     title(strrep(res.name, '_', ''));
     
