@@ -38,7 +38,8 @@ switch plotnum
             res(ii).time = alltimes / 1e3;
             ax(ii) = subplot(2, nF, ii, polaraxes());
             ax(ii + nF) = subplot(2, nF, ii + nF, polaraxes());
-            [res(ii), ax(ii), ax(ii + nF)] = plot_wave_polar(res(ii), sig, ax(ii), ax(ii + nF));
+            [res(ii), ax(ii), ax(ii + nF)] = ...
+				plot_wave_polar(res(ii), sig, ax(ii), ax(ii + nF));
 
         end
         legend(strrep(fields, '_', ' '), 'position', [.9 .55 0 0])
