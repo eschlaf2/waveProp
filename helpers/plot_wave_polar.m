@@ -40,16 +40,17 @@ function [res, ax1, ax2] = plot_wave_polar(res, sig, ax1, ax2)
 %     Zu = unwrap(res.Z);
 %     valid = ~isnan(Zu);
 %     f = fit(res.time(valid)', Zu(valid), 'smoothingspline', 'smoothing', .05);
-	data = smoothdata(...
+	data1 = smoothdata(...
 		interp1(res.time, exp(1j*res.Z), tt), ...
-		'gaussian', 5 / (tt(2) - tt(1)), 'omitnan');
-% 	data = cumsum(interp1(res.time, exp(1j*res.Z), tt), 'omitnan');
+		'movmean', 5 / (tt(2) - tt(1)), 'includenan');
     
-	polarplot(ax1, angle(data), tt, '-', 'linewidth', 2);
+	polarplot(ax1, angle(data1), tt, '-', 'linewidth', 2);
 	axis tight;
     title(strrep(res.name, '_', ''));
     
-	polarplot(ax2, res.Z, time, '.', ...
+% 	data2 = cumsum(interp1(res.time, exp(1j*res.Z), tt), 'omitnan');
+	data2 = cumsum(exp(1j*res.Z));
+	polarplot(ax2, angle(data2), time, '.', ...
 		'markersize', 10);
 	hold off;
 	axis tight
