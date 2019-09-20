@@ -1,5 +1,6 @@
 % pat = 'c7';
-% plotnum = 6 requires package CircStat2012a
+% Requires Circular Statistics Toolbox (plotnum case 6)
+
 
 if ~exist('files', 'var'); files = dir([pat '_Seizure*10_wave_prop_1.mat']); end
 if ~exist('metrics', 'var'); metrics = {'maxdescent', 'events', 'delays_T01_fband1_50'}; end
@@ -80,9 +81,9 @@ switch plotnum
 				idx = idx + 1;
 				tt = data.(m{1}).computeTimes;
 				d1 = data.(m{1}).Z(:);
-                d1(data.(m{1}).p(:) < sig) = nan;
+                d1(data.(m{1}).p(:) >= sig) = nan;
                 d2 = data.(m{2}).Z(:);
-                d2(data.(m{2}).p(:) < sig) = nan;
+                d2(data.(m{2}).p(:) >= sig) = nan;
 				d2 = interp1(data.(m{2}).computeTimes, d2, tt(:), ...
 					'nearest');
 				dd = d2 - d1;
@@ -109,7 +110,7 @@ switch plotnum
 			end
 			
 		end
-        stats = table(filename, whichpair, R, theta, kappa, conf, sigma, q, N, ...
+        stats = table(filename, whichpair, R, theta, kappa, conf, sigma, N, ...
             m1, dZ);
 		
 

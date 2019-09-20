@@ -8,9 +8,7 @@ pairs = [2 3];  % Ignore very short delay windows for now
 % Extract variables from table
 theta = stats.theta;
 m1 = stats.m1;
-% cvar = 1 - stats.R;
-cstd = asin(stats.r ./ sqrt(stats.N) ./ stats.R);
-% cvar = sqrt(-2 * log(stats.R));  % circular standard deviation
+cconf = stats.conf;
 whichpair = stats.whichpair;
 [S, C, sigS, sigC, cvar] = deal(nan(size(theta)));
 for ii = 1:size(stats, 1)
@@ -39,7 +37,8 @@ patient = reorder(patient);
 seizure = reorder(seizure);
 m1 = reorder(m1);
 theta = reorder(theta);
-cstd = reorder(cstd);
+cconf = reorder(cconf);
+cvar = reorder(cvar);
 whichpair = reorder(whichpair);
 
 % Add a nan row between patients
@@ -48,14 +47,15 @@ for uu = sort(u, 'descend')'
 	patient = [patient(1:uu-1); {''}; patient(uu:end)];
 	seizure = [seizure(1:uu-1); {''}; seizure(uu:end)];
 	theta = [theta(1:uu-1); nan; theta(uu:end)];
-	cstd = [cstd(1:uu-1); nan; cstd(uu:end)];
+	cconf = [cconf(1:uu-1); nan; cconf(uu:end)];
+	cvar = [cvar(1:uu-1); nan; cvar(uu:end)];
 	whichpair = [whichpair(1:uu-1); 0; whichpair(uu:end)];
 	m1 = [m1(1:uu-1); 0; m1(uu:end)];
 end
 
 % Compute lower and upper bounds (circular variance)
-lowCI = theta - 2*cstd;
-hiCI = theta + 2*cstd;
+lowCI = theta - cconf;
+hiCI = theta + cconf;
 toolow = lowCI < -pi;
 toohi = hiCI > pi;
 
