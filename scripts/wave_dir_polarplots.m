@@ -68,7 +68,7 @@ switch plotnum
 		whichpair = zeros(nrows, 1, 'uint16');
 		dZ = cell(nrows, 1);
 		[m1, R, theta, kappa, conf, sigma, N] = ...
-            deal(zeros(nrows, 1));
+            deal(nan(nrows, 1));
 		
 		idx = 0;
 		for f = 1:nF % for each file
@@ -79,6 +79,10 @@ switch plotnum
 			
 			for m = metricpairs'  % and each pair of metrics
 				idx = idx + 1;
+				
+				whichpair(idx) = mod(idx-1, nM) + 1;
+				filename{idx} = name;
+				
 				tt = data.(m{1}).computeTimes;
 				d1 = data.(m{1}).Z(:);
                 d1(data.(m{1}).p(:) >= sig) = nan;
@@ -94,6 +98,7 @@ switch plotnum
 %                 Smu(idx) = mean(sin(dd), 'omitnan');
 %                 Ssig(idx) = std(sin(dd), 'omitnan');
                 N(idx) = sum(finite);
+				if N(idx) == 0, continue, end
                 
 				m1(idx) = mean(dZ{idx}, 'omitnan');
                 R(idx) = abs(m1(idx));
@@ -104,8 +109,6 @@ switch plotnum
 % 				R(idx) = abs(m1(idx));  % recall circular variance is 1 - R
 %                 r(idx) = sqrt(Csig(idx)^2 + Ssig(idx)^2);
 				theta(idx) = angle(m1(idx));
-				whichpair(idx) = mod(idx-1, nM) + 1;
-				filename{idx} = name;
 				
 			end
 			
