@@ -76,22 +76,15 @@ print(gcf, delays.Name, '-dpng')
 fieldname = checkname(sprintf('delays_T%02g_fband%d_%d', T, band));
 outfile.(fieldname) = delays;
 
+disp('Computing wave directions from delays (and again) ...')
+[delays, mea] = wave_prop(mea, 'delays', ...
+	'exclude', false, 'showplots', showplots, 'T', 10, 'band', [1 13]);
+plot_wave_directions(mea, delays);
+print(gcf, delays.Name, '-dpng')
+fieldname = checkname(sprintf('delays_T%02g_fband%d_%d', T, band));
+outfile.(fieldname) = delays;
 
-% band = [25 50];
-% disp('Computing wave directions from delays ...')
-% [delays, mea] = wave_prop(mea, 'delays', ...
-% 	'exclude', false, 'showplots', showplots, 'T', T, 'band', band);
-% plot_wave_directions(mea, delays);
-% print(gcf, delays.Name, '-dpng')
-% outfile.(sprintf('delays_T%02d_fband%d_%d', T, band)) = delays;
-% 
-% band = [300 500];
-% disp('Computing wave directions from delays ...')
-% [delays, mea] = wave_prop(mea, 'delays', ...
-% 	'exclude', false, 'showplots', showplots, 'T', T, 'band', band);
-% plot_wave_directions(mea, delays);
-% print(gcf, delays.Name, '-dpng')
-% outfile.(sprintf('delays_T%02d_fband%d_%d', T, band)) = delays;
+
 
 
 disp('Done.')
