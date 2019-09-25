@@ -6,7 +6,7 @@ function [res, ax1, ax2] = plot_wave_polar(res, sig, ax1, ax2)
     fields = fieldnames(res.data);
 % 	whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
 %     res.time = res.data.(fields{whichfields(1)}).computeTimes / 1e3;
-	time = res.time - min(res.time);
+	time = res.time;  % - min(res.time);
 	[res.Z, res.Vx, res.Vy] = ...
 		deal(zeros(length(time), length(fields)));
 	for jj = 1:numel(fields)
@@ -44,7 +44,7 @@ function [res, ax1, ax2] = plot_wave_polar(res, sig, ax1, ax2)
 		interp1(res.time, exp(1j*res.Z), tt), ...
 		'movmean', 1 / (tt(2) - tt(1)), 'includenan');
     
-	polarplot(ax1, angle(data1), tt, '.', 'linewidth', 2, 'markersize', 4);
+	polarplot(ax1, angle(data1), tt - tt(1), '.', 'linewidth', 2, 'markersize', 4);
 	axis tight;
     title(strrep(res.name, '_', ''));
     
