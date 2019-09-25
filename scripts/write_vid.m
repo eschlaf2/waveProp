@@ -63,6 +63,8 @@ for ii = 1:numplots
 	title(ax(ii), ttl{ii})
 	ax(ii).XLim = [0 max(position(:, 1)) + 1];
 	ax(ii).YLim = [0 max(position(:, 2)) + 1];
+    ax(ii).XTickLabel = [];
+    ax(ii).YTickLabel = [];
 	ax(ii).NextPlot = 'replacechildren';
 	if ~isempty(clims), colorbar(ax(ii)); end
     scatter(ax(ii), ...
