@@ -2,8 +2,8 @@
 % for wave direction. Highlight individual patients and seizures.
 
 % Load the table with comparison data
-load('direction_stats.mat');  % This should have the stats and a variable with the metrics
-pairs = [2 3];  % Ignore very short delay windows for now
+% load('direction_stats.mat');  % This should have the stats and a variable with the metrics
+% pairs = [2 3];  % Ignore very short delay windows for now
 
 % Extract variables from table
 theta = stats.theta;
@@ -69,88 +69,67 @@ hiCI = theta + cconf;
 toolow = lowCI < -pi;
 toohi = hiCI > pi;
 
+%% Make the figure
 % Clear the figure
 fig = figure(1); clf
-ax = axes('parent', fig);
-offset = @(ii) 2.2 * pi * ii;
+nP = length(pairs);
+ax = gobjects(nP, 1);
 
 % Plot the means first so it's easy to label
-for ii = 1:length(pairs)
-	mask = whichpair==ii | whichpair == 0;
-	plot(theta(mask) + offset(ii), 'LineWidth', 2); hold on
-end
-set(ax, 'ColorOrderIndex', 1);
-
-% Plot the gray blocks, confidence bounds, and means again
 cdata = lines(7);
-cicolor = .5 * [1 1 1];
-for ii = 1:length(pairs)
+
+% Rename metrics
+metricpairs = strrep(metricpairs, 'maxdescent', 'M');
+metricpairs = strrep(metricpairs, 'events', 'E');
+metricpairs = strrep(metricpairs, 'delays_T01_fband1_50', 'D');
+metricpairs = strrep(metricpairs, 'delays_T0p2_fband0_50', 'Ds');
+metricpairs = strrep(metricpairs, 'delays_T10_fband1_13', 'D10');
+
+for ii = 1:nP
+	ax(ii) = subplot(nP, 1, ii);
+	mask = whichpair==ii | whichpair == 0;
+	N = sum(mask);
+	set(ax(ii),'TickLength',[0 0], ...
+		'XTick', (0:N+1), ...
+		'XTickLabel', [], ...
+		'XAxisLocation', 'origin', ...
+		'YGrid','on', ...  % 'YTick', (-pi:pi:pi), ...
+		'YTickLabel', [], ...
+		'box', 'off', ...
+		'nextplot', 'replacechildren', ...
+		'xlim', [1 sum(mask)], ...
+		'ylim', [-pi pi]);
+	plot(theta(mask), 'LineWidth', 2, 'color', cdata(ii, :)); 
+	hold(ax(ii), 'on')
+end
+set(ax(ii), 'XTickLabel', seizure(mask));
+
+for ii = 1:nP
 	mask = whichpair==ii | whichpair == 0;
 	N = sum(mask);
 	
-% 	if mod(ii, 2)
-		patch([0 N+1 N+1 0], [-pi -pi pi pi] + offset(ii), .8*[1 1 1], ...
-			'linestyle', 'none', 'facealpha', .5, 'linewidth', 2); hold on; 
-% 	end
 	x = [1;1] * (1:sum(mask));
 	y = [lowCI(mask)'; hiCI(mask)'];
 	toohi = y(2, :) > pi;
 	toolow = y(1, :) < -pi;
 	cicolor = cdata(ii, :);
 	
-	plot(ax, x, max(min(y, pi), -pi) + offset(ii), 'color', cicolor); 
-	plot(ax, x(:, toohi), ...
-		[0*y(1, toohi) - pi; y(2, toohi) - 2*pi] + offset(ii), ...
+	plot(ax(ii), x, y, 'color', cicolor); 
+	plot(ax(ii), x(:, toohi), ...
+		[0*y(1, toohi) - pi; y(2, toohi) - 2*pi], ...
 		'color', cicolor);
-	plot(ax, x(:, toolow), ...
-		[0*y(2, toolow) + pi; y(1, toolow) + 2*pi] + offset(ii), ...
+	plot(ax(ii), x(:, toolow), ...
+		[0*y(2, toolow) + pi; y(1, toolow) + 2*pi], ...
 		'color', cicolor); 
-	scatter(ax, 1:N, theta(mask) + offset(ii), 50, cdata(ii, :), 'filled');
+	scatter(ax(ii), 1:N, theta(mask), 50, cdata(ii, :), 'filled');
 	x = 1:N;
 	y = theta(mask);
-	scatter(ax, x(nanconf(mask)), y(nanconf(mask)) + offset(ii), 90, .4*[1 1 1], 'd', 'filled');
-% 	h.Marker
+	scatter(ax(ii), ...
+		x(nanconf(mask)), y(nanconf(mask)), 90, .4*[1 1 1], ...
+		'd', 'filled');
+	ylabel(ax(ii), sprintf('%s - %s \\color{white}...', ...
+		metricpairs{pairs(ii), 2}, metricpairs{pairs(ii), 1} ...
+		));
+	hold(ax(ii), 'off');
+
 end
-hold off
-
-% % Put ticks at the center of each group (i.e. dZ=0)
-% yticks((offset(1) - pi:offset(1):offset(ii)) + 1*pi)
-% yticklabels([])  % ... but don't label since it will be in the legend
-% 
-% % Label each seizure
-% xticks(1:N)
-% xticklabels(seizure(mask))
-
-% set(gca, 'ticklength', [0;0], 'ygrid', 'on')
-axis tight
-% box(ax, 'on')
-set(ax,'TickLength',[0 0], ...
-	'XTick', (1:N), ...
-	'XTickLabel', seizure(mask), ...
-	'YGrid','on', ...
-	'YTick', (offset(1) - pi:offset(1):offset(ii)) + 1*pi, ...
-	'YTickLabel', []);
-% axis tight
-
-%% make legend
-metricpairs = strrep(metricpairs, 'maxdescent', 'M');
-metricpairs = strrep(metricpairs, 'events', 'E');
-metricpairs = strrep(metricpairs, 'delays_T01_fband1_50', 'D');
-metricpairs = strrep(metricpairs, 'delays_T0p2_fband0_50', 'Ds');
-l = cell(length(pairs), 1);
-for ii = 1:length(pairs)
-	l{ii} = sprintf('%s - %s \\color{white}...', metricpairs{pairs(ii), 2},metricpairs{pairs(ii), 1}); 
-end
-lgd = legend(l, ...
-	'location', 'northoutside', ...
-	'Orientation', 'horiz', ...
-	'Interpreter', 'tex', ...
-	'FontName', 'pt sans caption', ...
-	'FontSize', 16);
-lgd.Box = 'off';
-ax.FontName = 'pt sans caption';
-% ax.Box = 'off';
-% ax.GridLineStyle = '-';
-% ax.BoxStyle = 'full'
-% ax.Line
-
