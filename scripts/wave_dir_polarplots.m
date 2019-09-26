@@ -24,7 +24,8 @@ switch plotnum
         figure(1); clf; fullwidth(true);
         ax = gobjects(2*nF, 1);
         for ii = 1:nF
-            res(ii).name = strrep(files(ii).name(strfind(files(ii).name, 'Seizure')+(7:8)), '_', '');
+			finfo = strsplit(files(ii).name, {'_', '.'});
+            res(ii).name = sprintf('%s %s', finfo{1}, finfo{2}(8:end));
 			res(ii).data = load(fullfile(files(ii).folder, files(ii).name), metrics{:});
 % 			for m = metrics
 % 				res(ii).data.(m{:}) = temp.(m{:});
