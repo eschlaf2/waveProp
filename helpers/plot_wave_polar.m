@@ -50,7 +50,8 @@ function [res, ax1, ax2] = plot_wave_polar(res, sig, ax1, ax2)
     
 	data2 = cumsum(interp1(res.time, diff(tt(1:2)) * exp(1j*res.Z), tt), 'omitnan');
 % 	data2 = cumsum(exp(1j*res.Z), 'omitnan');
-	polarplot(ax2, angle(data2), abs(data2), '-', 'linewidth', 2, ...
+	polarplot(ax2, angle(data2), cumsum(tt), ...  % abs(data2), ...
+                '-', 'linewidth', 2, ...
 		'markersize', 10);
 	hold off;
 	axis tight

@@ -43,7 +43,7 @@ switch plotnum
 
         end
         legend(strrep(fields, '_', ' '), 'position', [.9 .55 0 0])
-        rlim = arrayfun(@(a) a.RLim(2), ax);
+        rlim = arrayfun(@(a) a.RLim(2), ax(1:nF));
         for kk = 1:numel(ax)
             if kk <= nF, ax(kk).RLim = [0 max(rlim)]; end
             ax(kk).ThetaTickLabel = [];

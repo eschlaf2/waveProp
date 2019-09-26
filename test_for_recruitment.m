@@ -41,7 +41,7 @@ if any(strcmpi(method, 'wpli'))
 	DOWNSAMPLED_FREQ = mea.SamplingRate / ds_step;
 	lfp = mea.lfp;
 	lfp = lfp(1:ds_step:end, :);
-	Time = mea.Time;
+	Time = mea.Time();
 	Time = Time(1:ds_step:end);
 
 	%% Set parameters for coherence calculations
