@@ -67,19 +67,44 @@ switch plotnum
 		
 %% Density plots
 	case 7
-		edges = linspace(-pi, pi, 51);
+		% Plots histogram (normalized to percentage) of directions within 5 seconds
+		% of each time point at .1 second intervals. Each seizure and metric
+
+		edges = linspace(-pi, pi, 65);
 		halfwin = 5;  % (s)
 		N = cell(nF, 1);
 		for ii = 1:nF
 			tt = res(ii).time;
-			[nT, nM] = size(res(ii).Z);
-			N{ii} = nan(nT, numel(edges) - 1, nM);
-			for tidx = 1:numel(tt)
-				mask = (tt >= (tt(tidx) - halfwin)) & (tt <= (tt(tidx) + halfwin));
-				for m = 1:size(res(ii).Z, 2)
+			time = tt(1):.1:tt(end);
+			[~, nM] = size(res(ii).Z);
+			N{ii} = nan(numel(time), numel(edges) - 1, nM);
+			figure('Units', 'normalized', 'Position', [0 0 .5 1])
+			win = gausswin(2*halfwin / diff(time(1:2))) * ...
+				gausswin(round(pi / 2 / diff(edges(1:2))))';
+			for m = 1:size(res(ii).Z, 2)
+				for tidx = 1:numel(time)
+					mask = (tt >= (time(tidx) - halfwin)) & (tt <= (time(tidx) + halfwin));
+
 					N{ii}(tidx, :, m) = histcounts(res(ii).Z(mask, m), edges);
 				end
+				subplot(nM, 1, m), 
+				Z = conv2(N{ii}(:, :, m), win, 'same');
+				Z = Z ./ max(sum(Z, 2), 10) * 100;
+				emilys_pcolor(time, edges(2:end), Z); %, ...
+		% 			'clims', [0 20]); 
+				hold on;
+				plot(tt, angle(smoothdata(exp(1j * res(ii).Z(:, m)), 'omitnan', ...
+					'SamplePoints', tt)), 'c.');
+				hold off;
+				title(rename_metrics(metrics{m}))
 			end
+			annotation('textbox', ...
+				'String', res(ii).name, ...
+				'Position', [0 0 1 1], ...
+				'FitBoxToText', true, ...
+				'LineStyle', 'none');
+			drawnow;
+			print(sprintf('figs/dens_%s', checkname(res(ii).name)), '-dpng');
 		end
 
 %% quantify distributions		
