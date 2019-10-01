@@ -129,8 +129,12 @@ switch plotnum
 				emilys_pcolor(time, edges(2:end), Z); %, ...
 		% 			'clims', [0 20]); 
 				hold on;
+				try
 				plot(tt, angle(smoothdata(exp(1j * res(ii).Z(:, m)), 'omitnan', ...
 					'SamplePoints', tt)), 'c.');
+				catch ME
+					disp(ME)
+				end
 				hold off;
 				title(rename_metrics(metrics{m}))
 			end
