@@ -37,6 +37,9 @@ ttl{1} = 'raw';
 ii = 2;
 t0 = time(1); tf = t0 + T;
 for passband = bands
+	band = passband;
+	if band(1) == 0, band(1) = []; end
+	band = min(band, samplerate / 2 - 1);
     b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
     tempdat = zeros(size(doi));
     while tf <= time(end)
