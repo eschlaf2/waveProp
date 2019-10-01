@@ -15,10 +15,13 @@ if ~exist('plotnum', 'var'); plotnum = 1; end
 if ~exist('sig', 'var'); sig = 5e-2; end
 nF = numel(files);
 
-switch plotnum
-    case 1
+%% Make res
 
-        clear res;
+
+switch plotnum
+	case 0
+	% Make res
+		clear res;
         res(nF) = struct(...
             'name', [], ...
             'data', [], ...
@@ -28,29 +31,62 @@ switch plotnum
             'Vx', [], ...
             'Vy', []);
 
-        figure(1); clf; fullwidth(true);
-        ax = gobjects(2*nF, 1);
         for ii = 1:nF
 			finfo = strsplit(files(ii).name, {'_', '.'});
             res(ii).name = sprintf('%s %s', finfo{1}, finfo{2}(8:end));
 			res(ii).data = load(fullfile(files(ii).folder, files(ii).name), metrics{:});
-% 			for m = metrics
-% 				res(ii).data.(m{:}) = temp.(m{:});
-% 			end
             fields = fieldnames(res(ii).data);
-%             whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
 			alltimes = cellfun(@(f) ...
 				res(ii).data.(f).computeTimes(:), ...
 				fields, 'uni', 0);
 			alltimes = unique(cat(1, alltimes{:}));
             res(ii).time = alltimes / 1e3;
+			
+			
+			time = res(ii).time;  % - min(res.time);
+			[res(ii).Z, res(ii).Vx, res(ii).Vy] = ...
+				deal(zeros(length(time), length(fields)));
+			for jj = 1:numel(fields)
+				for f = 'Zp'
+
+					switch f
+						case {'Z', 'p'}
+							data = interp1(...
+								res(ii).data.(fields{jj}).computeTimes / 1e3, ...
+								res(ii).data.(fields{jj}).(f), time, 'nearest');
+						case 'Vx'
+							data = interp1(...
+								res(ii).data.(fields{jj}).computeTimes / 1e3, ...
+								res(ii).data.(fields{jj}).V(1, :), time, 'nearest');
+						case 'Vy'
+							data = interp1(...
+								res(ii).data.(fields{jj}).computeTimes / 1e3, ...
+								res(ii).data.(fields{jj}).V(2, :), time, 'nearest');
+					end
+					res(ii).(f)(:, jj) = data;
+					% Remove values where fit is not significant
+					mask = res(ii).data.(fields{jj}).p < sig;
+					res(ii).(f)(~mask, jj) = nan;
+					% Remove values where slope is zero in both directions
+					res(ii).(f)(all(abs(res.data.(fields{jj}).beta(1:2, :)) < eps), jj) = nan;
+				end
+			end
+        end
+        
+		
+    case 1
+
+        figure(1); clf; fullwidth(true);
+        ax = gobjects(2*nF, 1);
+        for ii = 1:nF
+            fields = fieldnames(res(ii).data);
             ax(ii) = subplot(2, nF, ii, polaraxes());
             ax(ii + nF) = subplot(2, nF, ii + nF, polaraxes());
-            [res(ii), ax(ii), ax(ii + nF)] = ...
-				plot_wave_polar(res(ii), sig, ax(ii), ax(ii + nF));
+            [ax(ii), ax(ii + nF)] = ...
+				plot_wave_polar(res(ii), ax(ii), ax(ii + nF));
 
         end
-        legend(strrep(fields, '_', ' '), 'position', [.9 .55 0 0])
+        legend(rename_metrics(fields), 'position', [.9 .55 0 0])
         rlim = arrayfun(@(a) a.RLim(2), ax(1:nF));
         for kk = 1:numel(ax)
             if kk <= nF, ax(kk).RLim = [0 max(rlim)]; end
