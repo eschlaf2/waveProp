@@ -13,10 +13,10 @@ if ~exist('metrics', 'var')
 end
 if ~exist('plotnum', 'var'); plotnum = 1; end
 if ~exist('sig', 'var'); sig = 5e-2; end
+nF = numel(files);
 
 switch plotnum
     case 1
-        nF = numel(files);
 
         clear res;
         res(nF) = struct(...
@@ -64,11 +64,27 @@ switch plotnum
             'FitBoxToText', 'on', ...
             'LineStyle', 'none');
         ttl(pat)
+		
+%% Density plots
+	case 7
+		edges = linspace(-pi, pi, 51);
+		halfwin = 5;  % (s)
+		N = cell(nF, 1);
+		for ii = 1:nF
+			tt = res(ii).time;
+			[nT, nM] = size(res(ii).Z);
+			N{ii} = nan(nT, numel(edges) - 1, nM);
+			for tidx = 1:numel(tt)
+				mask = (tt >= (tt(tidx) - halfwin)) & (tt <= (tt(tidx) + halfwin));
+				for m = 1:size(res(ii).Z, 2)
+					N{ii}(tidx, :, m) = histcounts(res(ii).Z(mask, m), edges);
+				end
+			end
+		end
 
 %% quantify distributions		
 	case 6 
 
-		nF = numel(files);
 		metricpairs = nchoosek(metrics, 2);
 		nM = size(metricpairs, 1);
 		
