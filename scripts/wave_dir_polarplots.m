@@ -125,7 +125,7 @@ switch plotnum
 				end
 				subplot(nM, 1, m), 
 				Z = conv2(N{ii}(:, :, m), win, 'same');
-				Z = Z ./ max(sum(Z, 2), 10) * 100;
+				Z = Z ./ max(sum(Z, 2), mean(sum(Z, 2))) * 100;
 				emilys_pcolor(time, edges(2:end), Z); %, ...
 		% 			'clims', [0 20]); 
 				hold on;
