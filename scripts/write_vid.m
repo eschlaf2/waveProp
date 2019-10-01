@@ -40,7 +40,7 @@ for passband = bands
 	band = passband;
 	if band(1) == 0, band(1) = []; end
 	band = min(band, samplerate / 2 - 1);
-    b = fir1(150, 2 * passband / samplerate);  % convert passband to pi-rad/sample
+    b = fir1(150, 2 * band / samplerate);  % convert passband to pi-rad/sample
     tempdat = zeros(size(doi));
     while tf <= time(end)
         inds = (time >= t0) & (time <= tf);
