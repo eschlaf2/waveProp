@@ -68,7 +68,7 @@ switch plotnum
 					mask = res(ii).data.(fields{jj}).p < sig;
 					res(ii).(f)(~mask, jj) = nan;
 					% Remove values where slope is zero in both directions
-					res(ii).(f)(all(abs(res.data.(fields{jj}).beta(1:2, :)) < eps), jj) = nan;
+					res(ii).(f)(all(abs(res(ii).data.(fields{jj}).beta(1:2, :)) < eps), jj) = nan;
 				end
 			end
         end
