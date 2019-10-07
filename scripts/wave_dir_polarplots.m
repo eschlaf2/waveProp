@@ -129,7 +129,7 @@ for ii = 1:nF
 		subplot(nM, 1, m), 
 		Zdens = conv2(N{ii}(:, :, m), win, 'same');
 		Zdens = Zdens ./ max(sum(Zdens, 2), mean(sum(Zdens, 2))) * 100;
-		emilys_pcolor(time, edges(2:end), Zdens); %, ...
+		emilys_pcolor(time, edges(2:end), Zdens, 'clims', [0 5]); %, ...
 % 			'clims', [0 20]); 
 		hold on;
 		try
