@@ -104,50 +104,62 @@ switch plotnum
 %% Density plots
 	case 7
 		% Plots histogram (normalized to percentage) of directions within 5 seconds
-		% of each time point at .1 second intervals. Each seizure and metric
+% of each time point at .1 second intervals. Each seizure and metric
 
-		edges = linspace(-pi, pi, 65);
-		halfwin = 5;  % (s)
-		N = cell(nF, 1);
-		for ii = 1:nF
-			tt = res(ii).time;
-			time = tt(1):.1:tt(end);
-			rotateby = angle(sum(exp(1j*res(ii).Z), 'omitnan'));
-			Z = angle(exp(1j * res(ii).Z) .* exp(-1j * rotateby));
-			[~, nM] = size(Z);
-			N{ii} = nan(numel(time), numel(edges) - 1, nM);
-			figure('Units', 'normalized', 'Position', [0 0 .5 1])
-			win = gausswin(2*halfwin / diff(time(1:2))) * ...
-				gausswin(round(pi / 2 / diff(edges(1:2))))';
-			for m = 1:nM
-				for tidx = 1:numel(time)
-					mask = (tt >= (time(tidx) - halfwin)) & (tt <= (time(tidx) + halfwin));
-
-					N{ii}(tidx, :, m) = histcounts(Z(mask, m), edges);
-				end
-				subplot(nM, 1, m), 
-				Zdens = conv2(N{ii}(:, :, m), win, 'same');
-				Zdens = Zdens ./ max(sum(Zdens, 2), mean(sum(Zdens, 2))) * 100;
-				emilys_pcolor(time, edges(2:end), Zdens); %, ...
-		% 			'clims', [0 20]); 
-				hold on;
-				try
-				plot(tt, angle(smoothdata(exp(1j * Z(:, m)), 'omitnan', ...
-					'SamplePoints', tt)), 'c.');
-				catch ME
-					disp(ME)
-				end
-				hold off;
-				title(rename_metrics(metrics{m}))
-			end
-			annotation('textbox', ...
-				'String', res(ii).name, ...
-				'Position', [0 0 1 1], ...
-				'FitBoxToText', true, ...
-				'LineStyle', 'none');
-			drawnow;
-			print(sprintf('figs/dens_%s', checkname(res(ii).name)), '-dpng');
+edges = linspace(-pi, pi, 65);
+halfwin = 5;  % (s)
+N = cell(nF, 1);
+for ii = 1:nF
+	tt = res(ii).time;
+	time = tt(1):.1:tt(end);
+	% Rotate Z so that the distributions are centered and it is easy to see
+	% deviations
+	rotateby = angle(sum(exp(1j*res(ii).Z), 'omitnan'));
+	Z = angle(exp(1j * res(ii).Z) .* exp(-1j * rotateby));
+	[~, nM] = size(Z);
+	N{ii} = nan(numel(time), numel(edges) - 1, nM);
+	figure('Units', 'normalized', 'Position', [0 0 .5 1])
+	win = gausswin(round(2*halfwin / diff(time(1:2)))) * ...
+		gausswin(round(pi / 2 / diff(edges(1:2))))';
+	for m = 1:nM
+		for tidx = 1:numel(time)
+			mask = (tt >= (time(tidx) - halfwin)) & (tt <= (time(tidx) + halfwin));
+			N{ii}(tidx, :, m) = histcounts(Z(mask, m), edges);
 		end
+		subplot(nM, 1, m), 
+		Zdens = conv2(N{ii}(:, :, m), win, 'same');
+		Zdens = Zdens ./ max(sum(Zdens, 2), mean(sum(Zdens, 2))) * 100;
+		emilys_pcolor(time, edges(2:end), Zdens); %, ...
+% 			'clims', [0 20]); 
+		hold on;
+		try
+		plot(tt, (angle(smoothdata(exp(1j * Z(:, m)), 'omitnan', ...
+			'SamplePoints', tt))), 'c.');
+		catch ME
+			if ~strcmp(ME.identifier, 'MATLAB:griddedInterpolant:DegenerateGridErrId')
+				rethrow(ME)
+			end
+			disp(ME)
+		end
+		hold off;
+		ytks = -pi:pi/2:pi;
+		ytklbl = cell(size(ytks));
+		ytklbl{2} = '-\pi/2'; ytklbl{4} = '\pi/2';
+		for y=ytks, yline(y); end  % grid doesn't show over pcolor
+		
+		yticks(ytks);
+		yticklabels(ytklbl);
+		title(rename_metrics(metrics{m}))
+	end
+	annotation('textbox', ...
+		'String', res(ii).name, ...
+		'Position', [0 0 1 1], ...
+		'FitBoxToText', true, ...
+		'LineStyle', 'none');
+	drawnow;
+	print(sprintf('figs/dens_%s', checkname(res(ii).name)), '-dpng');
+end
+
 
 %% quantify distributions		
 	case 6 
