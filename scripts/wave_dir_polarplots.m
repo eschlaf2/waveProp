@@ -242,12 +242,21 @@ switch plotnum
             polarplot(ax2, data, alltime, '.'); hold off;  % ... add the differences at each time
 
             % Prettify
-            title(ax2, strrep(sprintf('%s - %s', metrics{d1}, metrics{d2}), '_', ' '))
+            title(ax2, strrep(sprintf('%s - %s', ...
+				rename_metrics(metrics{d1}), ...
+				rename_metrics(metrics{d2})), '_', ' '))
             axis tight
             ax2.ThetaTickLabel = [];
         %     set(gca, 'thetaticklabels', [])
-        end
-        ttl(sprintf('%s', pat));
+		end
+		
+		annotation('textbox', ...
+			'String', pat, ...
+			'Position', [0 0 1 1], ...
+			'FitBoxToText', true, ...
+			'LineStyle', 'none');
+		drawnow;
+%         ttl(sprintf('%s', pat));
 
 
 %% Blurred im
