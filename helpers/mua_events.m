@@ -2,10 +2,11 @@ function [event_inds, artefact_inds, mea] = mua_events(mea)
 % Takes a structure or matfile as input and computes event times. Events
 % are defined as peaks in MUA more than EVENT_THRESH standard deviations from the
 % baseline in the negative direction and at least MIN_DIST ms apart
+% Uses global variable globs
 
-EVENT_THRESH = 4;      % min peak distance from baseline (in negative direction) [sd]
-MIN_DIST = 1;          % min time between peaks [ms]
-ARTEFACT_THRESH = 16;  % activity outside this range is considered artefact [sd] 
+EVENT_THRESH = mea.params.event_thresh;      % min peak distance from baseline (in negative direction) [sd]
+MIN_DIST = mea.params.min_dist;          % min time between peaks [ms]
+ARTEFACT_THRESH = mea.params.artefact_thresh;  % activity outside this range is considered artefact [sd] 
 
 % Import fields
 if (isfield(mea, 'mua') || isprop(mea, 'mua'))
@@ -59,10 +60,8 @@ end
 % store results to mea
 event_inds = find(events);
 artefact_inds = find(artefacts);
-try
+
+if nargout == 3
 	mea.artefact_inds = artefact_inds;
 	mea.event_inds = event_inds;
-catch ME
-	disp(ME)
-	disp('Artefact and event indices not saved to matfile.')
 end

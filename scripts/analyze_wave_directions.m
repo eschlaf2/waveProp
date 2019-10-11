@@ -1,4 +1,4 @@
-% pat = 'SIM'; seizure = 9;
+% pat = 'SIM'; seizure = 9; paramfile = '';
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
 addpath(datapath);  % ... add the original data path first
 patpath = genpath(pat);  % ... and then add the local patient path on top 
@@ -13,6 +13,12 @@ if ~exist(fname, 'file')
 end
 
 mea = load(fname);
+if isempty(paramfile)
+	mea.params = init_params();
+else
+	run(paramfile);  % this file should add field ''params'' to mea
+end
+
 if ~isfield(mea, 'Path')
 	mea.Path = which(fname);
 	save(mea.Path, '-v7.3', '-struct', 'mea')
@@ -33,62 +39,68 @@ outfile = matfile(outname, 'writable', true);
 %%
 
 disp('Computing wave directions from events ...')
-[events, mea] = wave_prop(mea, 'events', ...
-	'exclude', false, 'showplots', showplots);
+[events, mea] = wave_prop(mea, 'events');
 plot_wave_directions(mea, events);
 print(gcf, events.Name, '-dpng');
+events.params = mea.params;
 outfile.events = events;
 % 
 disp('Computing wave directions from maxdescent ...')
-[maxdescent, mea] = wave_prop(mea, 'maxdescent', ...
-	'exclude', false, 'showplots', showplots);
+[maxdescent, mea] = wave_prop(mea, 'maxdescent');
 plot_wave_directions(mea, maxdescent);
 print(gcf, maxdescent.Name, '-dpng');
+maxdescent.params = mea.params;
 outfile.maxdescent = maxdescent;
 
 % disp('Computing wave directions from rising deviance ...')
 % [rising, mea] = wave_prop(mea, 'rising', 'exclude', false);
 % plot_wave_directions(mea, rising);
 % print(gcf, rising.Name, '-dpng');
+% rising.params = mea.params;
 % outfile.rising = rising;
 % 
 % disp('Computing wave directions from falling deviance ...')
 % [falling, mea] = wave_prop(mea, 'falling', 'thresh', -Inf, 'exclude', false);
 % plot_wave_directions(mea, falling);
 % print(gcf, falling.Name, '-dpng');
+% falling.params = mea.params
 % outfile.falling = falling;
 % 
 disp('Computing wave directions from delays ...')
 T = .2;
 band = [0 50];
-[delays, mea] = wave_prop(mea, 'delays', ...
-	'exclude', false, 'showplots', showplots, 'T', T, 'band', band);
+mea.params.T = T;
+mea.params.delay_band = band;
+[delays, mea] = wave_prop(mea, 'delays');
 plot_wave_directions(mea, delays);
 print(gcf, delays.Name, '-dpng')
+delays.params = mea.params;
 fieldname = checkname(sprintf('delays_T%02g_fband%d_%d', T, band));
 outfile.(fieldname) = delays;
 
 disp('Computing wave directions from delays (again) ...')
 T = 1;
 band = [1 50];
-[delays, mea] = wave_prop(mea, 'delays', ...
-	'exclude', false, 'showplots', showplots, 'T', T, 'band', band);
+mea.params.T = T;
+mea.params.delay_band = band;
+[delays, mea] = wave_prop(mea, 'delays');
 plot_wave_directions(mea, delays);
 print(gcf, delays.Name, '-dpng')
+delays.params = mea.params;
 fieldname = checkname(sprintf('delays_T%02g_fband%d_%d', T, band));
 outfile.(fieldname) = delays;
 
 disp('Computing wave directions from delays (T=10) ...')
 T = 10;
 band = [1 13];
-[delays, mea] = wave_prop(mea, 'delays', ...
-	'exclude', false, 'showplots', showplots, 'T', T, 'band', band);
+mea.params.T = T;
+mea.params.delay_band = band;
+[delays, mea] = wave_prop(mea, 'delays');
 plot_wave_directions(mea, delays);
 print(gcf, delays.Name, '-dpng')
+delays.params = mea.params;
 fieldname = checkname(sprintf('delays_T%02g_fband%d_%d', T, band));
 outfile.(fieldname) = delays;
-
-
 
 
 disp('Done.')

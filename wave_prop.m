@@ -17,23 +17,19 @@ function [wave_fit, mea] = wave_prop(mea, metric, varargin)
 %% Parse inputs
 p = inputParser;
 
-allMetrics = {'delays', 'maxdescent', 'events', 'deviance', 'rising', 'falling'};
-allFitMethods = {'nyc', 'bos'};
-
-validate = @(x, all) any(validatestring(x, all));
-
 addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile'));
 addRequired(p, 'metric', @(x) validate(x, allMetrics));
-addParameter(p, 'fitMethod', 'bos', @(x) validate(x, allFitMethods));
-addParameter(p, 'showPlots', true, @islogical);
-addParameter(p, 'T', 10, @isnumeric);  % window length for delay method (s)
-addParameter(p, 'halfWin', 50, @isnumeric);  % half-window length for all non-delay methods (ms)
-addParameter(p, 'exclude', true, @islogical);  % logical: exclude inactive channels?
-addParameter(p, 'thresh', Inf, @isnumeric);  % threshold for deiviance methods
-addParameter(p, 'band', [1 13], @isnumeric);  % frequency band for coherence
 
 parse(p, mea, metric, varargin{:})
 struct2var(p.Results)
+
+if ~isfield(mea, 'params'), mea.params = default_params(); end
+
+half_win = mea.params.half_win;
+exclude = mea.params.exclude;
+thresh = mea.params.thresh;
+band = mea.params.delay_band;
+showPlots = mea.params.show_plots;
 
 %% Convert mea to struct if it is not writable
 if ~isstruct(mea)
@@ -50,7 +46,7 @@ if exclude  % exclude non-spiking channels
 end
 
 %% Assign wave fitting method
-switch lower(fitMethod)
+switch lower(fit_method)
 	case 'bos'
 		fit_wave = @(data, position) fit_wave_bos(data, position, metric);
 	case 'nyc'
@@ -60,7 +56,7 @@ end
 
 %% Compute fits
 [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, ...
-	T, halfWin, thresh, band);
+	T, half_win, thresh, band);
 
 end
 
