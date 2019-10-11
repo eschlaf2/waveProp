@@ -16,7 +16,7 @@ p('half_win', 50); % half-window for all non-delay methods (ms)
 p('exclude', false, @islogical);  % logical: exclude inactive channels?
 p('thresh', Inf);  % threshold for deviance methods
 p('delay_band', [1 13]);  % frequency band for coherence
-p('showPlots', true, @islogical);  % show detailed plots during analysis
+p('show_plots', true, @islogical);  % show detailed plots during analysis
 
 
 

@@ -16,9 +16,11 @@ function [wave_fit, mea] = wave_prop(mea, metric, varargin)
 
 %% Parse inputs
 p = inputParser;
+allMetrics = {'delays', 'maxdescent', 'events', 'deviance', 'rising', 'falling'};
+validMetrics = @(x) any(validatestring(x, allMetrics));
 
 addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile'));
-addRequired(p, 'metric', @(x) validate(x, allMetrics));
+addRequired(p, 'metric', @(x) validMetrics);
 
 parse(p, mea, metric, varargin{:})
 struct2var(p.Results)
