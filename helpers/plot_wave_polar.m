@@ -7,6 +7,7 @@ function [ax1, ax2] = plot_wave_polar(res, ax1, ax2)
 %     Zu = unwrap(res.Z);
 %     valid = ~isnan(Zu);
 %     f = fit(res.time(valid)', Zu(valid), 'smoothingspline', 'smoothing', .05);
+	tt = min(cat(1, res.time)):.01:max(cat(1, res.time));	
 	data1 = smoothdata(...
 		interp1(res.time, exp(1j*res.Z), tt), ...
 		'movmean', .1 / (tt(2) - tt(1)), 'includenan');
