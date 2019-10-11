@@ -27,13 +27,15 @@ addRequired(p, 'metric', validMetrics);
 parse(p, mea, metric, varargin{:})
 struct2var(p.Results)
 
-if ~isfield(mea, 'params'), mea.params = default_params(); end
+if ~isfield(mea, 'params'), mea.params = init_params(); end
 
+fit_method = mea.params.fit_method;
 half_win = mea.params.half_win;
 exclude = mea.params.exclude;
 thresh = mea.params.thresh;
+T = mea.params.T;
 band = mea.params.delay_band;
-showPlots = mea.params.show_plots;
+show_plots = mea.params.show_plots;
 
 %% Convert mea to struct if it is not writable
 if ~isstruct(mea)
@@ -59,13 +61,13 @@ switch lower(fit_method)
 end
 
 %% Compute fits
-[wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, metric, ...
+[wave_fit, mea] = compute_waves(mea, fit_wave, show_plots, metric, ...
 	T, half_win, thresh, band);
 
 end
 
-function [wave_fit, mea] = compute_waves(mea, fit_wave, showPlots, ...
-    metric, T, halfWin, thresh, band)
+function [wave_fit, mea] = compute_waves(mea, fit_wave, show_plots, ...
+    metric, T, half_win, thresh, band)
 %% Compute wave propagation at each discharge time as described in 
 % Liou, Jyun You, et al. ?Multivariate Regression Methods for Estimating
 % Velocity of Ictal Discharges from Human Microelectrode Recordings.?
@@ -155,7 +157,7 @@ assignin('base', 'mea', mea);
 %% Open a video file if PLOT is set to true
 
 Name = sprintf('%s_wave_prop_%s', mea.Name, metric);
-if showPlots
+if show_plots
 	v = VideoWriter(Name);
 	plotTitles = [strrep(mea.Name, '_', ' ') ' (' metric ')'];
 % 	v.FrameRate = 50;
@@ -176,18 +178,18 @@ p = nan(1, numWaves);     % certainty
 for ii = 1:numWaves  % estimate wave velocity for each discharge
 	position = POS;
 	t = computeTimes(ii);
-	if showPlots, img = nan(max(POS)); end
+	if show_plots, img = nan(max(POS)); end
 	switch metric
 		case 'events'
 			
 % 			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
-			inds = logical((spike_times >= t - halfWin) .* ...            % Get spike times within halfWin ms
-				(spike_times <= t + halfWin));                            % ... of discharge at time t
+			inds = logical((spike_times >= t - half_win) .* ...            % Get spike times within halfWin ms
+				(spike_times <= t + half_win));                            % ... of discharge at time t
 % 			dataToPlot = nan(numCh, 1);
 			pos_inds = chInds(inds);
             st = spike_times(inds);
             temp = arrayfun(@(ii) mean(st(pos_inds == ii)), 1:numCh);  % Find the mean spike time on each channel
-			dataToPlot = temp - (t - halfWin) + 1;  % imagesc mean spike time on each channel
+			dataToPlot = temp - (t - half_win) + 1;  % imagesc mean spike time on each channel
 % 			[~, pos_inds, data] = find(spike_times(inds, :));              % 
 			data = spike_times(inds);
 			temp = data(:)';
@@ -195,7 +197,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
             if numel(data) == 0, continue, end
 		
 		case {'rising'; 'falling'; 'deviance'}
-			inds = (TimeMs >= t - halfWin) & (TimeMs <= t + halfWin);  % Select the window around the event time
+			inds = (TimeMs >= t - half_win) & (TimeMs <= t + half_win);  % Select the window around the event time
 			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
 			temp = (temp - temp(1, :));  % Set initial value as baseline
             if thresh == -Inf, threshI = quantile(max(dir*temp), .25) / 2; 
@@ -207,20 +209,20 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			tt = TimeMs(inds);
             dataToPlot = data;
 			dataToPlot(~isnan(data)) = ...
-                tt(data(~isnan(data))) - (t - halfWin);  % Convert to time (ms)
+                tt(data(~isnan(data))) - (t - half_win);  % Convert to time (ms)
 			pos_inds = 1:numCh;
             if numel(unique(data)) < 3, continue, end
 			
 		case 'maxdescent'
 			
-			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));  % Select the window around the event time
+			inds = logical((TimeMs >= t - half_win) .* (TimeMs <= t + half_win));  % Select the window around the event time
 			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
 			temp = temp - temp(1, :);  % set first time point as baseline (for visualization early)
 			
 			[~, data] = min(diff(temp, 1, 1));  % Find time of maximal descent
 			data = data(:);
             tt = TimeMs(inds);
-			dataToPlot = tt(data) - (t - halfWin);
+			dataToPlot = tt(data) - (t - half_win);
 			pos_inds = 1:numCh;
 			if numel(unique(data)) < 3, continue, end
 
@@ -239,7 +241,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 				compute_coherence(temp, params, 'pairs', center);          % compute the coherence over the selected interval
 			[delay, ~, ~] = compute_delay(coh, coh_conf, -phi, freq);      % compute delays on each electrode based on coherence
 			data = 1e3 * delay(center,:)';                                 % we use delays relative to the center (converted to ms)
-			dataToPlot = data + halfWin;
+			dataToPlot = data + half_win;
 			pos_inds = 1:numCh;
     end
     
@@ -261,7 +263,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		% don't waste time (risk errors) plotting if a wave can't be fit
 		continue
 	end
-	if showPlots
+	if show_plots
 		figure(h); clf
 		[p1, p2] = plot_wave_fit(position, data, beta(:, ii));
 		title(p1, sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
@@ -270,13 +272,13 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 % 		figure(h(2));
 		img(addy) = dataToPlot;
 		subplot(236); 
-		p3 = imagesc(img', [-1 2*halfWin]); axis xy
-        colormap(h, 1 - parula(2 * halfWin + 2));
+		p3 = imagesc(img', [-1 2*half_win]); axis xy
+        colormap(h, 1 - parula(2 * half_win + 2));
 		xlabel('X'); ylabel('Y');
 		colorbar();
 		cmap = h.Colormap;
 		cInds = round(dataToPlot) + 1;
-		cInds = min(max(cInds, 1), 2*halfWin+2);
+		cInds = min(max(cInds, 1), 2*half_win+2);
 		if strcmpi(metric, 'events'), cInds = cInds(pos_inds); end
 		
 		subplot(2,3,4:5);
@@ -305,7 +307,7 @@ end
 Z = angle([1 1i] * V);
 % Zu = unwrap(Z);
 
-if showPlots, close(v); end
+if show_plots, close(v); end
 
 wave_fit.beta = beta;
 wave_fit.V = V;
