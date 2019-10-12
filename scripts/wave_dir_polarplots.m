@@ -47,21 +47,23 @@ switch plotnum
 			[res(ii).Z, res(ii).Vx, res(ii).Vy] = ...
 				deal(zeros(length(time), length(fields)));
 			for jj = 1:numel(fields)
-				for f = 'Zp'
+				for f = 'Zpxy'
 
 					switch f
 						case {'Z', 'p'}
 							data = interp1(...
 								res(ii).data.(fields{jj}).computeTimes / 1e3, ...
 								res(ii).data.(fields{jj}).(f), time, 'nearest');
-						case 'Vx'
+						case 'x'
 							data = interp1(...
 								res(ii).data.(fields{jj}).computeTimes / 1e3, ...
 								res(ii).data.(fields{jj}).V(1, :), time, 'nearest');
-						case 'Vy'
+							f = 'Vx';
+						case 'y'
 							data = interp1(...
 								res(ii).data.(fields{jj}).computeTimes / 1e3, ...
 								res(ii).data.(fields{jj}).V(2, :), time, 'nearest');
+							f = 'Vy';
 					end
 					res(ii).(f)(:, jj) = data;
 					% Remove values where fit is not significant
