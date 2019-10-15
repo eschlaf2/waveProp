@@ -113,7 +113,7 @@ end
 if SAVE
 	v_out = v_out(:, :, 1:mod(n, chunk));
 	r_out = r_out(:, :, 1:mod(n, chunk));
-	save(sprintf('%s_%06d', basename, n), 'v_out', 'r_out', 't');
+	save(sprintf('%s_%06d', basename, n), 'v_out', 'r_out', 't', 'mov');
 end
 
 close(gcf)
