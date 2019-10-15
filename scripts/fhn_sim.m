@@ -6,7 +6,7 @@ nrows=160;                               % Number of rows in domain
 dt=.5;                                   % Time step (ms)
 dur=80e3/dt;                             % Number of time steps
 mindur=80e3/dt;
-Iex=.5;                                  % Amplitude of external current
+Iex=.25;                                  % Amplitude of external current
 G = 1;                                  % Conductance
 a = 0.48; b = 0.8; phi = 0.17;  % FHN model parameters
 dvdt = @(v, r, I) v - v.^3/3 - r + I;  % Fast dynamics
@@ -43,7 +43,7 @@ colormap(hot); axis image off; th=title('');
 set(gcf,'position',[500 600 256 256],'color',[1 1 1],'menubar','none')
 hold on;
 patch('faces', [(1:4) 1], ...
-	'vertices', [mea - [5 5]; mea + [5 -5]; mea + [5 5]; mea + [-5 5]], ...
+	'vertices', [mea - [5 5]; mea + [4 -5]; mea + [4 4]; mea + [-5 4]], ...
 	'edgecolor', [1 0 0], ...
 	'facecolor', 'none', ...
 	'linewidth', 2);
@@ -51,7 +51,7 @@ hold off;
 mov(dur/skipfactor) = getframe;
 
 n=0;                 % Counter for time loop
-% n = 15e3/dt;
+% n = 24e3/dt;
 k=0;                 % Counter for movie frames
 done=0;              % Flag for while loop
 
@@ -105,7 +105,7 @@ while ~done          % Time loop
    		k = k + 1;
     end
     
-    done=(n > dur);
+    done=(n >= dur);
     if n > mindur && max(v(:)) < 1.0e-4, done=1; end      % If activation extinguishes, quit early.
     if ~isempty(get(gcf,'userdata')), done=1; end % Quit if user clicks on 'Quit' button.
 end
@@ -113,13 +113,14 @@ end
 if SAVE
 	v_out = v_out(:, :, 1:mod(n, chunk));
 	r_out = r_out(:, :, 1:mod(n, chunk));
-	save(sprintf('%s_%d', basename, n), 'v_out', 'r_out', 't');
+	save(sprintf('%s_%06d', basename, n), 'v_out', 'r_out', 't');
 end
 
 close(gcf)
 
 function seizure = define_seizure(t)
 
+stages = {'pre', 'moving away', 'moving around', 'constant burst', 'increasing burst'};
 tau = [10 20 20 10 10]';  % Seizure stages
 tau = cumsum(tau);
 
@@ -151,7 +152,7 @@ theta =@(t) ...
 	thetaf * (t > tau(3));
 
 % Stim times
-N = 110;  % Number of discharges
+N = 100;  % Number of discharges
 noise = .01;  % sd (in ms)
 Ss = linspace(tau(1), tau(5), N)' + noise*randn(N, 1);  % starts
 Sf = Ss + D(Ss);  % ... and ends
@@ -163,4 +164,29 @@ I = mod(sum((t >= Ss') + (t <= Sf'), 2), 2);  % Stim indicator
 
 % Stimulus map
 seizure = [posx posy I];
+end
+
+function convert_to_mea_data
+
+files = dir('spiral_wave_3/*mat');
+chunksize = 1e4;
+nf = length(files);
+
+mea_addy = [80, 80];
+
+win = 1./(sqrt((-3:3).^2 + (-3:3)'.^2) + .5);
+win = win ./ sum(win(:));
+
+for ii = 0:nf - 1
+		load(files(ii+1).name, 'v_out');
+		v_out = v_out(mea_addy(1) + (-8:7), ...
+			mea_addy(2) + (-8:7), :);
+		for jj = 1e4:-1:1
+			temp(:, :, jj) = conv2(v_out(:, :, jj), win, 'valid');
+		end
+		
+		mea.Data(:, :, (ii*chunksize + 1):((ii+1)*chunksize)) = temp;
+end
+
+
 end
