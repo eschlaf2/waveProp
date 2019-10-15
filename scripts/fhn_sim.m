@@ -1,6 +1,5 @@
 rng default
 defvar(who, 'SAVE', false);
-mx = zeros(50e4, 1);  % temporary - watch max values
 
 ncols=160;                               % Number of columns in domain
 nrows=160;                               % Number of rows in domain
@@ -23,7 +22,7 @@ basename = sprintf('%s%s%s', fname, filesep, fname);
 
 
 if SAVE
-	v_out=nan(nrows,ncols, chunk, 'single'); 
+	v_out=zeros(nrows,ncols, chunk, 'int16'); 
 	r_out = v_out;
 end
 	
@@ -85,8 +84,8 @@ while ~done          % Time loop
 	
 	% Store r and v
 	if SAVE
-		v_out(:, :, mod(n-1, chunk)+1) = v;
-		r_out(:, :, mod(n-1, chunk)+1) = r;
+		v_out(:, :, mod(n-1, chunk)+1) = v*1e4;
+		r_out(:, :, mod(n-1, chunk)+1) = r*1e4;
 		if rem(n, chunk)==0
 			fname = sprintf('%s_%06d', basename, n);
 			fprintf('Saving %s ...', fname);
