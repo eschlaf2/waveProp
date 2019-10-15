@@ -52,7 +52,7 @@ hold off;
 mov(dur/skipfactor) = getframe;
 
 n=0;                 % Counter for time loop
-n = 15e3/dt;
+% n = 15e3/dt;
 k=0;                 % Counter for movie frames
 done=0;              % Flag for while loop
 
@@ -88,7 +88,10 @@ while ~done          % Time loop
 		v_out(:, :, mod(n-1, chunk)+1) = v;
 		r_out(:, :, mod(n-1, chunk)+1) = r;
 		if rem(n, chunk)==0
-			save(sprintf('%s_%06d', basename, n), 'v_out', 'r_out');
+			fname = sprintf('%s_%06d', basename, n);
+			fprintf('Saving %s ...', fname);
+			save(fname, 'v_out', 'r_out');
+			fprintf(' Done.\n')
 		end
 	end
     
