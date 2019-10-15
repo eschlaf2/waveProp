@@ -85,8 +85,11 @@ while ~done          % Time loop
 	
 	% Store r and v
 	if SAVE
-		r_out(:, :, n)=r;
-		v_out(:, :, n)=v; 
+		v_out(:, :, mod(n-1, chunk)+1) = v;
+		r_out(:, :, mod(n-1, chunk)+1) = r;
+		if rem(n, chunk)==0
+			save(sprintf('%s_%06d', basename, n), 'v_out', 'r_out');
+		end
 	end
     
     % Update image and text 
@@ -108,7 +111,7 @@ end
 if SAVE
 	v_out = v_out(:, :, 1:mod(n, chunk));
 	r_out = r_out(:, :, 1:mod(n, chunk));
-	save(basename, 'v_out', 'r_out');
+	save(sprintf('%s_%d', basename, n), 'v_out', 'r_out', 't');
 end
 
 close(gcf)
