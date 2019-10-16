@@ -11,7 +11,7 @@ if ~exist('metrics', 'var')
 		'delays_T01_fband1_50', ...
 		'delays_T10_fband1_13'}; 
 end
-if ~exist('plotnum', 'var'); plotnum = 1; end
+if ~exist('plotnum', 'var'); plotnum = 0; end
 if ~exist('sig', 'var'); sig = 5e-2; end
 nF = numel(files);
 
