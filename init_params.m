@@ -16,7 +16,7 @@ p('half_win', 50); % half-window for all non-delay methods (ms)
 p('exclude', false, @islogical);  % logical: exclude inactive channels?
 p('thresh', Inf);  % threshold for deviance methods
 p('delay_band', [1 13]);  % frequency band for coherence
-p('show_plots', true, @islogical);  % show detailed plots during analysis
+p('show_plots', false, @islogical);  % show detailed plots during analysis
 
 
 
@@ -31,6 +31,7 @@ p('discharge_method', 1, @(x) any(x == [1, 2]));  % discharge times based on (1)
 % Method 1 (firing rate based)
 p('min_fr', 1/60);   % exclude channels with mean firing rate less than one spike per minute (Liou et al., 2018) ?\cite{Liou2018a}
 p('min_peak_distance', 100);  % (ms)
+p('min_peak_prominence', 100);  % (std of diff);
 
 % Method 2  (lfp based)
 p('min_lfp_deviance', 2);  % (sd)

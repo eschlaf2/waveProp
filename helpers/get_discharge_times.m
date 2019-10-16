@@ -4,6 +4,7 @@ function [waveTimes, mea] = get_discharge_times(mea, varargin)
 METHOD = mea.params.discharge_method;
 MIN_FR = mea.params.min_fr;  % (method 1);
 MIN_PD = mea.params.min_peak_distance;  % (method 1)
+MIN_PK_PROM = mea.params.min_peak_prominence;  % (method 1)
 MIN_DEV = mea.params.min_lfp_deviance;  % [method 2; 2 (sd)]
 MIN_ACTIVE = mea.params.min_active_electrodes;  % (method 2; default: 10)
 WIN = mea.params.smoothing_win;  % [method 2; default: 10 (ms)];
@@ -32,7 +33,7 @@ switch METHOD
 
 		[~, waveTimes] = findpeaks(meanFr, ...  % find peaks in mean firing rate
 			mea.SamplingRate / 1e3, ...  % ... in ms 
-			'minpeakprom', 100 * std(diff(meanFr)), ...  % ... use discrete peaks
+			'minpeakprom', MIN_PK_PROM * std(diff(meanFr)), ...  % ... use discrete peaks
 			'minpeakdistance', MIN_PD);  % ... that are at least 100 ms apart
 		waveTimes = waveTimes - mea.Padding(1) * 1e3;
 		

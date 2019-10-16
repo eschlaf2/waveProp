@@ -109,10 +109,11 @@ while ~done          % Time loop
     if ~isempty(get(gcf,'userdata')), done=1; end % Quit if user clicks on 'Quit' button.
 	n = n + 1;
 end
+n = n-1;
 
 if SAVE
-	v_out = v_out(:, :, 1:mod(n, chunk));
-	r_out = r_out(:, :, 1:mod(n, chunk));
+	v_out = v_out(:, :, 1:mod(n-1, chunk)+1);
+	r_out = r_out(:, :, 1:mod(n-1, chunk)+1);
 	save(sprintf('%s_%06d', basename, n), 'v_out', 'r_out', 't', 'mov');
 end
 
@@ -180,6 +181,7 @@ win = win ./ sum(win(:));
 
 for ii = 0:nf - 1
 		load(files(ii+1).name, 'v_out');
+		chunksize = size(v_out, 3);
 		v_out = v_out(mea_addy(1) + (-8:7), ...
 			mea_addy(2) + (-8:7), :);
 		for jj = chunksize:-1:1
@@ -188,6 +190,6 @@ for ii = 0:nf - 1
 		
 		mea.Data(:, :, (ii*chunksize + 1):((ii+1)*chunksize)) = -temp;
 end
-
+mea.Data = reshape(mea.Data, 100, [])';
 
 end
