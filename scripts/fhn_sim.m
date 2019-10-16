@@ -50,14 +50,13 @@ patch('faces', [(1:4) 1], ...
 hold off;
 mov(dur/skipfactor) = getframe;
 
-n=0;                 % Counter for time loop
+n=1;                 % Counter for time loop
 % n = 24e3/dt;
 k=0;                 % Counter for movie frames
 done=0;              % Flag for while loop
 
 
 while ~done          % Time loop
-    n = n + 1;
 	inds = round(mea + seizure(n, [1 2]));
 	iex(inds(1) + (-2:2), inds(2) + (-2:2)) = Iex * seizure(n, 3);
     
@@ -108,6 +107,7 @@ while ~done          % Time loop
     done=(n >= dur);
     if n > mindur && max(v(:)) < 1.0e-4, done=1; end      % If activation extinguishes, quit early.
     if ~isempty(get(gcf,'userdata')), done=1; end % Quit if user clicks on 'Quit' button.
+	n = n + 1;
 end
 
 if SAVE
@@ -168,7 +168,8 @@ end
 
 function convert_to_mea_data
 
-files = dir('spiral_wave_3/*mat');
+files = dir('spiral_wave_4/*mat');
+addpath('spiral_wave_4/');
 chunksize = 1e4;
 nf = length(files);
 
@@ -181,11 +182,11 @@ for ii = 0:nf - 1
 		load(files(ii+1).name, 'v_out');
 		v_out = v_out(mea_addy(1) + (-8:7), ...
 			mea_addy(2) + (-8:7), :);
-		for jj = 1e4:-1:1
+		for jj = chunksize:-1:1
 			temp(:, :, jj) = conv2(v_out(:, :, jj), win, 'valid');
 		end
 		
-		mea.Data(:, :, (ii*chunksize + 1):((ii+1)*chunksize)) = temp;
+		mea.Data(:, :, (ii*chunksize + 1):((ii+1)*chunksize)) = -temp;
 end
 
 
