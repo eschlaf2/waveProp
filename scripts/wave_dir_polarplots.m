@@ -39,8 +39,8 @@ switch plotnum
 			alltimes = cellfun(@(f) ...
 				res(ii).data.(f).computeTimes(:), ...
 				fields, 'uni', 0);
-			alltimes = unique(cat(1, alltimes{:}));
-            res(ii).time = alltimes / 1e3;
+			alltimes = cat(1, alltimes{:});
+            res(ii).time = unique(alltimes / 1e3, 'stable');
 			
 			
 			time = res(ii).time;  % - min(res.time);

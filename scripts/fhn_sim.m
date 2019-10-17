@@ -118,7 +118,10 @@ if SAVE
 	mea.seizure = seizure;
 	mea.fhn_params = params;
 	save(mea.Path, '-struct', 'mea');
-% 	convert_to_wavefit_data(mea);
+	clearvars -except sim_num
+	pat = 'FHN'; seizure = sim_num; paramfile = 'tempscripts/fhn_params.m';
+	analyze_wave_directions;
+	convert_to_wavefit_data(mea);
 end
 
 function [params, p] = init_params(varargin)
@@ -244,7 +247,7 @@ mea.Path = sprintf(...
 	'%s%s%s_Seizure%d_Neuroport_10_10.mat', ...
 	pwd, filesep, fname, sim_num);
 
-files = dir([fname filesep '*mat']);
+files = dir([fname filesep 'FHN_' num2str(sim_num) '*mat']);
 addpath(fname)
 
 nf = length(files);
@@ -289,7 +292,7 @@ onset_inds = onset_inds(nearinds);
 
 gt.computeTimes = res.time * 1e3;
 gt.Z = angle(S(onset_inds, 1:2) * [1; 1j]);
-gt.speed = abs(S(onset_inds, 1:2) * [1; 1j]) ./ (res.time - onset_times');
+gt.speed = abs(S(onset_inds, 1:2) * [1; 1j]) ./ (res.time(:) - onset_times(:));
 gt.V = [gt.speed .* cos(gt.Z), gt.speed .* sin(gt.Z)]';
 gt.p = 0 * nearinds;
 gt.beta = pinv(gt.V');
