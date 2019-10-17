@@ -1,7 +1,8 @@
 rng default
 defvar(who, 'SAVE', false);
 
-params = init_params();
+if ~exist('options', 'var'), options = {}, end
+params = init_params(options{:});
 struct2var(params.model);
 
 v=zeros(nrows,ncols);                    % Initialize voltage array
@@ -291,7 +292,7 @@ onset_times = onset_times(nearinds);
 onset_inds = onset_inds(nearinds);
 
 gt.computeTimes = res.time * 1e3;
-gt.Z = angle(S(onset_inds, 1:2) * [1; 1j]);
+gt.Z = angle(-S(onset_inds, 1:2) * [1j; 1]);
 gt.speed = abs(S(onset_inds, 1:2) * [1; 1j]) ./ (res.time(:) - onset_times(:));
 gt.V = [gt.speed .* cos(gt.Z), gt.speed .* sin(gt.Z)]';
 gt.p = 0 * nearinds;
