@@ -32,7 +32,7 @@ noise =@() randn(nrows,ncols) * .01;
 
 % Setup image
 ih=imagesc(v); set(ih,'cdatamapping','direct')
-colormap(hot); axis image off; th=title('');
+colormap(hot); axis image off; th=title('T');
 set(gcf,'position',[500 600 256 256],'color',[1 1 1],'menubar','none')
 hold on;
 patch('faces', [(1:4) 1], ...
@@ -45,7 +45,7 @@ mov(dur/skipfactor) = getframe;
 
 n=1;                 % Counter for time loop
 % n = 24e3/dt;
-k=0;                 % Counter for movie frames
+k=1;                 % Counter for movie frames
 done=0;              % Flag for while loop
 
 
@@ -94,6 +94,7 @@ while ~done          % Time loop
         set(th,'string', ...
 			sprintf('%0.1f  %0.2f   %0.2f',n*dt,v(mea_ctr(1),mea_ctr(2)),r(mea_ctr(1),mea_ctr(2))))
         drawnow
+		mov(k) = getframe(ih.Parent.Parent);
    		k = k + 1;
     end
     
