@@ -118,7 +118,7 @@ if SAVE
 	mea.seizure = seizure;
 	mea.fhn_params = params;
 	save(mea.Path, '-struct', 'mea');
-	convert_to_wavefit_data(mea);
+% 	convert_to_wavefit_data(mea);
 end
 
 function [params, p] = init_params(varargin)
