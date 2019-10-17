@@ -153,7 +153,7 @@ parse(p, varargin{:});
 res.model = p.Results;
 
 if isempty(res.drdt)
-	res.model.drdt = @(v, r) res.phi * (v + res.a - res.b * r);
+	res.model.drdt = @(v, r) res.model.phi * (v + res.model.a - res.model.b * r);
 end
 
 
