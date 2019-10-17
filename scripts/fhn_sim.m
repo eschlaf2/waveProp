@@ -43,7 +43,7 @@ patch('faces', [(1:4) 1], ...
 hold off;
 mov(dur/skipfactor) = getframe;
 
-n=round(t(1)/dt) + 1;                 % Counter for time loop
+n=1;                 % Counter for time loop
 k=1;                 % Counter for movie frames
 done=0;              % Flag for while loop
 
@@ -89,7 +89,7 @@ while ~done          % Time loop
 		m=1+round(63*v); m=min(max(m,1), 64); % Map voltage to image grayscale value
         set(ih,'cdata',m);
         set(th,'string', ...
-			sprintf('%0.1f  %0.2f   %0.2f',n*dt,v(mea_ctr(1),mea_ctr(2)),r(mea_ctr(1),mea_ctr(2))))
+			sprintf('%0.3f  %0.2f   %0.2f',t(n),v(mea_ctr(1),mea_ctr(2)),r(mea_ctr(1),mea_ctr(2))))
         drawnow
 		mov(k) = getframe(ih.Parent.Parent);
    		k = k + 1;
