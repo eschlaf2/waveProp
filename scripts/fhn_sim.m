@@ -114,7 +114,7 @@ end
 close(gcf)
 
 if SAVE
-	mea = convert_to_mea_data(basename);
+	mea = convert_to_mea_data(fname, sim_num, t);
 	mea.seizure = seizure;
 	mea.fhn_params = params;
 	save(mea.Path, '-struct', 'mea');
@@ -241,7 +241,7 @@ mea.SamplingRate = 2e3;
 [xx, yy] = meshgrid(1:10, 1:10);
 mea.Position = [xx(:) yy(:)];
 mea.Path = sprintf(...
-	'%s%s%s_Seizure%02d_Neuroport_10_10.mat', ...
+	'%s%s%s_Seizure%d_Neuroport_10_10.mat', ...
 	pwd, filesep, fname, sim_num);
 
 files = dir([fname filesep '*mat']);
