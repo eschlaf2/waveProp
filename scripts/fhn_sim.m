@@ -154,7 +154,7 @@ parse(p, varargin{:});
 params.model = p.Results;
 dt = params.model.dt;
 t = params.model.t;
-params.model.t = (dt:dt:sum(t) * 1e3) / 1e3 + t(1);  % time (s)
+params.model.t = (dt:dt:diff(t) * 1e3) / 1e3 + t(1);  % time (s)
 
 if isempty(params.model.drdt)
 	params.model.drdt = @(v, r) params.model.phi * (v + params.model.a - params.model.b * r);
