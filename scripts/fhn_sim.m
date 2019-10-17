@@ -238,7 +238,7 @@ mea.Name = ['FHN ' num2str(sim_num)];
 mea.Padding = [10 10];
 mea.Duration = t(end) - mea.Padding(2);
 mea.SamplingRate = 2e3;
-[xx, yy] = meshgrid(1:10, 1:10);
+[xx, yy] = ndgrid(1:10, 1:10);
 mea.Position = [xx(:) yy(:)];
 mea.Path = sprintf(...
 	'%s%s%s_Seizure%d_Neuroport_10_10.mat', ...
