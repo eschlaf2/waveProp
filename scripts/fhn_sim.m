@@ -7,19 +7,19 @@ struct2var(params.model);
 v=zeros(nrows,ncols);                    % Initialize voltage array
 r=v;                                     % Initialize refractoriness array
 
-fname = ['FHN' filesep 'FHN'];
+dirname = ['FHN' filesep 'FHN'];
 if ~exist('sim_num', 'var')
-	sim_num = numel(dir(sprintf('%s_Seizure*mat', fname)));
+	sim_num = numel(dir(sprintf('%s_Seizure*mat', dirname)));
 end
 if ischar(sim_num), sim_num = str2double(sim_num); end
-basename = sprintf('%s%sFHN_%d', fname, filesep, sim_num);
+basename = sprintf('%s%sFHN_%d', dirname, filesep, sim_num);
 
 if SAVE
 	v_out=zeros(nrows,ncols, chunk, 'int16'); 
 	r_out = v_out;
 end
 	
-if ~exist(fname, 'dir'), mkdir(fname), end
+if ~exist(dirname, 'dir'), mkdir(dirname), end
 
 % Set initial stim current and pattern
 iex=zeros(nrows,ncols);
@@ -114,7 +114,7 @@ end
 close(gcf)
 
 if SAVE
-	mea = convert_to_mea_data(fname, sim_num, t);
+	mea = convert_to_mea_data(dirname, sim_num, t);
 	mea.seizure = seizure;
 	mea.fhn_params = params;
 	save(mea.Path, '-struct', 'mea');
@@ -238,7 +238,7 @@ mea.Name = ['FHN ' num2str(sim_num)];
 mea.Padding = [10 10];
 mea.Duration = t(end) - mea.Padding(2);
 mea.SamplingRate = 2e3;
-[xx, yy] = ndgrid(1:10, 1:10);
+[xx, yy] = meshgrid(1:10, 1:10);
 mea.Position = [xx(:) yy(:)];
 mea.Path = sprintf(...
 	'%s%s%s_Seizure%d_Neuroport_10_10.mat', ...
@@ -288,7 +288,7 @@ onset_times = onset_times(nearinds);
 onset_inds = onset_inds(nearinds);
 
 gt.computeTimes = res.time * 1e3;
-gt.Z = angle(-S(onset_inds, 1:2) * [1; 1j]);
+gt.Z = angle(S(onset_inds, 1:2) * [1; 1j]);
 gt.speed = abs(S(onset_inds, 1:2) * [1; 1j]) ./ (res.time - onset_times');
 gt.V = [gt.speed .* cos(gt.Z), gt.speed .* sin(gt.Z)]';
 gt.p = 0 * nearinds;
