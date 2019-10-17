@@ -26,7 +26,6 @@ if ~exist(dirname, 'dir'), mkdir(dirname), end
 iex=zeros(nrows,ncols);
 
 % Define the seizure (stim location and duration)
-t = (dt/1e3 : dt/1e3 : 80)' - 10;  % time (s)
 seizure = define_seizure(t, params.seizure);
 mea_ctr = floor([(nrows/2) (ncols/2)]);
 noise =@() randn(nrows,ncols) * .01;
@@ -44,8 +43,7 @@ patch('faces', [(1:4) 1], ...
 hold off;
 mov(dur/skipfactor) = getframe;
 
-n=1;                 % Counter for time loop
-% n = 24e3/dt;
+n=round(t(1)/dt) + 1;                 % Counter for time loop
 k=1;                 % Counter for movie frames
 done=0;              % Flag for while loop
 
@@ -55,15 +53,14 @@ while ~done          % Time loop
 	iex(inds(1) + (-2:2), inds(2) + (-2:2)) = Iex * seizure(n, 3);
     
     % Create padded v matrix to incorporate Neumann boundary conditions
-% 	vv=[[0 v(2,:) 0];[v(:,2) v v(:,end-1)];[0 v(end-1,:) 0]];
-	vv = padarray(v(3:end-2, 3:end-2), [2 2], 'replicate', 'both');
+	vv = padarray(v, [2 2], 'replicate', 'both');
     
     % Update v
 	L = del2(vv);  % Laplacian
-	v_new=v + dvdt(v, r, iex+G*L + noise())*dt;
+	v_new=v + dvdt(v, r, iex+G*L(3:end-2, 3:end-2) + noise())*dt;
 	
-% 	mx(n) = max(v, [], 'all');
-	if any(v_new(:) > 1e3)  % decrease dt when growth is too steep
+	% decrease dt when growth is too steep
+	if any(v_new(:) > 1e3)  
 		[t, vn] = ode45(...
 			@(t, y) dvdt(y, r(:), iex(:)+G*L(:)), ...
 			[0 dt], ...  % (t range)
@@ -89,8 +86,7 @@ while ~done          % Time loop
     
     % Update image and text 
     if rem(n,skipfactor)==0
-		% Map voltage to image grayscale value
-		m=1+round(63*v); m=max(m,1); m=min(m,64);
+		m=1+round(63*v); m=min(max(m,1), 64); % Map voltage to image grayscale value
         set(ih,'cdata',m);
         set(th,'string', ...
 			sprintf('%0.1f  %0.2f   %0.2f',n*dt,v(mea_ctr(1),mea_ctr(2)),r(mea_ctr(1),mea_ctr(2))))
@@ -101,7 +97,6 @@ while ~done          % Time loop
     
     done=(n >= dur);
     if n > mindur && max(v(:)) < 1.0e-4, done=1; end      % If activation extinguishes, quit early.
-    if ~isempty(get(gcf,'userdata')), done=1; end % Quit if user clicks on 'Quit' button.
 	n = n + 1;
 end
 n = n-1;
@@ -109,7 +104,7 @@ n = n-1;
 if SAVE
 	v_out = v_out(:, :, 1:mod(n-1, chunk)+1);
 	r_out = r_out(:, :, 1:mod(n-1, chunk)+1);
-	save(sprintf('%s_%06d', basename, n), 'v_out', 'r_out', 't', 'mov', 'params');
+	save(sprintf('%s_%06d', basename, n), 'v_out', 'r_out', 't', 'mov', 'params', 'mea_ctr');
 end
 
 close(gcf)
@@ -136,6 +131,7 @@ add('nrows', 160);                               % Number of rows in domain
 add('dt', .5);                                   % Time step (ms)
 add('dur', 160e3);                             % Number of time steps
 add('mindur', 160e3);
+add('t', [-10 70]);  % time (s)
 
 % Coupling parameters
 add('Iex', .25);                                  % Amplitude of external current
@@ -156,6 +152,9 @@ add('chunk', 1e4);  % Save results in chunks
 
 parse(p, varargin{:});
 params.model = p.Results;
+dt = params.model.dt;
+t = params.model.t;
+params.model.t = (dt:dt:sum(t) * 1e3) / 1e3 + t(1);  % time (s)
 
 if isempty(params.model.drdt)
 	params.model.drdt = @(v, r) params.model.phi * (v + params.model.a - params.model.b * r);
@@ -222,16 +221,16 @@ theta =@(t) ...
 	thetaf * (t > tau(3));
 
 % Stim times
-Ss = linspace(tau(1), tau(5), N)' + noise*randn(N, 1);  % starts
+Ss = linspace(tau(1), tau(5), N) + noise*randn(1, N);  % starts
 Sf = Ss + D(Ss);  % ... and ends
 
 % Prep output
 posx = R(t) .* cos(theta(t));  % Stim position (relative to mea; pos in units of electrodes)
 posy = R(t) .* sin(theta(t));
-Istim = mod(sum((t >= Ss') + (t <= Sf'), 2), 2);  % Stim indicator
+Istim = mod(sum((t >= Ss') + (t <= Sf')), 2);  % Stim indicator
 
 % Stimulus map
-seizure = [posx posy Istim];
+seizure = [posx(:) posy(:) Istim(:)];
 
 end
 
