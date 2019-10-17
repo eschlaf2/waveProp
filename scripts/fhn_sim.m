@@ -152,7 +152,7 @@ add('chunk', 1e4);  % Save results in chunks
 parse(p, varargin{:});
 res.model = p.Results;
 
-if isempty(res.drdt)
+if isempty(res.model.drdt)
 	res.model.drdt = @(v, r) res.model.phi * (v + res.model.a - res.model.b * r);
 end
 
