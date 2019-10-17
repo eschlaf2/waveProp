@@ -121,7 +121,7 @@ if SAVE
 	convert_to_wavefit_data(mea);
 end
 
-function [res, p] = init_params(varargin)
+function [params, p] = init_params(varargin)
 p = inputParser;
 add =@(varargin) addParameter(p, varargin{:});
 p.KeepUnmatched = true;
@@ -151,10 +151,10 @@ add('skipfactor', 40);    % Save every nth frame
 add('chunk', 1e4);  % Save results in chunks
 
 parse(p, varargin{:});
-res.model = p.Results;
+params.model = p.Results;
 
-if isempty(res.model.drdt)
-	res.model.drdt = @(v, r) res.model.phi * (v + res.model.a - res.model.b * r);
+if isempty(params.model.drdt)
+	params.model.drdt = @(v, r) params.model.phi * (v + params.model.a - params.model.b * r);
 end
 
 
@@ -185,7 +185,7 @@ add('N', 100);  % Number of discharges
 add('noise', .01);  % sd (in ms)
 
 parse(p, varargin{:});
-res.seizure = p.Results;
+params.seizure = p.Results;
 
 end
 
@@ -244,9 +244,9 @@ mea.Path = sprintf(...
 	'%s%s%s_Seizure%02d_Neuroport_10_10.mat', ...
 	pwd, filesep, fname, sim_num);
 
-files = dir([fname '*mat']);
-% addpath('spiral_wave_4/');
-% chunksize = 1e4;
+files = dir([fname filesep '*mat']);
+addpath(fname)
+
 nf = length(files);
 
 mea_addy = [80, 80];
@@ -295,7 +295,5 @@ gt.p = 0 * nearinds;
 gt.beta = pinv(gt.V');
 
 fits.groundtruth = gt;
-
-
 
 end
