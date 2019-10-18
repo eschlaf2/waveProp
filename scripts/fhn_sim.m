@@ -176,16 +176,45 @@ add('d0', .07);  % Short burst
 add('df', .2);  % Long burst
 
 % Radius function
-add('r0', 10);
-add('rf', 70);
+add('r0', 10);  % Starting radius
+add('rf', 70);  % Ending radius
 
 % Angle function
-add('theta0', -pi/2);
-add('thetaf', 0);
+add('theta0', -pi/2);  % Starting angle
+add('thetaf', 0);  % Ending angle
 
 % Stim times
 add('N', 100);  % Number of discharges
 add('noise', .01);  % sd (in ms)
+
+% parse(p, varargin{:});
+% struct2var(p.Results);
+% tau = cumsum(tau(:));
+
+% Linear mapping function [t0, tf] -> [0, 1]
+L =@(t0, tf, t) (tf == t0) || (t - t0) ./ (tf - t0);  
+
+% Stim duration function
+D =@(t) ...  
+	dss * (t > tau(1) & t <= tau(3)) + ...
+	d0 * (t > tau(3) & t <= tau(4)) + ...
+	(d0 + (df - d0) * L(tau(4), tau(5), t)) .* (t > tau(4) & t <= tau(5));
+
+% Radius function
+R =@(t) ...
+	(r0 + (rf - r0) * L(tau(1), tau(2), t)) .* (t > tau(1) & t <= tau(2)) + ...
+	(rf) * (t > tau(2));
+
+% Angle function
+theta =@(t) ...
+	theta0 * (t <= tau(2)) + ...
+	(theta0 + (thetaf - theta0) .* L(tau(2), tau(3), t)) .* (t > tau(2) & t <= tau(3)) + ...
+	thetaf * (t > tau(3));
+
+add('D', D);
+add('R', R);
+add('theta', theta);
+add('L', L);
 
 parse(p, varargin{:});
 params.seizure = p.Results;
@@ -197,28 +226,10 @@ function [seizure, R, theta] = define_seizure(t, params)
 stages = {'pre', 'moving away', 'moving around', 'constant burst', 'increasing burst'};
 
 struct2var(params);
-
 tau = cumsum(tau(:));
-
-% Linear mapping function [t0, tf] -> [0, 1]
-T =@(t0, tf, t) (t - t0) ./ (tf - t0);  
-
-% Stim duration function
-D =@(t) ...  
-	dss * (t > tau(1) & t <= tau(3)) + ...
-	d0 * (t > tau(3) & t <= tau(4)) + ...
-	(d0 + (df - d0) * T(tau(4), tau(5), t)) .* (t > tau(4) & t <= tau(5));
-
-% Radius function
-R =@(t) ...
-	(r0 + (rf - r0) * T(tau(1), tau(2), t)) .* (t > tau(1) & t <= tau(2)) + ...
-	(rf) * (t > tau(2));
-
-% Angle function
-theta =@(t) ...
-	theta0 * (t <= tau(2)) + ...
-	(theta0 + (thetaf - theta0) .* T(tau(2), tau(3), t)) .* (t > tau(2) & t <= tau(3)) + ...
-	thetaf * (t > tau(3));
+for v = {'L', 'R', 'D', 'theta'}
+	eval(sprintf('%s = %s;', v{:}, func2str(params.(v{:}))));
+end
 
 % Stim times
 Ss = linspace(tau(1), tau(5), N) + noise*randn(1, N);  % starts
