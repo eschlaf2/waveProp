@@ -154,7 +154,7 @@ parse(p, varargin{:});
 params.model = p.Results;
 dt = params.model.dt;
 t = params.model.t;
-params.model.mindur = min(params.model.mindur, diff(t) / dt);
+params.model.mindur = min(params.model.mindur, diff(t) * 1e3 / dt);
 params.model.t = (dt:dt:diff(t) * 1e3) / 1e3 + t(1);  % time (s)
 
 if isempty(params.model.drdt)
