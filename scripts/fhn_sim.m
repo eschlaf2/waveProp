@@ -192,7 +192,7 @@ add('noise', .01);  % sd (in ms)
 % tau = cumsum(tau(:));
 
 % Linear mapping function [t0, tf] -> [0, 1]
-L =@(t0, tf, t) (tf == t0) || (t - t0) ./ (tf - t0);  
+L =@(t0, tf, t) max(min((t - t0) / (tf - t0), 1), 0);
 
 % Stim duration function
 D =@(t) ...  
