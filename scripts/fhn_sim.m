@@ -110,7 +110,7 @@ end
 close(gcf)
 
 if SAVE
-	mea = convert_to_mea_data(dirname, sim_num, t);
+	mea = convert_to_mea_data(dirname, sim_num, t, params.seizure);
 	mea.seizure = seizure;
 	mea.fhn_params = params;
 	save(mea.Path, '-struct', 'mea');
@@ -154,7 +154,8 @@ parse(p, varargin{:});
 params.model = p.Results;
 dt = params.model.dt;
 t = params.model.t;
-params.model.mindur = min(params.model.mindur, diff(t) * 1e3 / dt);
+params.model.dur = min(params.model.dur, diff(t) * 1e3 / dt);
+params.model.mindur = min(params.model.mindur, params.model.dur);
 params.model.t = (dt:dt:diff(t) * 1e3) / 1e3 + t(1);  % time (s)
 
 if isempty(params.model.drdt)
@@ -246,11 +247,11 @@ seizure = [posx(:) posy(:) Istim(:)];
 
 end
 
-function mea = convert_to_mea_data(dirname, sim_num, t)
+function mea = convert_to_mea_data(dirname, sim_num, t, params)
 mea.BadChannels = [];
 mea.Time = t;
 mea.Name = ['FHN ' num2str(sim_num)];
-mea.Padding = [10 10];
+mea.Padding = [-t(1) sum(params.tau) - t(end)];
 mea.Duration = t(end) - mea.Padding(2);
 mea.SamplingRate = 2e3;
 [xx, yy] = meshgrid(1:10, 1:10);
