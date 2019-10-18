@@ -130,7 +130,7 @@ add('ncols', 160);                               % Number of columns in domain
 add('nrows', 160);                               % Number of rows in domain
 add('dt', .5);                                   % Time step (ms)
 add('dur', 160e3);                             % Number of time steps
-add('mindur', 160e3);
+add('mindur', Inf);
 add('t', [-10 70]);  % time (s)
 
 % Coupling parameters
@@ -154,6 +154,7 @@ parse(p, varargin{:});
 params.model = p.Results;
 dt = params.model.dt;
 t = params.model.t;
+params.model.mindur = min(params.model.mindur, diff(t) / dt);
 params.model.t = (dt:dt:diff(t) * 1e3) / 1e3 + t(1);  % time (s)
 
 if isempty(params.model.drdt)
@@ -245,7 +246,7 @@ seizure = [posx(:) posy(:) Istim(:)];
 
 end
 
-function mea = convert_to_mea_data(fname, sim_num, t)
+function mea = convert_to_mea_data(dirname, sim_num, t)
 mea.BadChannels = [];
 mea.Time = t;
 mea.Name = ['FHN ' num2str(sim_num)];
@@ -256,10 +257,10 @@ mea.SamplingRate = 2e3;
 mea.Position = [xx(:) yy(:)];
 mea.Path = sprintf(...
 	'%s%s%s_Seizure%d_Neuroport_10_10.mat', ...
-	pwd, filesep, fname, sim_num);
+	pwd, filesep, dirname, sim_num);
 
-files = dir([fname filesep 'FHN_' num2str(sim_num) '*mat']);
-addpath(fname)
+files = dir([dirname filesep 'FHN_' num2str(sim_num) '*mat']);
+addpath(dirname)
 
 nf = length(files);
 
