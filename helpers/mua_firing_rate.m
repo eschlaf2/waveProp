@@ -20,8 +20,7 @@ dims = [T, NCh];
 events = zeros(dims, 'single');
 events(event_inds) = 1;
 samplingRateMs = samplingRate / 1e3;  % samples per ms
-windMs = 100;
-window = windMs * samplingRateMs;  % number of samples to use in the window
+window = mea.params.fr_window * samplingRateMs;  % number of samples to use in the window
 
 % Compute spike rate
 fr = smoothdata(events, 1, 'movmean', window) * ...

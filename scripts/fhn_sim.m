@@ -28,7 +28,7 @@ iex=zeros(nrows,ncols);
 % Define the seizure (stim location and duration)
 seizure = define_seizure(t, params.seizure);
 mea_ctr = floor([(nrows/2) (ncols/2)]);
-noise =@() randn(nrows,ncols) * .01;
+noise =@() randn(nrows,ncols) * I_noise;
 
 % Setup image
 ih=imagesc(v); set(ih,'cdatamapping','direct')
@@ -57,11 +57,15 @@ while ~done          % Time loop
     
     % Update v
 	L = del2(vv);  % Laplacian
-	v_new=v + dvdt(v, r, iex+G*L(3:end-2, 3:end-2) + noise())*dt;
+	L = L(3:end-2, 3:end-2);
+	v_new=v + dvdt(v, r, iex+G*L + noise())*dt;
+	temp = dvdt(v, r, iex+G*L + noise());
+% 	disp(max(abs(temp(:))));
 	
 	% decrease dt when growth is too steep
-	if any(v_new(:) > 1e3)  
-		[t, vn] = ode45(...
+	if max(abs(temp(:))) > sqrt(2) + Iex * G
+		disp('High v')
+		[tt, vn] = ode45(...
 			@(t, y) dvdt(y, r(:), iex(:)+G*L(:)), ...
 			[0 dt], ...  % (t range)
 			v(:)); % y0
@@ -133,9 +137,10 @@ add('dur', 160e3);                             % Number of time steps
 add('mindur', Inf);
 add('t', [-10 70]);  % time (s)
 
-% Coupling parameters
+% Current parameters
 add('Iex', .25);                                  % Amplitude of external current
 add('G', 1);                                  % Conductance
+add('I_noise', .01);  % injected current noise
 
 % FHN parameters
 add('a', 0.48); 
@@ -187,7 +192,7 @@ add('thetaf', 0);  % Ending angle
 
 % Stim times
 add('N', 100);  % Number of discharges
-add('noise', .01);  % sd (in ms)
+add('idi_noise', .01);  % sd (in ms)
 
 % parse(p, varargin{:});
 % struct2var(p.Results);
@@ -234,7 +239,7 @@ for v = {'L', 'R', 'D', 'theta'}
 end
 
 % Stim times
-Ss = linspace(tau(1), tau(5), N) + noise*randn(1, N);  % starts
+Ss = linspace(tau(1), tau(5), N) + idi_noise*randn(1, N);  % starts
 Sf = Ss + D(Ss);  % ... and ends
 
 % Prep output
