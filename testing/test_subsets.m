@@ -41,19 +41,25 @@ nWaves = numel(mea.waveTimes);
 original_mea = mea;
 
 for sub = subsets
+	
 	% Initialize stats
 	stats.detections = zeros(nTrials, 1);
 	stats.detection_rate = nan(nTrials, 1);
 	[stats.dtheta, stats.dspeed] = deal(nan(nTrials, nWaves));
-	for trial = 1:nTrials
+	
+	for trial = 1:nTrials  % For each trial
+		
+		% select a subset of channels
 		issub = keep_random_channels(mea, sub);
-		if ~issub, continue, end
+		if ~issub, continue, end  % exit if the subset is the size of the number of channels
+		
+		% Compute the wave fits and save to outfile
 		fits = wave_prop(mea, method);
 		fits = rmfield(fits, {'data', 'position'});
 		fieldname = sprintf('sub%02d_%d', sub, trial);
 		outfile.(fieldname) = fits;  % save details
 		
-		% Save stats
+		% Store stats of fits compared to full
 		mask = fits.p < sig_thresh;
 		stats.detections(trial) = sum(mask);
 		stats.detection_rate(trial) = ...
@@ -62,5 +68,7 @@ for sub = subsets
 		stats.dspeed(trial, mask) = speed(fits.V(:, mask)) - speed(full.V(:, mask));
 		mea = original_mea;
 	end
+	
+	% Save stats of fits to outfile
 	outfile.(sprintf('sub%02d_stats', sub)) = stats;
 end
