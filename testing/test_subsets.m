@@ -1,25 +1,24 @@
 % pat = 'CUCX4'; seizure = 2; method = 'M';
 
+% Params
 rng default
 nTrials = 5;
 sig_thresh = .05;
-outfile = matfile(sprintf('testing%ssubsets%s%s_%d_%s', ...
-	filesep, filesep, pat, seizure, method), 'Writable', true);
+subsets = [4 9 16 25 36 49 64];
 
 % Setup
-full = load(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pat, seizure), method);
-full = full.(method);
+outfile = matfile(sprintf('testing%ssubsets%s%s_%d_%s', ...
+	filesep, filesep, pat, seizure, method), 'Writable', true);
 mea = load(sprintf('%s%s%s_Seizure%d_Neuroport_10_10.mat', ...
 	pat, filesep, pat, seizure));
-
-if strcmpi(method, 'D')
-	mea.params = init_params('T', 1, 'delay_band', [1 50]); 
-else
-	mea.params = init_params();
-end
+mea.params = init_params();
 
 switch upper(method(1))
 	case 'D'
+		if strcmpi(method, 'd') || strcmpi(method, 'd1')
+			mea.params.T = 1;
+			mea.params.delay_band = [1 50];
+		end
 		method = 'delays';
 	case 'M'
 		method = 'maxdescent';
@@ -27,14 +26,18 @@ switch upper(method(1))
 		method = 'events';
 end
 
+% Get wave fits from full method
+full = load(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pat, seizure), method);
+full = full.(method);
+
+% Use wavetimes from the full method on the subsets
 mea.waveTimes = full.computeTimes;
+
+% Convenience 
+speed =@(v) sqrt(sum(v.^2));
 nWaves = numel(mea.waveTimes);
 
-% Convenience functions
-speed =@(v) sqrt(sum(v.^2));
-
-% Subsets of electrodes
-subsets = [4 9 16 25 36 49 64];
+% Reset mea to original after each trial
 original_mea = mea;
 
 for sub = subsets
