@@ -1,40 +1,38 @@
-% pat = 'SIM'; seizure = 9; paramfile = '';
+% pat = 'SIM'; seizure = 9; paramfile = ''; n = 64;
 datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
 addpath(datapath);  % ... add the original data path first
 patpath = genpath(pat);  % ... and then add the local patient path on top 
 addpath(patpath);  % ... so that it is searched first
 computetimesmethod = 1;
-showplots = true;
 
+% Load mea data
 fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
 if ~exist(fname, 'file')
 	disp('Creating epoch file ...')
 	create_epoch(pat, seizure, 'padding', [10 10]);
 end
-
 mea = load(fname);
+
+% Add field params to mea
 if isempty(paramfile)
 	mea.params = init_params();
 else
 	run(paramfile);  % this file should add field ''params'' to mea
 end
 
-if ~isfield(mea, 'Path')
-	mea.Path = which(fname);
-	save(mea.Path, '-v7.3', '-struct', 'mea')
-end
-if ~isfield(mea, 'BadChannels')
-	mea.BadChannels = [];
-	save(which(fname), '-v7.3', '-struct', 'mea');
-end
+% Create output file
 [~, name, ~] = fileparts(fname);
+outname = sprintf('%s_wave_prop', name);
 
-% mea = load('SIM/seizing_cortical_field_sim.mat');
-% name = mea.Name;
-outname = sprintf('%s_wave_prop_%d', name, computetimesmethod);
+% Compute discharge times
+[~, mea] = get_discharge_times(mea);
+
+% Use subset of channels for testing
+if keep_random_channels(mea, n)
+	outname = sprintf('%s_wave_prop_sub%02d', name, n);
+end
+	
 outfile = matfile(outname, 'writable', true);
-% mea = exclude_channels(mea);
-[~, mea] = get_discharge_times(mea, 'method', computetimesmethod);
 
 %%
 
