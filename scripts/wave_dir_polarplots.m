@@ -2,7 +2,7 @@
 % Requires Circular Statistics Toolbox (plotnum case 6)
 
 if ~exist('seizure', 'var'); seizure = '*'; else, seizure = num2str(seizure); end
-if ~exist('files', 'var'); files = dir([pat '_Seizure' seizure '*10_wave_prop_1.mat']); end
+if ~exist('files', 'var'); files = dir([pat '_Seizure' seizure '*10_wave_prop.mat']); end
 if ~exist('metrics', 'var')
 	metrics = {...
 		'delays_T0p2_fband0_50', ...
