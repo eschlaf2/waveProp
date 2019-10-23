@@ -45,6 +45,7 @@ mov(dur/skipfactor) = getframe;
 
 n=1;                 % Counter for time loop
 k=1;                 % Counter for movie frames
+sample=0;  % Counter for subsampling
 done=0;              % Flag for while loop
 
 % Create the stimulus shape
@@ -56,6 +57,7 @@ stim_inds = [x(mask) y(mask)];
 rotate_inds =@(A, theta) round([cos(theta) -sin(theta); sin(theta) cos(theta)] * A')';
 
 while ~done          % Time loop
+	
 	iex = zeros(nrows, ncols);
 	if seizure(n, 3)
 		stim = rotate_inds(stim_inds, angle(seizure(n, [1 2]) * [1; 1j]));
@@ -76,7 +78,7 @@ while ~done          % Time loop
 	
 	% decrease dt when growth is too steep
 	if max(abs(temp(:))) > dvdt_max
-		disp('High v')
+		fprintf('%d: High v\n', n);
 		[tt, vn] = ode45(...
 			@(t, y) dvdt(y, r(:), iex(:)+G*L(:)), ...
 			[0 dt], ...  % (t range)
@@ -89,6 +91,11 @@ while ~done          % Time loop
     r=r + drdt(v, r)*dt;
 	v = v_new;
 	
+	
+	% Continue without saving if subsampling
+	sample = mod(sample + 1, samplerate);
+	if sample ~= 0, continue, end
+	
 	% Store r and v
 	if SAVE
 		v_out(:, :, mod(n-1, chunk)+1) = v*1e4;
@@ -100,8 +107,8 @@ while ~done          % Time loop
 			fprintf(' Done.\n')
 		end
 	end
-    
-    % Update image and text 
+	
+	% Update image and text 
     if rem(n,skipfactor)==0
 		m=1+round(63*v); m=min(max(m,1), 64); % Map voltage to image grayscale value
         set(ih,'cdata',m);
@@ -110,8 +117,8 @@ while ~done          % Time loop
         drawnow
 		mov(k) = getframe(ih.Parent.Parent);
    		k = k + 1;
-    end
-    
+	end
+        
     done=(n >= dur);
     if n > mindur && max(v(:)) < 1.0e-4, done=1; end      % If activation extinguishes, quit early.
 	n = n + 1;
@@ -127,7 +134,7 @@ end
 close(gcf)
 
 if SAVE
-	mea = convert_to_mea_data(dirname, sim_num, t, params.seizure);
+	mea = convert_to_mea_data(dirname, sim_num, t(1:samplerate:end), params.seizure);
 	mea.seizure = seizure;
 	mea.fhn_params = params;
 	save(mea.Path, '-struct', 'mea');
@@ -145,14 +152,14 @@ p.KeepUnmatched = true;
 % Integration parameters
 add('ncols', 160);                               % Number of columns in domain
 add('nrows', 160);                               % Number of rows in domain
-add('dt', .5);                                   % Time step (ms)
+add('dt', .25);                                   % Time step (ms)
 add('dur', 160e3);                             % Number of time steps
 add('mindur', Inf);
 add('t', [-10 70]);  % time (s)
 
 % Current parameters
 add('Iex', .25);                                  % Amplitude of external current
-add('G', 1);                                  % Conductance
+add('G', 2);                                  % Conductance
 add('I_noise', .01);  % injected current noise
 
 % FHN parameters
@@ -167,6 +174,7 @@ add('drdt', '');
 % Video and output params
 add('skipfactor', 40);    % Save every nth frame
 add('chunk', 1e4);  % Save results in chunks
+add('samplerate', 2e3);  % Option to save at a lower frame rate than dt
 
 parse(p, varargin{:});
 params.model = p.Results;
@@ -175,6 +183,9 @@ t = params.model.t;
 params.model.dur = min(params.model.dur, diff(t) * 1e3 / dt);
 params.model.mindur = min(params.model.mindur, params.model.dur);
 params.model.t = (dt:dt:diff(t) * 1e3) / 1e3 + t(1);  % time (s)
+samplerate = params.model.samplerate;
+k = max(floor(1e3 / dt / samplerate), 1);
+params.model.samplerate = k;
 
 if isempty(params.model.drdt)
 	params.model.drdt = @(v, r) params.model.phi * (v + params.model.a - params.model.b * r);
@@ -271,7 +282,7 @@ mea.Time = t;
 mea.Name = ['FHN ' num2str(sim_num)];
 mea.Padding = [-t(1) sum(params.tau) - t(end)];
 mea.Duration = t(end) - mea.Padding(2);
-mea.SamplingRate = 2e3;
+mea.SamplingRate = 1 / diff(t(1:2));
 [xx, yy] = meshgrid(1:10, 1:10);
 mea.Position = [xx(:) yy(:)];
 mea.Path = sprintf(...
