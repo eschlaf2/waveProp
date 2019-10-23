@@ -29,8 +29,10 @@ switch upper(method(1))
 		if strcmpi(method, 'd') || strcmpi(method, 'd1')
 			mea.params.T = 1;
 			mea.params.delay_band = [1 50];
+			method = 'delays_T01_fband1_50';
+		else
+			method = 'delays_T10_fband1_13';
 		end
-		method = 'delays';
 	case 'M'
 		method = 'maxdescent';
 	case 'E'
@@ -80,5 +82,5 @@ for snr = noise_levels
 	end
 	
 	% Save stats of fits to outfile
-	outfile.(sprintf('snr%02d_stats', snr)) = stats;
+	outfile.(checkname(sprintf('snr%02d_stats', snr))) = stats;
 end
