@@ -80,5 +80,5 @@ for snr = noise_levels
 	end
 	
 	% Save stats of fits to outfile
-	outfile.(sprintf('snr%02d_stats', sub)) = stats;
+	outfile.(sprintf('snr%02d_stats', snr)) = stats;
 end
