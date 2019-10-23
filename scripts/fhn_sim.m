@@ -41,7 +41,7 @@ patch('faces', [(1:4) 1], ...
 	'facecolor', 'none', ...
 	'linewidth', 2);
 hold off;
-mov(dur/skipfactor) = getframe;
+mov(max(floor(dur/skipfactor), 1)) = getframe;
 
 n=1;                 % Counter for time loop
 k=1;                 % Counter for movie frames
@@ -139,7 +139,7 @@ if SAVE
 	mea.fhn_params = params;
 	save(mea.Path, '-struct', 'mea');
 	clearvars -except sim_num
-	pat = 'FHN'; seizure = sim_num; paramfile = 'tempscripts/fhn_params.m';
+	pat = 'FHN'; seizure = sim_num; paramfile = '';
 	analyze_wave_directions;
 	convert_to_wavefit_data(mea);
 end
@@ -321,7 +321,7 @@ function convert_to_wavefit_data(mea)
 [~, fname, ~] = fileparts(mea.Path);
 finfo = strsplit(fname, '_');
 pat = finfo{1}; seizure = finfo{2}(8:end);
-fits = matfile([fname '_wave_prop_1.mat'], 'writable', true);
+fits = matfile([fname '_wave_prop.mat'], 'writable', true);
 plotnum = 0; wave_dir_polarplots;  % this should produce res
 
 time = mea.Time();
