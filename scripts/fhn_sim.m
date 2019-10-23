@@ -91,7 +91,6 @@ while ~done          % Time loop
     r=r + drdt(v, r)*dt;
 	v = v_new;
 	
-	
 	% Continue without saving if subsampling
 	sample = mod(sample + 1, samplerate);
 	if sample ~= 0, continue, end
@@ -135,7 +134,7 @@ end
 close(gcf)
 
 if SAVE
-	mea = convert_to_mea_data(dirname, sim_num, t(1:samplerate:end), params.seizure);
+	mea = convert_to_mea_data(dirname, sim_num, t, params.seizure);
 	mea.seizure = seizure;
 	mea.fhn_params = params;
 	save(mea.Path, '-struct', 'mea');
@@ -180,13 +179,14 @@ add('samplerate', 2e3);  % Option to save at a lower frame rate than dt
 parse(p, varargin{:});
 params.model = p.Results;
 dt = params.model.dt;
+samplerate = params.model.samplerate;
+k = max(floor(1e3 / dt / samplerate), 1);
+params.model.samplerate = k;
+dt = k * dt;
 t = params.model.t;
 params.model.dur = min(params.model.dur, diff(t) * 1e3 / dt);
 params.model.mindur = min(params.model.mindur, params.model.dur);
 params.model.t = (dt:dt:diff(t) * 1e3) / 1e3 + t(1);  % time (s)
-samplerate = params.model.samplerate;
-k = max(floor(1e3 / dt / samplerate), 1);
-params.model.samplerate = k;
 
 if isempty(params.model.drdt)
 	params.model.drdt = @(v, r) params.model.phi * (v + params.model.a - params.model.b * r);
