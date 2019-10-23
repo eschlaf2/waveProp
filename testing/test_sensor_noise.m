@@ -66,7 +66,7 @@ for snr = noise_levels
 		% Compute the wave fits and save to outfile
 		fits = wave_prop(mea, method);
 		fits = rmfield(fits, {'data', 'position'});
-		fieldname = sprintf('snr%02d_%d', snr, trial);
+		fieldname = checkname(sprintf('snr%02g_%d', snr, trial));
 		outfile.(fieldname) = fits;  % save details
 		
 		% Store stats of fits compared to full
