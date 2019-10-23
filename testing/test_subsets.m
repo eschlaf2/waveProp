@@ -60,7 +60,7 @@ for sub = subsets
 		outfile.(fieldname) = fits;  % save details
 		
 		% Store stats of fits compared to full
-		mask = fits.p < sig_thresh;
+		mask = fits.p < sig_thresh & full.p < sig_thresh;
 		stats.detections(trial) = sum(mask);
 		stats.detection_rate(trial) = ...
 			sum(mask) ./ sum(full.p < sig_thresh);
