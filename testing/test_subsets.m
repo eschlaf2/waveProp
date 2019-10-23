@@ -18,10 +18,11 @@ switch upper(method(1))
 		if strcmpi(method, 'd') || strcmpi(method, 'd1')
 			mea.params.T = 1;
 			mea.params.delay_band = [1 50];
-			method = 'delays_T01_fband1_50';
+			method_full = 'delays_T01_fband1_50';
 		else
-			method = 'delays_T10_fband1_13';
+			method_full = 'delays_T10_fband1_13';
 		end
+		method = 'delays';
 	case 'M'
 		method = 'maxdescent';
 	case 'E'
@@ -30,8 +31,8 @@ end
 
 
 % Get wave fits from full method
-full = load(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pat, seizure), method);
-full = full.(method);
+full = load(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pat, seizure), method_full);
+full = full.(method_full);
 
 % Use wavetimes from the full method on the subsets
 mea.waveTimes = full.computeTimes;
