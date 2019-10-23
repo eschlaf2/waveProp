@@ -128,7 +128,8 @@ n = n-1;
 if SAVE
 	v_out = v_out(:, :, 1:mod(n-1, chunk)+1);
 	r_out = r_out(:, :, 1:mod(n-1, chunk)+1);
-	save(sprintf('%s_%06d', basename, n), 'v_out', 'r_out', 't', 'mov', 'params', 'mea_ctr');
+	save(sprintf('%s_%06d', basename, n), 'v_out', 'r_out');
+	save(sprintf('%s_info', basename), 'mov', 't', 'params', 'mea_ctr');
 end
 
 close(gcf)
