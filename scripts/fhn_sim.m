@@ -301,6 +301,7 @@ win = 1./(sqrt((-3:3).^2 + (-3:3)'.^2) + .5);
 win = win ./ sum(win(:));
 
 for ii = 0:nf - 1
+	if strfind(files(ii+1).name, 'info'), continue, end
 		load(files(ii+1).name, 'v_out');
 		chunksize = size(v_out, 3);
 		v_out = v_out(mea_addy(1) + (-8:7), ...
