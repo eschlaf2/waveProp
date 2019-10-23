@@ -22,8 +22,8 @@ end
 	
 if ~exist(dirname, 'dir'), mkdir(dirname), end
 
-% Set initial stim current and pattern
-iex=zeros(nrows,ncols);
+% Set initial dvdt max
+dvdt_max = 10 * dvdt(v(1), r(1), Iex * G);
 
 % Define the seizure (stim location and duration)
 seizure = define_seizure(t, params.seizure);
@@ -47,10 +47,23 @@ n=1;                 % Counter for time loop
 k=1;                 % Counter for movie frames
 done=0;              % Flag for while loop
 
+% Create the stimulus shape
+R = 5;
+[x, y] = meshgrid(-R:R, -R:R);
+% [x, y] = meshgrid(-1:1, -50:50);
+mask = (x(:).^2 + y(:).^2) <= R^2; 
+stim_inds = [x(mask) y(mask)];
+rotate_inds =@(A, theta) round([cos(theta) -sin(theta); sin(theta) cos(theta)] * A')';
 
 while ~done          % Time loop
-	inds = round(mea_ctr + seizure(n, [1 2]));
-	iex(inds(1) + (-2:2), inds(2) + (-2:2)) = Iex * seizure(n, 3);
+	iex = zeros(nrows, ncols);
+	if seizure(n, 3)
+		stim = rotate_inds(stim_inds, angle(seizure(n, [1 2]) * [1; 1j]));
+		inds = round(mea_ctr + seizure(n, [1 2])) + stim;
+		inds(any((inds > [nrows ncols]) | (inds < [1 1]), 2), :) = [];
+		inds = sub2ind(size(iex), inds(:, 1), inds(:, 2));
+		iex(inds) = Iex;
+	end
     
     % Create padded v matrix to incorporate Neumann boundary conditions
 	vv = padarray(v, [2 2], 'replicate', 'both');
@@ -60,16 +73,16 @@ while ~done          % Time loop
 	L = L(3:end-2, 3:end-2);
 	v_new=v + dvdt(v, r, iex+G*L + noise())*dt;
 	temp = dvdt(v, r, iex+G*L + noise());
-% 	disp(max(abs(temp(:))));
 	
 	% decrease dt when growth is too steep
-	if max(abs(temp(:))) > sqrt(2) + Iex * G
+	if max(abs(temp(:))) > dvdt_max
 		disp('High v')
 		[tt, vn] = ode45(...
 			@(t, y) dvdt(y, r(:), iex(:)+G*L(:)), ...
 			[0 dt], ...  % (t range)
 			v(:)); % y0
 		v_new = reshape(vn(end, :), size(v_new));
+		dvdt_max = max(abs([(v_new(:) - v(:)) / dt; dvdt_max]));
 	end
 	
     % Update r
