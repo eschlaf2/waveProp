@@ -2,7 +2,7 @@ rng default
 defvar(who, 'SAVE', false);
 
 if ~exist('options', 'var'), options = {}, end
-params = init_params(options{:});
+params = init_fhn_params(options{:});
 struct2var(params.model);
 
 v=zeros(nrows,ncols);                    % Initialize voltage array
