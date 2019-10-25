@@ -14,7 +14,7 @@ mea = load(fname);
 
 % Add field params to mea
 if isempty(paramfile)
-	mea.params = init_params();
+	mea.params = init_mea_params();
 else
 	run(paramfile);  % this file should add field ''params'' to mea
 end

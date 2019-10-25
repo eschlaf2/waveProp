@@ -11,7 +11,7 @@ outfile = matfile(sprintf('testing%ssubsets%s%s_%d_%s', ...
 	filesep, filesep, pat, seizure, method), 'Writable', true);
 mea = load(sprintf('%s%s%s_Seizure%d_Neuroport_10_10.mat', ...
 	pat, filesep, pat, seizure));
-mea.params = init_params();
+mea.params = init_mea_params();
 
 switch upper(method(1))
 	case 'D'

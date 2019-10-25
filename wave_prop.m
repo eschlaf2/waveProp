@@ -27,7 +27,7 @@ addRequired(p, 'metric', validMetrics);
 parse(p, mea, metric, varargin{:})
 struct2var(p.Results)
 
-if ~isfield(mea, 'params'), mea.params = init_params(); end
+if ~isfield(mea, 'params'), mea.params = init_mea_params(); end
 
 fit_method = mea.params.fit_method;
 half_win = mea.params.half_win;
