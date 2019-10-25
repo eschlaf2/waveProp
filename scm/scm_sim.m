@@ -34,16 +34,30 @@ if ~exist('options', 'var'); options = {}; end
 
 params = init_scm_params(options{:});
 disp(params)
-struct2var(params);
 
-[base_path, ~, ~] = fileparts(basename);
+
+[base_path, ~, ~] = fileparts(params.basename);
 if ~exist(base_path, 'dir'), mkdir(base_path), end
-if SAVE, save(sprintf('%s_%d_info', basename, sim_num), 'params'); end
+if params.SAVE, save(sprintf('%s_%d_info', params.basename, params.sim_num), 'params'); end
 
-%%%% Define the source map. -----------------------------------------------
+run_simulation(params)
+convert_to_mea(params)
+
+%% Run Simulation
+function run_simulation(params)
+
+% Extract parameters
+basename = params.basename;
+duration = params.duration;
+IC = params.IC;
+map_type = params.map_type;
+padding = params.padding;
+SAVE = params.SAVE;
+sim_num = params.sim_num;
+t_step = params.t_step;
+
+% Create stimulus map
 [map,state] = make_map(params,-padding(1),0);           % Then, make the source map.
-
-%%%% Run the simulation. --------------------------------------------------
 last = IC;           %Load the initial conditions to start.
 
 if strcmp(map_type, 'ictal_wavefront')          %When using the ictal wavefront map,     
@@ -71,14 +85,46 @@ for t0 = 0:t_step:K-1
 	fprintf('Done.\n')
 end
 
+end
 
+%% Convert to mea
+function convert_to_mea(params)
+	files = dir(sprintf('%s_%d_*mat', params.basename, params.sim_num));
+	addpath(files(1).folder);
+	load(files(1).name, 'last');
+	fig = figure();
+	ih = imagesc(last.Ve);
+	th = title('0');
+	clear mov
+	mov(numel(files) - 1) = getframe(fig);
+	[data, tt] = deal(cell(numel(files) - 1 , 1));
+	
+	for f = files'
+		if strfind(f.name, 'info'), continue, end
+		load(f.name, 'last', 'NP', 'time');
+		disp(f.name)
+		ind = strsplit(f.name, {'_', '.'});
+		ind = str2double(ind{end - 1}) + 1;
+		disp(ind)
+		set(ih, 'cdata', last.Ve);
+		set(th, 'string', num2str(ind)); 
+		drawnow
+		mov(ind) = getframe(fig);
+		data{ind} = NP.Ve;
+		tt{ind} = time;
+	end
+	mov(cellfun(@isempty, {mov.cdata})) = [];
+	data(cellfun(@isempty, data)) = [];
+	tt(cellfun(@isempty, tt)) = [];
+	
+end
 
 %% Sub routines
 function [source_drive, map, state] = set_source_drive(t0, last, params, map, state)
 
 if t0 < params.padding(1)  % preseizure
 	source_drive = mean(last.dVe(:));
-elseif t0 >= params.padding(1) && t0 < params.padding(1) + duration  % seizure
+elseif t0 >= params.padding(1) && t0 < (params.padding(1) + params.duration)  % seizure
 	source_drive = params.ictal_source_drive; 
 	if strcmp(params.map_type, 'ictal_wavefront')      %... when appropriate, update ictal wavefront location.
 		[map,state] = make_map(params,t0,state);
