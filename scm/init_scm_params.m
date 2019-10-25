@@ -3,7 +3,6 @@ function [res, G] = init_scm_params(varargin)
 
 %% parsing functions
 validate = @(x, all) any(validatestring(x, all));  % validate strings
-isnonneg = @(x) isnumeric(x) & x >= 0;  % check nonnegative
 
 %% seizing_cortical_field
 G = inputParser;
@@ -15,6 +14,7 @@ p('basename', 'SCM/SCM/SCM');
 p('sim_num', 0);
 p('SAVE', true);  % Save output
 p('visualize_results', false);  %Set this variable to true to create plots during simulation.
+p('visualization_rate', 10);  % Show this many frames per second
 p('t_step', 1);  % Simulate t_step second intervals
 
 % Seizure parameters
@@ -28,21 +28,30 @@ p('noise', 0.5);             %Noise level
 allMapTypes = {'ictal_wavefront', 'fixed_point_source'};
 p('map_type', 'ictal_wavefront', @(x) validate(x, allMapTypes));  % Ictal source 
 p('stim_center', [0 0], @(x) numel(x) == 2);
-p('IC', {});  % Initial conditions of the sim
+p('IC', {});  % Initial conditions of the sim (enter options as name-value pairs)
 p('grid_size', [100 100], @(x) ~mod(x, 2) && numel(x) == 2);  % size of grid to simulate (must be even)
-
+p('ictal_source_drive', 3);
+p('post_ictal_source_drive', 1.5);
 
 parse(G, varargin{:});
 res = G.Results;
+
+% Clean results
 if any(res.stim_center<=0), res.stim_center = round(res.grid_size * .4); end
 res.stim_center = round(res.stim_center);
 
 %% Initial conditions
+% These are the same as in Waikato-Kramer except that dVe defaults to -1
+% instead of 1 (original IC in <map_type='ictal_wavefront'> scenario).
+% Additionally, resizing is done via bootstrapping in the case of a grid
+% size different from 100x100.
+
 G = inputParser;
 G.CaseSensitive = true;
 p = @(varargin) addParameter(G, varargin{:});  % convenience function
 
 IC = load('default_scm_ICs.mat');
+IC = resize(IC, res);
 
 p('D11', IC.D11)
 p('D22', IC.D22)
@@ -69,5 +78,20 @@ p('phi_ei', IC.phi_ei)
 parse(G, res.IC{:});
 
 res.IC = G.Results;
+
+end
+
+function IC = resize(IC, res)
+% Resize IC fields by bootstrapping from original values. The same subset
+% of indices is used for each field. i.e. the ICs on the whole are a
+% sub(super)-set of the default ICs.
+
+if ~all(res.grid_size == size(IC.D11))
+	rng(0)  % for reproducibility
+	inds = randi(numel(IC.D11), res.grid_size(1), res.grid_size(2));
+	for f = fieldnames(IC)'
+		IC.(f{:}) = IC.(f{:})(inds);
+	end
+end
 
 end
