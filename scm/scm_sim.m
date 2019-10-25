@@ -53,7 +53,7 @@ end
 K = sum(padding) + duration;  
 fig = [];
 for t0 = 0:t_step:K-1
-	
+	fprintf('Running %d / %d .. ', t0, K-1);
 	[source_drive, map, state] = ...
 		set_source_drive(t0, last, params, map, state);
 
@@ -63,10 +63,12 @@ for t0 = 0:t_step:K-1
 	
 	% Save the results of this run.
 	if SAVE
+		fprintf('Saving .. ')
 		fname = sprintf('%s_%d_%03d.mat', basename, sim_num, t0*t_step);
 		save(fname, 'NP','EC','time','last');
 	end
-
+	
+	fprintf('Done.\n')
 end
 
 
