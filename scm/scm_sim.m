@@ -50,7 +50,6 @@ function run_simulation(params)
 basename = params.basename;
 duration = params.duration;
 IC = params.IC;
-map_type = params.map_type;
 padding = params.padding;
 SAVE = params.SAVE;
 sim_num = params.sim_num;
@@ -59,10 +58,6 @@ t_step = params.t_step;
 % Create stimulus map
 [map,state] = make_map(params,-padding(1),0);           % Then, make the source map.
 last = IC;           %Load the initial conditions to start.
-
-if strcmp(map_type, 'ictal_wavefront')          %When using the ictal wavefront map,     
-	last.dVe = zeros(size(last.dVe)) - 1 ;      %... adjust offset to resting potential of excitatory population (mV)
-end
 
 K = sum(padding) + duration;  
 fig = [];
@@ -91,9 +86,8 @@ end
 function convert_to_mea(params)
 	files = dir(sprintf('%s_%d_*mat', params.basename, params.sim_num));
 	addpath(files(1).folder);
-	load(files(1).name, 'last');
 	fig = figure();
-	ih = imagesc(last.Ve);
+	ih = imagesc(params.IC.dVe);
 	th = title('0');
 	clear mov
 	mov(numel(files) - 1) = getframe(fig);
@@ -106,7 +100,7 @@ function convert_to_mea(params)
 		ind = strsplit(f.name, {'_', '.'});
 		ind = str2double(ind{end - 1}) + 1;
 		disp(ind)
-		set(ih, 'cdata', last.Ve);
+		set(ih, 'cdata', last.dVe);
 		set(th, 'string', num2str(ind)); 
 		drawnow
 		mov(ind) = getframe(fig);
@@ -116,6 +110,11 @@ function convert_to_mea(params)
 	mov(cellfun(@isempty, {mov.cdata})) = [];
 	data(cellfun(@isempty, data)) = [];
 	tt(cellfun(@isempty, tt)) = [];
+	
+	temp = cat(1, data{:});
+	mea.Data = reshape(temp)
+	
+	
 	
 end
 
