@@ -30,10 +30,15 @@
 % Department of Mathematics and Statistics, Boston University, USA.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if exist('options', 'var'), params = init_scm_params(options{:}), else params = init_scm_params(), end
+if ~exist('options', 'var'); options = {}; end
+
+params = init_scm_params(options{:});
+disp(params)
 struct2var(params);
+
 [base_path, ~, ~] = fileparts(basename);
 if ~exist(base_path, 'dir'), mkdir(base_path), end
+if SAVE, save(sprintf('%s_%d_info', basename, sim_num), 'params'); end
 
 %%%% Define the source map. -----------------------------------------------
 [map,state] = make_map(params,-padding(1),0);           % Then, make the source map.
@@ -46,26 +51,38 @@ if strcmp(map_type, 'ictal_wavefront')          %When using the ictal wavefront 
 end
 
 K = sum(padding) + duration;  
-for t0 = 0:t_step:K
-	if t0 <= padding(1)  % preseizure
-		source_drive = mean(last.dVe(:));
-	elseif t0 > padding(1) && t0 < padding(1) + duration  % seizure
-		source_drive = 3; 
-		if strcmp(map_type, 'ictal_wavefront')      %... when appropriate, update ictal wavefront location.
-			[map,state] = make_map(params,t0,state);
-		end
-	else  % postseizure
-		source_drive = 1.5;
-	end
+fig = [];
+for t0 = 0:t_step:K-1
+	
+	[source_drive, map, state] = ...
+		set_source_drive(t0, last, params, map, state);
 
-	[NP, EC, time, last] = seizing_cortical_field(source_drive, map, t_step, last, [], params);
+	[NP, EC, time, last, fig] = ...
+		seizing_cortical_field(source_drive, map, t_step, last, fig, params);
 	time = time - padding(1) + t0;
-	%... save the results of this run.
-	save(sprintf('%s_%d_%03d.mat', basename, sim_num, t0*T0), ...
-		'NP','EC','time','last')
+	
+	% Save the results of this run.
+	if SAVE
+		fname = sprintf('%s_%d_%03d.mat', basename, sim_num, t0*t_step);
+		save(fname, 'NP','EC','time','last');
+	end
 
 end
 
 
 
+%% Sub routines
+function [source_drive, map, state] = set_source_drive(t0, last, params, map, state)
+
+if t0 < params.padding(1)  % preseizure
+	source_drive = mean(last.dVe(:));
+elseif t0 >= params.padding(1) && t0 < params.padding(1) + duration  % seizure
+	source_drive = params.ictal_source_drive; 
+	if strcmp(params.map_type, 'ictal_wavefront')      %... when appropriate, update ictal wavefront location.
+		[map,state] = make_map(params,t0,state);
+	end
+else  % postseizure
+	source_drive = params.post_ictal_source_drive;
+end
+end
 
