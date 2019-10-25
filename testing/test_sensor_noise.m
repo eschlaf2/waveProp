@@ -36,8 +36,10 @@ switch upper(method(1))
 		method = 'delays';
 	case 'M'
 		method = 'maxdescent';
+		method_full = method;
 	case 'E'
 		method = 'events';
+		method_full = method;
 end
 
 % Get wave fits from full method
