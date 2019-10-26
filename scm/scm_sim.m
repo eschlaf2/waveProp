@@ -78,7 +78,7 @@ for t0 = t0_start:t_step:K-1
 	% Save the results of this run.
 	if SAVE
 		fprintf('Saving .. ')
-		fname = checkname(sprintf('%s_%d_%03d.mat', basename, sim_num, t0*t_step));
+		fname = checkname(sprintf('%s_%d_%03d', basename, sim_num, t0*t_step));
 		save(fname, 'NP','EC','time','last', 'map', 'state');
 	end
 	
