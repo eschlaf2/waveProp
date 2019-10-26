@@ -137,7 +137,8 @@ function convert_to_mea(params)
 		);
 	
 	save(mea.Path, '-struct', 'mea');
-	save(sprintf('%s_%d_mov', params.basename, params.sim_num), 'mov');
+	m = matfile(sprintf('%s_%d_info', params.basename, params.sim_num), 'Writable', true);
+	m.Ve_movie = mov;
 	
 end
 
