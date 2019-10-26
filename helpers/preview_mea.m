@@ -1,7 +1,8 @@
-function preview_mea(mea, skipfactor, pause_length)
+function preview_mea(mea, skipfactor, t_start, pause_length)
 
 defvar('skipfactor', 100);
 defvar('pause_length', 0);
+defvar('t_start', 0);
 
 figure();
 im = nan(max(mea.Position));
@@ -12,7 +13,7 @@ th = title('');
 t = mea.Time();
 
 nt = length(mea.Data);
-for ii = 1:skipfactor:nt
+for ii = find(t >= t_start, 1):skipfactor:nt
 	im(inds) = mea.Data(ii, :);
 	set(ih, 'cdata', im); set(th, 'string', num2str(t(ii)));
 	drawnow;
