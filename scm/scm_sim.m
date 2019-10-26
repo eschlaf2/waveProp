@@ -120,6 +120,7 @@ function convert_to_mea(params)
 	time = cat(1, tt{:});
 	sample_rate = min(round(1/mean(diff(time))/1e3)*1e3, params.subsample_rate);
 	dt = 1 / sample_rate;
+	nt = size(data_mat, 1);
 	inds = interp1(time, 1:nt, time(1):dt:time(end), 'nearest');
 	time =@() time(1):dt:time(end);
 	data_mat = data_mat(inds, :, :);
