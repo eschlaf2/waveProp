@@ -9,6 +9,7 @@ G = inputParser;
 p = @(varargin) addParameter(G, varargin{:});  % convenience function
 G.KeepUnmatched = true;
 
+
 % Save and visualize
 p('basename', 'SCM/SCM/SCM');
 p('sim_num', 0);
@@ -16,6 +17,7 @@ p('SAVE', true);  % Save output
 p('visualize_results', false);  %Set this variable to true to create plots during simulation.
 p('visualization_rate', 10);  % Show this many frames per second
 p('t_step', 1);  % Simulate t_step second intervals
+p('t0_start', 0);  % Continue from previous sim (IC will use last from file number t0_start-1)
 
 % Seizure parameters
 p('duration', 90);  % Seizure duration
@@ -32,6 +34,7 @@ p('IC', {});  % Initial conditions of the sim (enter options as name-value pairs
 p('grid_size', [100 100], @(x) ~mod(x, 2) && numel(x) == 2);  % size of grid to simulate (must be even)
 p('ictal_source_drive', 3);
 p('post_ictal_source_drive', 1.5);
+p('subsample_rate', Inf);  % Allow subsampling when making mea
 
 parse(G, varargin{:});
 res = G.Results;
