@@ -89,10 +89,6 @@ end
 
 %% Convert to mea
 
-function im = data2frame(data, cmap)
-im = round((data - min(data(:))) / range(data(:)) * (length(cmap) - 1)) + 1;
-end
-
 function convert_to_mea(params)
 	files = dir(sprintf('%s_%d_*mat', params.basename, params.sim_num));
 	addpath(files(1).folder);
