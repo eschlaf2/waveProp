@@ -35,7 +35,6 @@ if ~exist('options', 'var'); options = {}; end
 params = init_scm_params(options{:});
 disp(params)
 
-
 [base_path, ~, ~] = fileparts(params.basename);
 if ~exist(base_path, 'dir'), mkdir(base_path), end
 if params.SAVE, save(sprintf('%s_%d_info', params.basename, params.sim_num), 'params'); end
@@ -54,14 +53,20 @@ padding = params.padding;
 SAVE = params.SAVE;
 sim_num = params.sim_num;
 t_step = params.t_step;
+t0_start = params.t0_start;
 
 % Create stimulus map
-[map,state] = make_map(params,-padding(1),0);           % Then, make the source map.
-last = IC;           %Load the initial conditions to start.
+if t0_start > 0
+	load(sprintf('%s_%d_%03d', basename, sim_num, t0_start), 'last', 'map', 'state')
+else
+	last = IC;  %Load the initial conditions to start.
+	[map,state] = make_map(params,-padding(1),0);  % Then, make the source map.
+
+end
 
 K = sum(padding) + duration;  
 fig = [];
-for t0 = 0:t_step:K-1
+for t0 = t0_start:t_step:K-1
 	fprintf('Running %d / %d .. ', t0, K-1);
 	[source_drive, map, state] = ...
 		set_source_drive(t0, last, params, map, state);
@@ -74,7 +79,7 @@ for t0 = 0:t_step:K-1
 	if SAVE
 		fprintf('Saving .. ')
 		fname = sprintf('%s_%d_%03d.mat', basename, sim_num, t0*t_step);
-		save(fname, 'NP','EC','time','last');
+		save(fname, 'NP','EC','time','last', 'map', 'state');
 	end
 	
 	fprintf('Done.\n')
@@ -111,22 +116,39 @@ function convert_to_mea(params)
 	data(cellfun(@isempty, data)) = [];
 	tt(cellfun(@isempty, tt)) = [];
 	
-	temp = cat(1, data{:});
-	mea.Data = reshape(temp)
+	data_mat = cat(1, data{:});
+	time = cat(1, tt{:});
+	sample_rate = min(round(1/mean(diff(time))/1e3)*1e3, params.subsample_rate);
+	dt = 1 / sample_rate;
+	inds = interp1(time, 1:nt, time(1):dt:time(end), 'nearest');
+	time =@() time(1):dt:time(end);
+	data_mat = data_mat(inds, :, :);
 	
 	
+	mea = create_mea( ...
+		data_mat, ... 
+		'SamplingRate', sample_rate, ... 
+		'Padding', params.padding, ...
+		'Name', ['SCM Seizure ' num2str(params.sim_num)], ...
+		'Time', time, ... 
+		'Path', sprintf('/projectnb/ecog/emily/Data/SEIZURES/SCM/SCM_Seizure%d_Neuroport_%d_%d.mat', ...
+			params.sim_num, params.padding) ...	 
+		);
+	
+	save(mea.Path, '-struct', 'mea');
+	save(sprintf('%s_%d_mov', params.basename, params.sim_num), '-struct', 'mov');
 	
 end
 
 %% Sub routines
-function [source_drive, map, state] = set_source_drive(t0, last, params, map, state)
+function [source_drive, map, state] = set_source_drive(t, last, params, map, state)
 
-if t0 < params.padding(1)  % preseizure
+if t < params.padding(1)  % preseizure
 	source_drive = mean(last.dVe(:));
-elseif t0 >= params.padding(1) && t0 < (params.padding(1) + params.duration)  % seizure
+elseif t >= params.padding(1) && t < (params.padding(1) + params.duration)  % seizure
 	source_drive = params.ictal_source_drive; 
 	if strcmp(params.map_type, 'ictal_wavefront')      %... when appropriate, update ictal wavefront location.
-		[map,state] = make_map(params,t0,state);
+		[map,state] = make_map(params,t,state);
 	end
 else  % postseizure
 	source_drive = params.post_ictal_source_drive;
