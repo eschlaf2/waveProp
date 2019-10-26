@@ -109,7 +109,7 @@ function convert_to_mea(params)
 		set(th, 'string', num2str(ind)); 
 		drawnow
 		mov(ind) = getframe(fig);
-		data{ind} = NP.Ve;
+		data{ind} = NP.Qe;
 		tt{ind} = time;
 	end
 	mov(cellfun(@isempty, {mov.cdata})) = [];
