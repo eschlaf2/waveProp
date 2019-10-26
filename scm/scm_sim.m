@@ -57,7 +57,7 @@ t0_start = params.t0_start;
 
 % Create stimulus map
 if t0_start > 0
-	load(sprintf('%s_%d_%03d', basename, sim_num, t0_start), 'last', 'map', 'state')
+	load(sprintf('%s_%d_%03d', basename, sim_num, t0_start - 1), 'last', 'map', 'state')
 else
 	last = IC;  %Load the initial conditions to start.
 	[map,state] = make_map(params,-padding(1),0);  % Then, make the source map.
@@ -78,7 +78,7 @@ for t0 = t0_start:t_step:K-1
 	% Save the results of this run.
 	if SAVE
 		fprintf('Saving .. ')
-		fname = sprintf('%s_%d_%03d.mat', basename, sim_num, t0*t_step);
+		fname = checkname(sprintf('%s_%d_%03d.mat', basename, sim_num, t0*t_step));
 		save(fname, 'NP','EC','time','last', 'map', 'state');
 	end
 	
@@ -132,8 +132,8 @@ function convert_to_mea(params)
 		'Padding', params.padding, ...
 		'Name', ['SCM Seizure ' num2str(params.sim_num)], ...
 		'Time', time, ... 
-		'Path', sprintf('/projectnb/ecog/emily/Data/SEIZURES/SCM/SCM_Seizure%d_Neuroport_%d_%d.mat', ...
-			params.sim_num, params.padding) ...	 
+		'Path', sprintf('%s/SCM/SCM_Seizure%d_Neuroport_%d_%d.mat', ...
+			pwd, params.sim_num, params.padding) ...	 
 		);
 	
 	save(mea.Path, '-struct', 'mea');
