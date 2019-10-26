@@ -88,14 +88,17 @@ end
 end
 
 %% Convert to mea
+
+function im = data2frame(data, cmap)
+im = round((data - min(data(:))) / range(data(:)) * (length(cmap) - 1)) + 1;
+end
+
 function convert_to_mea(params)
 	files = dir(sprintf('%s_%d_*mat', params.basename, params.sim_num));
 	addpath(files(1).folder);
-	fig = figure();
-	ih = imagesc(params.IC.Ve);
-	th = title('0');
-	clear mov
-	mov(numel(files) - 1) = getframe(fig);
+	cmap = bone;
+	im = round(rescale(params.IC.Ve) * (length(cmap) - 1)) + 1;
+	mov(numel(files) - 1) = im2frame(im, cmap);
 	[data, tt] = deal(cell(numel(files) - 1 , 1));
 	
 	for f = files'
@@ -105,10 +108,12 @@ function convert_to_mea(params)
 		ind = strsplit(f.name, {'_', '.'});
 		ind = str2double(ind{end - 1}) + 1;
 		disp(ind)
-		set(ih, 'cdata', last.Ve);
-		set(th, 'string', num2str(ind)); 
-		drawnow
-		mov(ind) = getframe(fig);
+		im = round(rescale(last.Ve) * (length(cmap) - 1)) + 1;
+		mov(ind) = im2frame(im, cmap);
+% 		set(ih, 'cdata', last.Ve);
+% 		set(th, 'string', num2str(ind)); 
+% 		drawnow
+% 		mov(ind) = getframe(fig);
 		data{ind} = NP.Qe;
 		tt{ind} = time;
 	end
