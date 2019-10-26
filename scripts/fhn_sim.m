@@ -138,8 +138,9 @@ if SAVE
 	mea.seizure = seizure;
 	mea.fhn_params = params;
 	save(mea.Path, '-struct', 'mea');
-	clearvars -except sim_num
-	pat = 'FHN'; seizure = sim_num; paramfile = '';
+	fname = mea.Path; 
+	clearvars -except fname
+	paramfile = '';
 	analyze_wave_directions;
 	convert_to_wavefit_data(mea);
 end
