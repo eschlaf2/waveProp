@@ -92,7 +92,7 @@ function convert_to_mea(params)
 	files = dir(sprintf('%s_%d_*mat', params.basename, params.sim_num));
 	addpath(files(1).folder);
 	fig = figure();
-	ih = imagesc(params.IC.dVe);
+	ih = imagesc(params.IC.Ve);
 	th = title('0');
 	clear mov
 	mov(numel(files) - 1) = getframe(fig);
@@ -105,7 +105,7 @@ function convert_to_mea(params)
 		ind = strsplit(f.name, {'_', '.'});
 		ind = str2double(ind{end - 1}) + 1;
 		disp(ind)
-		set(ih, 'cdata', last.dVe);
+		set(ih, 'cdata', last.Ve);
 		set(th, 'string', num2str(ind)); 
 		drawnow
 		mov(ind) = getframe(fig);
