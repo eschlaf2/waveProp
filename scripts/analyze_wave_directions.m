@@ -1,15 +1,12 @@
-% pat = 'SIM'; seizure = 9; paramfile = '';
-datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
-addpath(datapath);  % ... add the original data path first
-patpath = genpath(pat);  % ... and then add the local patient path on top 
-addpath(patpath);  % ... so that it is searched first
+% fname = 'SCM/SCM_Seizure0_Neuroport_10_30.mat'; paramfile = '';
+% datapath = genpath(['/projectnb/ecog/Data' filesep pat]);  % matlab doesn't follow symlinks so 
+% addpath(datapath);  % ... add the original data path first
+% patpath = genpath(pat);  % ... and then add the local patient path on top 
+% addpath(patpath);  % ... so that it is searched first
 
 % Load mea data
-fname = sprintf('%s_Seizure%d_Neuroport_10_10.mat', pat, seizure);
-if ~exist(fname, 'file')
-	disp('Creating epoch file ...')
-	create_epoch(pat, seizure, 'padding', [10 10]);
-end
+[fpath, fname, ~] = fileparts(fname);
+addpath(fpath);
 mea = load(fname);
 
 % Add field params to mea
