@@ -137,7 +137,7 @@ function convert_to_mea(params)
 		);
 	
 	save(mea.Path, '-struct', 'mea');
-	save(sprintf('%s_%d_mov', params.basename, params.sim_num), '-struct', 'mov');
+	save(sprintf('%s_%d_mov', params.basename, params.sim_num), 'mov');
 	
 end
 
