@@ -35,7 +35,7 @@ for ii = 1:nF
 	% Differences in speed
 	outliers = isoutlier(dspeed, dim);
 	dspeed(outliers) = nan;
-	dspeed_mn = mn(dspeed, dim);
+	dspeed_mn = mn(dspeed);
 	summary.dspeed(ii, 1, :) = dspeed_mn;
 	summary.dspeed(ii, 2, :) = ci(dspeed_mn);
 	
@@ -43,7 +43,7 @@ for ii = 1:nF
 	outliers = isoutlier(abs(dtheta), dim);
 	dtheta(outliers) = nan;
 	summary.dtheta(ii, 1, :) = circ_mean(dtheta, [], dim, 'omitnan');
-	confmean = circ_confmean(dtheta, [], dim, 'omitnan');
+	confmean = circ_confmean(dtheta, [], [], [], dim, 'omitnan');
 	if ~isreal(confmean), confmean = angle(confmean); end
 	summary.dtheta(ii, 2, :) = confmean;
 	
