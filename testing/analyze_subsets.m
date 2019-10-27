@@ -52,15 +52,27 @@ for ii = 1:nF
 end
 
 plot_detection_rates(summary, f);
-plot_dthetaSpeed(summary.dtheta, f, '\Delta \theta');
-plot_dthetaSpeed(summary.dspeed, f, '|\Delta V|');
+plot_dthetaSpeed(summary.dtheta, f, 'theta');
+plot_dthetaSpeed(summary.dspeed, f, 'speed');
 
 
 %% Subroutines
-function plot_dthetaSpeed(data, f, ttl)
+function plot_dthetaSpeed(data, f, metric)
+% data = summary.dtheta;  
+% metric = 'theta';
 
-% data = summary.dtheta;  % skip full data
-% ttl = '\Delta\theta';
+switch metric
+	case 'speed'
+		ttl = '|\Delta V|';
+		ci =@(data, dim) 2 * std(data, [], dim, 'omitnan')./sqrt(sum(isfinite(data), dim));
+	case 'theta'
+		ttl = '\Delta \theta';
+		mean =@(data, dim) circ_mean(data, [], dim, 'omitnan');
+		std =@(data, ~, dim) circ_std(data, [], [], dim, 'omitnan');
+		ci =@(data, dim) circ_confmean(data, [], [], [], dim, 'omitnan');
+	otherwise
+		error('Metric not recognized.')
+end
 
 [nf, ~, nt] = size(data);
 
@@ -84,14 +96,14 @@ for ii = 1:nf
 end
 
 % Plot summary
-mn_files = mean(data(:, 1, :), 3, 'omitnan');
-std_files = std(data(:, 1, :), [], 3, 'omitnan');
-n_obs_files = sum(isfinite(data(:, 1, :)), 3);
+mn_files = mean(data(:, 1, :), 3);
+std_files = std(data(:, 1, :), [], 3);
+ci_files = ci(data(:, 1, :), 3);
 x = 1:numel(mn_files);
 figure()
 
 yyaxis('left')
-plot(x .* [1;1], (mn_files + [1 -1] .* std_files./sqrt(n_obs_files))', 'r-', x, mn_files, '*-');
+plot(x .* [1;1], (mn_files + [1 -1] .* ci_files)', 'r-', x, mn_files, '*-');
 ylabel('Mean')
 
 yyaxis('right')
