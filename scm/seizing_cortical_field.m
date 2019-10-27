@@ -49,6 +49,7 @@ noise = params.noise;
 ictal_wavefront = strcmpi(params.map_type, 'ictal_wavefront');
 map = IC.map;
 state = IC.state;
+expansion_rate = params.expansion_rate;
 
 %% Parameter
 %Parameters for proportion of extracellular potassium.
@@ -230,7 +231,7 @@ end
 %% Simulation
 for i = 1: Nsteps
 	
-	if ictal_wavefront && i > 1 && diff(floor(time(i-1:i) / rate))
+	if ictal_wavefront && i > 1 && diff(floor(time(i-1:i) / expansion_rate))
 		[map, state] = update_map(params, state);
 	end
 
