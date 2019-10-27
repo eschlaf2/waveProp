@@ -44,6 +44,7 @@ if ~exist('params', 'var') || isempty(params), params = init_scm_params(), end
 visualize_results = params.visualize_results;
 visualization_rate = params.visualization_rate;
 grid_size = params.grid_size;
+spatial_resolution = params.spatial_resolution;
 noise = params.noise;
 ictal_wavefront = strcmpi(params.map_type, 'ictal_wavefront');
 map = IC.map;
