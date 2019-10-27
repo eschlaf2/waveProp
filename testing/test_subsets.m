@@ -2,7 +2,7 @@
 
 % Params
 rng default
-nTrials = 5;
+nTrials = 100;
 sig_thresh = .05;
 subsets = [4 9 16 25 36 49 64];
 
