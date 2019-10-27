@@ -10,7 +10,7 @@ subsets = [4 9 16 25 36 49 64];
 mea = load(fname);
 mea.params = init_mea_params();
 [~, fname, ~] = fileparts(fname);
-outfile = matfile(sprintf('testing%ssubsets%s%s_%d_%s', ...
+outfile = matfile(sprintf('testing%ssubsets%s%s_%s', ...
 	filesep, filesep, fname, method), 'Writable', true);
 
 switch upper(method(1))
