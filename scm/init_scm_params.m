@@ -35,6 +35,10 @@ p('grid_size', [100 100], @(x) ~mod(x, 2) && numel(x) == 2);  % size of grid to 
 p('ictal_source_drive', 3);
 p('post_ictal_source_drive', 1.5);
 p('subsample_rate', Inf);  % Allow subsampling when making mea
+p('spatial_resolution', .3);  % (mm) 
+
+% make_map parameters
+p('expansion_rate', 3);  % every 3 seconds expand the wavefront
 
 parse(G, varargin{:});
 res = G.Results;
@@ -77,6 +81,8 @@ p('phi2_ee', IC.phi2_ee)
 p('phi2_ei', IC.phi2_ei)
 p('phi_ee', IC.phi_ee)
 p('phi_ei', IC.phi_ei)
+p('map', IC.map);
+p('state', IC.state);
 
 parse(G, res.IC{:});
 
