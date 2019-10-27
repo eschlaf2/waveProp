@@ -64,11 +64,13 @@ function plot_dthetaSpeed(data, f, metric)
 switch metric
 	case 'speed'
 		ttl = '|\Delta V|';
+		mean_fun =@(data, dim) mean(data, dim, 'omitnan');
+		std_fun =@(data, dim) std(data, [], dim, 'omitnan');
 		ci_fun =@(data, dim) 2 * std(data, [], dim, 'omitnan')./sqrt(sum(isfinite(data), dim));
 	case 'theta'
 		ttl = '\Delta \theta';
 		mean_fun =@(data, dim) circ_mean(data, [], dim, 'omitnan');
-		std_fun =@(data, ~, dim) circ_std(data, [], [], dim, 'omitnan');
+		std_fun =@(data, dim) circ_std(data, [], [], dim, 'omitnan');
 		ci_fun =@(data, dim) circ_confmean(data, [], [], [], dim, 'omitnan');
 	otherwise
 		error('Metric not recognized.')
@@ -97,7 +99,7 @@ end
 
 % Plot summary
 mn_files = mean_fun(data(:, 1, :), 3);
-std_files = std_fun(data(:, 1, :), [], 3);
+std_files = std_fun(data(:, 1, :), 3);
 ci_files = ci_fun(data(:, 1, :), 3);
 x = 1:numel(mn_files);
 figure()
