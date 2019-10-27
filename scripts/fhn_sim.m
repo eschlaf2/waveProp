@@ -1,5 +1,5 @@
 rng default
-defvar(who, 'SAVE', false);
+defvar('SAVE', false);
 
 if ~exist('options', 'var'), options = {}, end
 params = init_params(options{:});
