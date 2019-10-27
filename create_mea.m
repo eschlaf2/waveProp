@@ -65,6 +65,9 @@ if ndims(mea.Data) == 3
 		assert(all(abs(mea.Map - map) < tol), 'Check Map.');
 	end
 end
+
+mea.Data = int16(rescale(mea.Data, -2^15, 2^15));
+
 end
 
 function mea = check_position(mea, tol)
