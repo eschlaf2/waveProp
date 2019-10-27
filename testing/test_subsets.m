@@ -1,4 +1,4 @@
-% pat = 'CUCX4'; seizure = 2; method = 'M';
+% fname = 'CUCX4/CUCX4_Seizure2_Neuroport_10_10.mat'; method = 'M';
 
 % Params
 rng default
@@ -7,11 +7,11 @@ sig_thresh = .05;
 subsets = [4 9 16 25 36 49 64];
 
 % Setup
-outfile = matfile(sprintf('testing%ssubsets%s%s_%d_%s', ...
-	filesep, filesep, pat, seizure, method), 'Writable', true);
-mea = load(sprintf('%s%s%s_Seizure%d_Neuroport_10_10.mat', ...
-	pat, filesep, pat, seizure));
+mea = load(fname);
 mea.params = init_mea_params();
+[~, fname, ~] = fileparts(fname);
+outfile = matfile(sprintf('testing%ssubsets%s%s_%d_%s', ...
+	filesep, filesep, fname, method), 'Writable', true);
 
 switch upper(method(1))
 	case 'D'
@@ -31,7 +31,7 @@ end
 
 
 % Get wave fits from full method
-full = load(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pat, seizure), method_full);
+full = load(sprintf('%s_wave_prop.mat', fname), method_full);
 full = full.(method_full);
 
 % Use wavetimes from the full method on the subsets
