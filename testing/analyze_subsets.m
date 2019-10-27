@@ -8,7 +8,7 @@ dim = 1;  % dim=1: returns stats for each wave time;
 % Convenience
 mn =@(data) mean(data, dim, 'omitnan');
 sd =@(data) std(data, [], dim, 'omitnan');
-ci =@(data) 2 * sd(data, [], dim) ./ sqrt(sum(isfinite(data), dim));
+ci =@(data) 2 * sd(data) ./ sqrt(sum(isfinite(data), dim));
 
 summary.dr = nan(nF, 2);
 [summary.dspeed, summary.dtheta] = deal(nan(...  % Array of nans 
