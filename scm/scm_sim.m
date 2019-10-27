@@ -66,8 +66,7 @@ fig = [];
 for t0 = t0_start:t_step:K-1
 	fprintf('Running %d / %d .. ', t0, K-1);
 	last.t0 = t0;
-	[source_drive, map, state] = ...
-		set_source_drive(t0, last, params);
+	source_drive = set_source_drive(t0, last, params);
 
 	[NP, EC, time, last, fig] = ...
 		seizing_cortical_field(source_drive, t_step, last, fig, params);
@@ -138,7 +137,7 @@ function convert_to_mea(params)
 end
 
 %% Sub routines
-function [source_drive, map, state] = set_source_drive(t, last, params)
+function [source_drive] = set_source_drive(t, last, params)
 
 if t < params.padding(1)  % preseizure
 	source_drive = mean(last.dVe(:));
