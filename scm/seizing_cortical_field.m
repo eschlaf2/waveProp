@@ -45,7 +45,9 @@ visualize_results = params.visualize_results;
 visualization_rate = params.visualization_rate;
 grid_size = params.grid_size;
 noise = params.noise;
+ictal_wavefront = strcmpi(params.map_type, 'ictal_wavefront');
 map = IC.map;
+state = IC.state;
 
 %% Parameter
 %Parameters for proportion of extracellular potassium.
@@ -109,7 +111,7 @@ end
 
 % number of time-steps for simulation
 Nsteps = round(time_end/dt);
-time   = (0:Nsteps-1)'*dt;
+time   = (0:Nsteps-1)'*dt + IC.t0;
 
 % 3x3 Laplacian matrix (used in grid convolution calculations)
 Laplacian = [0 1 0; 1 -4 1; 0 1 0];
@@ -227,7 +229,9 @@ end
 %% Simulation
 for i = 1: Nsteps
 	
-	
+	if ictal_wavefront && i > 1 && diff(floor(t(i-1:i) / rate))
+		[map, state] = update_map(params, state);
+	end
 
     %Save the "microscale" dynamics.
     QeNP(i,:,:) =    Qe_grid(xNP-halfWin:xNP+halfWin, yNP-halfWin:yNP+halfWin);
@@ -513,6 +517,9 @@ last.dVe = del_VeRest;
 last.dVi = del_ViRest;
 
 last.K = K;
+
+last.map = map;
+last.state = state;
 
 %%%% Define the output variables of simulation.
 

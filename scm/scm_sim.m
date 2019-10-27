@@ -48,7 +48,6 @@ function run_simulation(params)
 % Extract parameters
 basename = params.basename;
 duration = params.duration;
-IC = params.IC;
 padding = params.padding;
 SAVE = params.SAVE;
 sim_num = params.sim_num;
@@ -57,29 +56,28 @@ t0_start = params.t0_start;
 
 % Create stimulus map
 if t0_start > 0
-	load(sprintf('%s_%d_%03d', basename, sim_num, t0_start - 1), 'last', 'map', 'state')
+	load(sprintf('%s_%d_%03d', basename, sim_num, t0_start - 1), 'last')
 else
-	last = IC;  %Load the initial conditions to start.
-	[map,state] = make_map(params,-padding(1),0);  % Then, make the source map.
-
+	last = params.IC;  %Load the initial conditions to start.
 end
 
 K = sum(padding) + duration;  
 fig = [];
 for t0 = t0_start:t_step:K-1
 	fprintf('Running %d / %d .. ', t0, K-1);
+	last.t0 = t0;
 	[source_drive, map, state] = ...
-		set_source_drive(t0, last, params, map, state);
+		set_source_drive(t0, last, params);
 
 	[NP, EC, time, last, fig] = ...
-		seizing_cortical_field(source_drive, map, t_step, last, fig, params);
-	time = time - padding(1) + t0;
+		seizing_cortical_field(source_drive, t_step, last, fig, params);
+	time = time - padding(1);
 	
 	% Save the results of this run.
 	if SAVE
 		fprintf('Saving .. ')
 		fname = checkname(sprintf('%s_%d_%03d', basename, sim_num, t0*t_step));
-		save(fname, 'NP','EC','time','last', 'map', 'state');
+		save(fname, 'NP','EC','time','last');
 	end
 	
 	fprintf('Done.\n')
@@ -140,17 +138,15 @@ function convert_to_mea(params)
 end
 
 %% Sub routines
-function [source_drive, map, state] = set_source_drive(t, last, params, map, state)
+function [source_drive, map, state] = set_source_drive(t, last, params)
 
 if t < params.padding(1)  % preseizure
 	source_drive = mean(last.dVe(:));
 elseif t >= params.padding(1) && t < (params.padding(1) + params.duration)  % seizure
 	source_drive = params.ictal_source_drive; 
-	if strcmp(params.map_type, 'ictal_wavefront')      %... when appropriate, update ictal wavefront location.
-		[map,state] = make_map(params,t,state);
-	end
 else  % postseizure
 	source_drive = params.post_ictal_source_drive;
 end
+
 end
 

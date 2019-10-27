@@ -16,9 +16,8 @@ if strcmp(map_type, 'fixed_point_source')
 	%set the initial map.
 	map(xCenter + (-1:1), yCenter + (-2:0)) = 1;
 	state = NaN;                                %Not used in this case.
-end
 
-if strcmp(map_type, 'ictal_wavefront')
+else  % (map_type: 'ictal_wavefront')
 
 	shrink_factor = 0.5;
 	if numel(state) < Nx * Ny

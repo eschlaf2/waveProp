@@ -81,8 +81,10 @@ p('phi2_ee', IC.phi2_ee)
 p('phi2_ei', IC.phi2_ei)
 p('phi_ee', IC.phi_ee)
 p('phi_ei', IC.phi_ei)
-p('map', IC.map);
-p('state', IC.state);
+
+[map, state] = update_map(res);
+p('map', map);
+p('state', state);
 
 parse(G, res.IC{:});
 
