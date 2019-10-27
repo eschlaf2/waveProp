@@ -106,10 +106,6 @@ function convert_to_mea(params)
 		disp(ind)
 		im = round(rescale(last.Ve) * (length(cmap) - 1)) + 1;
 		mov(ind) = im2frame(im, cmap);
-% 		set(ih, 'cdata', last.Ve);
-% 		set(th, 'string', num2str(ind)); 
-% 		drawnow
-% 		mov(ind) = getframe(fig);
 		data{ind} = NP.Qe;
 		tt{ind} = time;
 	end
