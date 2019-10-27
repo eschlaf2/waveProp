@@ -230,7 +230,7 @@ end
 %% Simulation
 for i = 1: Nsteps
 	
-	if ictal_wavefront && i > 1 && diff(floor(t(i-1:i) / rate))
+	if ictal_wavefront && i > 1 && diff(floor(time(i-1:i) / rate))
 		[map, state] = update_map(params, state);
 	end
 
