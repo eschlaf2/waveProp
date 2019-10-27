@@ -1,4 +1,4 @@
-function preview_mea(mea, skipfactor, t_start, pause_length)
+function preview_mea(mea, t_start, skipfactor, pause_length)
 
 defvar('skipfactor', 100);
 defvar('pause_length', 0);
