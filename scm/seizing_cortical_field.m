@@ -89,16 +89,13 @@ store_electrode_values;
 %% Define dynamic variables
 
 %Use as initial conditions the "last" values of previous simulation.
-dynamic_vars = fieldnames(IC)';
-
-%% Visualization initialization
-if PM.visualize, [fig, ah, th] = visualize; end
+last = rmfield(IC, 't0');  % initialize
+new = struct;  % initialize
+dynamic_vars = fieldnames(last)';
 
 %% Simulation
 
-last = IC;  % initialize
-new = last;  % initialize
-for i = 1: Nsteps
+for ii = 1: Nsteps
 	
 	expand_wavefront;
 	store_electrode_values;
@@ -140,19 +137,31 @@ EC = rmfield(EC, no_return);
 
 % 1. update wave equations
 	function update_wave_equations
-new.phi2_ee(2:Nx-1,2:Ny-1) = last.phi2_ee(2:Nx-1,2:Ny-1) + dt*(-2*SS.v.*SS.Lambda.*last.phi2_ee(2:Nx-1,2:Ny-1) ...
-						 - (SS.v.*SS.Lambda).^2.*last.phi_ee(2:Nx-1,2:Ny-1) ...
-						 + (SS.v.*SS.Lambda).^2.*last.Qe(2:Nx-1,2:Ny-1))...
-						 + dt*(SS.v/dx)^2*convolve2(last.phi_ee, M.Laplacian, 'valid');
-new.phi_ee = last.phi_ee + dt*last.phi2_ee;
+		emily.phi2_ee = ...
+			last.phi2_ee + ...
+			dt * ( ...
+				-2 * SS.v .* SS.Lambda .* last.phi2_ee ...
+				- (SS.v .* SS.Lambda).^2 .* last.phi_ee ...
+				+ (SS.v .* SS.Lambda).^2 .* last.Qe...
+			) + ...
+			dt * (SS.v / dx)^2 * del2(last.phi_ee);
+		
+		new.phi2_ee = zeros(Nx,Ny);
+		new.phi2_ee(2:Nx-1,2:Ny-1) = last.phi2_ee(2:Nx-1,2:Ny-1) + dt*(-2*SS.v.*SS.Lambda.*last.phi2_ee(2:Nx-1,2:Ny-1) ...
+								 - (SS.v.*SS.Lambda).^2.*last.phi_ee(2:Nx-1,2:Ny-1) ...
+								 + (SS.v.*SS.Lambda).^2.*last.Qe(2:Nx-1,2:Ny-1))...
+								 + dt*(SS.v/dx)^2*convolve2(last.phi_ee, M.Laplacian, 'valid');
+							 
+		temp = new.phi2_ee - emily.phi2_ee;
+		new.phi_ee = last.phi_ee + dt*last.phi2_ee;
 
-new.phi2_ei = zeros(Nx,Ny);
-new.phi2_ei(2:Nx-1,2:Ny-1) = last.phi2_ei(2:Nx-1,2:Ny-1) + dt*(-2*SS.v.*SS.Lambda.*last.phi2_ei(2:Nx-1,2:Ny-1) ...
-						 - (SS.v.*SS.Lambda).^2.*last.phi_ei(2:Nx-1,2:Ny-1) ...
-						 + (SS.v.*SS.Lambda).^2.*last.Qe(2:Nx-1,2:Ny-1)) ...
-						 + dt*(SS.v/dx)^2*convolve2(last.phi_ei, M.Laplacian, 'valid');
-new.phi_ei = last.phi_ei + dt*last.phi2_ei;
-end
+		new.phi2_ei = zeros(Nx,Ny);
+		new.phi2_ei(2:Nx-1,2:Ny-1) = last.phi2_ei(2:Nx-1,2:Ny-1) + dt*(-2*SS.v.*SS.Lambda.*last.phi2_ei(2:Nx-1,2:Ny-1) ...
+								 - (SS.v.*SS.Lambda).^2.*last.phi_ei(2:Nx-1,2:Ny-1) ...
+								 + (SS.v.*SS.Lambda).^2.*last.Qe(2:Nx-1,2:Ny-1)) ...
+								 + dt*(SS.v/dx)^2*convolve2(last.phi_ei, M.Laplacian, 'valid');
+		new.phi_ei = last.phi_ei + dt*last.phi2_ei;
+	end
 
 % 2. update the 4 synaptic flux equations (include sc noise)
 	function update_synaptic_flux_eq
@@ -191,14 +200,14 @@ end
 
 % 3. update the soma voltages
 	function update_soma_voltages
-    new.Ve_grid = zeros(Nx,Ny);
-    new.Ve_grid(2:Nx-1,2:Ny-1) = last.Ve(2:Nx-1,2:Ny-1) + dt/SS.tau_e*( (SS.Ve_rest - last.Ve(2:Nx-1,2:Ny-1)) + last.dVe(2:Nx-1,2:Ny-1) ...
+    new.Ve = zeros(Nx,Ny);
+    new.Ve(2:Nx-1,2:Ny-1) = last.Ve(2:Nx-1,2:Ny-1) + dt/SS.tau_e*( (SS.Ve_rest - last.Ve(2:Nx-1,2:Ny-1)) + last.dVe(2:Nx-1,2:Ny-1) ...
           + SS.rho_e*Psi_ee(last.Ve(2:Nx-1,2:Ny-1)).*last.Phi_ee(2:Nx-1,2:Ny-1) ...      %E-to-E
           + SS.rho_i*Psi_ie(last.Ve(2:Nx-1,2:Ny-1)).*last.Phi_ie(2:Nx-1,2:Ny-1) ...      %I-to-E
           + last.D11(2:Nx-1,2:Ny-1).*convolve2(last.Ve, M.Laplacian, 'valid'));
 
-    new.Vi_grid = zeros(Nx,Ny);
-    new.Vi_grid(2:Nx-1,2:Ny-1) = last.Vi(2:Nx-1,2:Ny-1) + dt/SS.tau_i*( (SS.Vi_rest - last.Vi(2:Nx-1,2:Ny-1)) + last.dVi(2:Nx-1,2:Ny-1) ...
+    new.Vi = zeros(Nx,Ny);
+    new.Vi(2:Nx-1,2:Ny-1) = last.Vi(2:Nx-1,2:Ny-1) + dt/SS.tau_i*( (SS.Vi_rest - last.Vi(2:Nx-1,2:Ny-1)) + last.dVi(2:Nx-1,2:Ny-1) ...
           + SS.rho_e*Psi_ei(last.Vi(2:Nx-1,2:Ny-1)).*last.Phi_ei(2:Nx-1,2:Ny-1) ...      %E-to-I
           + SS.rho_i*Psi_ii(last.Vi(2:Nx-1,2:Ny-1)).*last.Phi_ii(2:Nx-1,2:Ny-1) ...      %I-to-I
           + last.D22(2:Nx-1,2:Ny-1).*convolve2(last.Vi, M.Laplacian, 'valid'));
@@ -206,11 +215,13 @@ end
 
 % 4. update the firing rates
 	function update_firing_rates
-    new.Qe = SS.Qe_max *(1./(1+exp(-pi/(sqrt(3)*SS.sigma_e).*(last.Ve - SS.theta_e)))) ...     %The E voltage must be big enough,
-            - SS.Qe_max *(1./(1+exp(-pi/(sqrt(3)*SS.sigma_e).*(last.Ve - (SS.theta_e+30)))));   %... but not too big.
-    new.Qi = SS.Qi_max *(1./(1+exp(-pi/(sqrt(3)*SS.sigma_i).*(last.Vi - SS.theta_i)))) ...     %The I voltage must be big enough,
-            - SS.Qi_max *(1./(1+exp(-pi/(sqrt(3)*SS.sigma_i).*(last.Vi - (SS.theta_i+30)))));   %... but not too big.
-end
+		new.Qe = SS.Qe_max *(1./(1+exp(-pi/(sqrt(3)*SS.sigma_e).*(last.Ve - SS.theta_e)))) ...     %The E voltage must be big enough,
+				- SS.Qe_max *(1./(1+exp(-pi/(sqrt(3)*SS.sigma_e).*(last.Ve - (SS.theta_e+30)))));   %... but not too big.
+		new.Qi = SS.Qi_max *(1./(1+exp(-pi/(sqrt(3)*SS.sigma_i).*(last.Vi - SS.theta_i)))) ...     %The I voltage must be big enough,
+				- SS.Qi_max *(1./(1+exp(-pi/(sqrt(3)*SS.sigma_i).*(last.Vi - (SS.theta_i+30)))));   %... but not too big.
+		last.Qe = new.Qe;
+		last.Qi = new.Qi;
+	end
 
 % 5. Update extracellular ion.
 	function update_extracellular_ion
@@ -224,15 +235,16 @@ end
 
 % 6. Update inhibitory gap junction strength, and resting voltages.  
 	function update_gap_resting
-    new.D22         = last.D22        + dt/PT.tau_dD *(PK.KtoD *last.K);
+    new.D22 = last.D22 + dt/PT.tau_dD *(PK.KtoD *last.K);
+	new.D11 = last.D11;
     new.dVe  = last.dVe + dt/PT.tau_dVe*(PK.KtoVe*last.K);
     new.dVi  = last.dVi + dt/PT.tau_dVi*(PK.KtoVi*last.K);
 	end
 
 % Expand wavefront
 	function expand_wavefront
-		if diff(floor(time(i) - [dt 0] / M.expansion_rate))
-			[last.map, last.state] = update_map(last.state);
+		if diff(floor(time(ii) - [dt 0] / M.expansion_rate))
+			[new.map, new.state] = update_map(last.state);
 		end
 	end
 
@@ -248,11 +260,11 @@ end
 			end
 		else  % ... or store
 			for v = out_vars 
-				NP.(v{:})(i, :, :) = reshape(last.(v{:})(addyNP), [1, PE.dimsNP]); 
+				NP.(v{:})(ii, :, :) = reshape(last.(v{:})(addyNP), [1, PE.dimsNP]); 
 				
 				% Take the local mean for ECOG electrodes
 				blurEC = conv2(last.(v{:}), ones(3), 'same') ./ 9;  
-				EC.(v{:})(i, :, :) = reshape(blurEC(addyEC), [1, PE.dimsEC]);
+				EC.(v{:})(ii, :, :) = reshape(blurEC(addyEC), [1, PE.dimsEC]);
 			end
 		end
 	end
@@ -285,21 +297,24 @@ end
 
 % Visualize results
 	function visualize
-		if ~exist('fig', 'var') 
-			[fig, ah, th] = create_fig(M.grid_size, addyNP, addyEC); 
-		else
+		if ~exist('fig', 'var') || isempty(fig)
+			fig = create_fig(M.grid_size, addyNP, addyEC);
+		end
+		if diff(floor((time(ii) - [dt 0]) * PM.visualization_rate))
 			% Image of excitatory population activity.
-			set(ah(1), 'cdata', Qe);
+			set(fig.ih(1), 'cdata', last.Qe);
 
 			% Image of inhibitory population activity.
-			set(ah(2), 'cdata', Qi);
+			set(fig.ih(2), 'cdata', last.Ve);
 
 			% Image of extracellular ion proportion.
-			set(ah(3), 'cdata', K)
-			set(th(3), 'string', sprintf('K %2f', mean(K(:))))
+			set(fig.ih(3), 'cdata', last.K)
+			set(fig.th(3), 'string', sprintf('K %2f', mean(last.K(:))))
 
 			% Image of inhibitory gap junction strength.
-			set(ah(4), 'cdata', Qe + Qi);  
+			set(fig.ih(4), 'cdata', last.Qe + last.Qi);  
+			
+			set(fig.ah, 'string', sprintf('T = %0.3f', time(ii)));
 			drawnow;
 		end
 	end
@@ -331,31 +346,44 @@ end
 %% Supplementary functions
 
 %------------------------------------------------------------------------
-function [fig, ah, th] = create_fig(grid_size, addyNP, addyEC)
-	titles = {'Qe', 'Qi', 'K', 'Qe + Qi'};
+function fig = create_fig(grid_size, addyNP, addyEC)
+	titles = {'Qe', 'Ve', 'K', 'Qe + Qi'};
 	clims = {[0 30], [0 30], [0 1], [0 30]};
-	fig = figure;
+	fig.fig = figure;
 	h = gobjects(4, 1);
 	th = gobjects(4, 1);
-	ah = gobjects(4, 1);
+	ih = gobjects(4, 1);
 	% Image of excitatory population activity.
-	  for ii = 1:4
-		  h(ii) = subplot(2,2,ii);
-		  ah(ii) = imagesc(zeros(grid_size), clims{ii});
-		  th(ii) = title(titles{ii});
-		  colormap jet; axis equal; axis tight; axis ij;
-	  end
+	for ii = 1:4
+		h(ii) = subplot(2,2,ii);
+		ih(ii) = imagesc(zeros(grid_size), clims{ii});
+		th(ii) = title(titles{ii});
+		colormap bone; axis equal; axis tight; axis ij;
+	end
 
-	  % Indicate electrode positions.
-	  hold(h(1), 'on')
-	  map = nan(grid_size);
-	  map(addyNP) = 1;
-	  map(addyEC) = 2;
-	  h = pcolor(map);
-	  h.FaceAlpha = .5;
-	  h.LineStyle = 'none';
+	% Indicate electrode positions.
+	colorEC = [0 1 1];
+	colorNP = [1 0 1];
+	
+	hold(h(1), 'on')
+	
+	[xE, yE] = ind2sub(grid_size, addyEC);
+	[xN, yN] = ind2sub(grid_size, addyNP);
+	kE = convhull(xE(:), yE(:));
+	kN = convhull(xN(:), yN(:));
+	plot(h(1), xE(kE), yE(kE), '-', 'color', colorEC);
+	plot(h(1), xN(kN), yN(kN), '-', 'color', colorNP);
+	legend({'EC', 'NP'}, 'location', 'southeast')
+	legend('boxoff')
 
-	  hold(h(1), 'off')
+	hold(h(1), 'off')
+	ah = annotation('textbox', [0 .99 0 0], 'string', 'T = ', ...
+		'FitBoxToText', 'on', 'LineStyle', 'none');
+	
+	fig.h = h;
+	fig.ih = ih;
+	fig.th = th;
+	fig.ah = ah;
 end
 
 %------------------------------------------------------------------------

@@ -30,15 +30,17 @@
 % Department of Mathematics and Statistics, Boston University, USA.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Get parameters and display them (for remote run tracking)
 if ~exist('params', 'var'); params = init_scm_params(); end
-
 disp(params)
 PM = params.meta;
 
+% Create a directory for files if necessary; save the parameters
 [base_path, ~, ~] = fileparts(PM.basename);
 if ~exist(base_path, 'dir'), mkdir(base_path), end
 if PM.SAVE, save(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'params'); end
 
+% Main
 run_simulation(params)
 convert_to_mea(PM)
 
