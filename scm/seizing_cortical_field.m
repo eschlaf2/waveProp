@@ -49,24 +49,19 @@ PE = params.electrodes;
 PT = params.time_constants;
 PN = params.noise;
 
-global HL
+% global HL
 HL = params.HL;
 
-struct2var(params.meta);
-struct2var(params.potassium);
+% struct2var(params.meta);
+% struct2var(params.potassium);
 
-%% Parameter
+%% A few convenience variables
 
 ictal_wavefront = strcmpi(M.map_type, 'ictal_wavefront');
-% set no. of sampling points (must be even!) along each axis of cortical grid
 Nx = M.grid_size(1);
 Ny = M.grid_size(2);
 dx = M.spatial_resolution;
 dt = M.dt;
-
-% define synaptic strengths
-rho_e = HL.ge;
-rho_i = HL.gi;
 
 % initialize random number generator (from input argument)
 rand_state = sum(100*clock);
@@ -178,14 +173,14 @@ for i = 1: Nsteps
 
     new.Ve_grid = zeros(Nx,Ny);
     new.Ve_grid(2:Nx-1,2:Ny-1) = last.Ve(2:Nx-1,2:Ny-1) + dt/HL.tau_e*( (HL.Ve_rest - last.Ve(2:Nx-1,2:Ny-1)) + last.dVe(2:Nx-1,2:Ny-1) ...
-          + rho_e*Psi_ee(last.Ve(2:Nx-1,2:Ny-1)).*last.Phi_ee(2:Nx-1,2:Ny-1) ...      %E-to-E
-          + rho_i*Psi_ie(last.Ve(2:Nx-1,2:Ny-1)).*last.Phi_ie(2:Nx-1,2:Ny-1) ...      %I-to-E
+          + HL.rho_e*Psi_ee(last.Ve(2:Nx-1,2:Ny-1)).*last.Phi_ee(2:Nx-1,2:Ny-1) ...      %E-to-E
+          + HL.rho_i*Psi_ie(last.Ve(2:Nx-1,2:Ny-1)).*last.Phi_ie(2:Nx-1,2:Ny-1) ...      %I-to-E
           + last.D11(2:Nx-1,2:Ny-1).*convolve2(last.Ve, M.Laplacian, 'valid'));
 
     new.Vi_grid = zeros(Nx,Ny);
     new.Vi_grid(2:Nx-1,2:Ny-1) = last.Vi(2:Nx-1,2:Ny-1) + dt/HL.tau_i*( (HL.Vi_rest - last.Vi(2:Nx-1,2:Ny-1)) + last.dVi(2:Nx-1,2:Ny-1) ...
-          + rho_e*Psi_ei(last.Vi(2:Nx-1,2:Ny-1)).*last.Phi_ei(2:Nx-1,2:Ny-1) ...      %E-to-I
-          + rho_i*Psi_ii(last.Vi(2:Nx-1,2:Ny-1)).*last.Phi_ii(2:Nx-1,2:Ny-1) ...      %I-to-I
+          + HL.rho_e*Psi_ei(last.Vi(2:Nx-1,2:Ny-1)).*last.Phi_ei(2:Nx-1,2:Ny-1) ...      %E-to-I
+          + HL.rho_i*Psi_ii(last.Vi(2:Nx-1,2:Ny-1)).*last.Phi_ii(2:Nx-1,2:Ny-1) ...      %I-to-I
           + last.D22(2:Nx-1,2:Ny-1).*convolve2(last.Vi, M.Laplacian, 'valid'));
 
 % 4. update the firing rates

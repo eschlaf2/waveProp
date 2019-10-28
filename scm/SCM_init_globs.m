@@ -24,7 +24,7 @@ H.gamma_i = 50;                                 % IPSP decay rate (/s)
 [H.sigma_e, H.sigma_i] = deal(3.0,   5.0);		% sigmoid 'width' (mV)
 
 % gain per synapse at resting voltage (millivolt.sec)
-[H.ge, H.gi] = deal(1.00e-3, -1.05e-3);
+[H.rho_e, H.rho_i] = deal(1.00e-3, -1.05e-3);
 
 % voltage limits
 [H.Ve_rev,  H.Vi_rev]  = deal(0, -70);          % reversal potential (mV)
