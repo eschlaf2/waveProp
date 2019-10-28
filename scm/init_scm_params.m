@@ -1,15 +1,36 @@
 % default_params
 function res = init_scm_params(varargin)
+% All parameters except IC and HL can be adjusted by passing name-value
+% pairs. To modify HL and IC, the value passed to either name should be a
+% cell containing name-value pairs of specific subparameters.
+% 
+% Example:
+% 	params = init_scm_params( ...
+% 		'sim_num', 1, ...
+% 		'IC', {'dVe', 1} ...
+% 		);
 
-%% parsing functions
-validate = @(x, all) any(validatestring(x, all));  % validate strings
+% Adjust values as name-value pairs
+res.meta = parse_meta(varargin);  
+res.model = parse_model(varargin);
 
-%% Meta
+% Passed as unmatched parameters from parsing of model
+res.electrodes = parse_electrodes(res.model);
+res.time_constants = parse_time(res.model);
+res.potassium = parse_potassium(res.model);
+res.noise = parse_noise(res.model);
+
+% IC and HL
+res.IC = parse_IC(res.model);
+res.HL = parse_HL(res.model);
+
+res.model = check_time_resolution(res.model, res.IC, res.HL);
+
+end
+
+function meta = parse_meta(options)
 % Save and visualize
-
-G = inputParser;
-p = @(varargin) addParameter(G, varargin{:});  % convenience function
-G.KeepUnmatched = true;
+[G, p] = get_parser();
 
 p('basename', 'SCM/SCM/SCM');
 p('sim_num', 0);
@@ -19,13 +40,13 @@ p('visualization_rate', 10);  % Show this many frames per second
 p('t_step', 1);  % Simulate t_step second intervals
 p('t0_start', 0);  % Continue from previous sim (IC will use last from file number t0_start-1)
 
-parse(G, varargin{:});
-res.meta = G.Results;
+parse(G, options{:});
+meta = G.Results;
+end
 
+function model = parse_model(options)
 %% Seizure definition
-G = inputParser;
-p = @(varargin) addParameter(G, varargin{:});  % convenience function
-G.KeepUnmatched = true;
+[G, p] = get_parser();
 
 p('duration', 90);  % Seizure duration
 p('padding', [10 30], @(x) isnumeric(x) & numel(x) == 2);  % Padding before and after seizure
@@ -35,7 +56,7 @@ allMapTypes = {'ictal_wavefront', 'fixed_point_source'};
 p('map_type', 'ictal_wavefront', @(x) validate(x, allMapTypes));  % Ictal source 
 p('stim_center', [0 0], @(x) numel(x) == 2);
 p('grid_size', [100 100], @(x) ~mod(x, 2) && numel(x) == 2);  % size of grid to simulate (must be even)
-p('dt', 4e-4);
+p('dt', 2e-4);
 p('Laplacian', [0 1 0; 1 -4 1; 0 1 0]);
 p('ictal_source_drive', 3);
 p('post_ictal_source_drive', 1.5);
@@ -44,23 +65,42 @@ p('spatial_resolution', .3);  % (mm)
 p('expansion_rate', 3);  % every 3 seconds expand the wavefront
 p('IC', {});  % Initial conditions of the sim (enter options as name-value pairs)
 p('HL', {});  % Constants that define the locations of steady states
+p('time_constants', {});  % tau parameters controlling rates
+p('potassium', {});  % Potassium (K-related) parameters
+p('noise', {});  % Noise parameters
+p('electrodes', {});  % electrode positions
 
-parse(G, varargin{:});
+
+parse(G, options{:});
 model = G.Results;
-model = clean_model(model);
+if isempty(model.time_constants), model.time_constants = G.Unmatched; end
+if isempty(model.potassium), model.potassium = G.Unmatched; end
+if isempty(model.electrodes), model.electrodes = G.Unmatched; end
+if isempty(model.noise), model.noise = G.Unmatched; end
 
+% set stimulus center if unset
+stim_center = model.stim_center;
+if any(stim_center<=0), stim_center = round(model.grid_size * .4); end
+model.stim_center = round(stim_center);
 
+end
+
+function noise = parse_noise(model)
 %% Noise
-G = inputParser; G.KeepUnmatched = true;
+[G, p] = get_parser();
+options = model.noise;
 
-p(G, 'noise', 0.5);  % Noise level
-p(G, 'noise_sf', []);    % noise scale-factor
-p(G, 'noise_sc', 0.2);             % subcortical noise
+p('noise', 0.5);  % Noise level
+p('noise_sf', []);  % noise scale-factor
+p('noise_sc', 0.2);  % subcortical noise
 
-G.parse(varargin{:});
+if isstruct(options), G.parse(options), else, G.parse(options{:}); end
 noise = G.Results;
-if isempty(noise.noise_sf); noise.noise_sf = 0.2*20*noise; end
+if isempty(noise.noise_sf); noise.noise_sf = 0.2*20*noise.noise; end
 
+end
+
+function IC = parse_IC(model)
 %% Initial conditions
 % These are the same as in Waikato-Kramer except that dVe defaults to -1
 % instead of 1 (original IC in <map_type='ictal_wavefront'> scenario).
@@ -71,7 +111,6 @@ G = inputParser; G.CaseSensitive = true;
 p = @(varargin) addParameter(G, varargin{:});  % convenience function
 
 IC = load('default_scm_ICs.mat');
-IC = resize(IC, res.scm);
 
 p('D11', IC.D11)
 p('D22', IC.D22)
@@ -95,75 +134,98 @@ p('phi2_ei', IC.phi2_ei)
 p('phi_ee', IC.phi_ee)
 p('phi_ei', IC.phi_ei)
 
-[map, state] = update_map(seizure);
+[map, state] = update_map(model);
 p('map', map);
 p('state', state);
 
 parse(G, model.IC{:});
 
 IC = G.Results;
+IC = resize(IC, model);
+
+end
+
+function model = check_time_resolution(model, IC, HL)
+% set time resolution
+D2 = IC.D22 * model.spatial_resolution.^2;
+if model.dt > 2e-4 && (any(D2(:) >= 0.87) || HL.v(:) > 140)
+	model.dt = 2e-4;
+	warning('High D2 or HL.v; setting dt to 2e-4.');
+end
+end
+
+function time_constants = parse_time(model)
 
 %% Time constants
-G = inputParser; G.KeepUnmatched = true;
-p = @(G, varargin) addParameter(G, varargin{:});
+[G, p] = get_parser();
+options = model.time_constants;
 
-p(G, 'tau_dD', 200);  %inhibitory gap junction time-constant (/s).
-p(G, 'tau_dVe', 250);  %excitatory population resting voltage time-constant (/s).
-p(G, 'tau_dVi', 250);  %inhibitory population resting voltage time-constant (/s).
+p('tau_dD', 200);  %inhibitory gap junction time-constant (/s).
+p('tau_dVe', 250);  %excitatory population resting voltage time-constant (/s).
+p('tau_dVi', 250);  %inhibitory population resting voltage time-constant (/s).
 
-parse(G, varargin{:})
+if isstruct(options), parse(G, options), else, parse(G, options{:}), end
 time_constants = G.Results;
 
+end
+
+function HL = parse_HL(model)
+
 %% Steady state constants
-G = inputParser; G.CaseSensitive = true;
+[G, p] = get_parser(); 
+G.CaseSensitive = true;
+options = model.HL;
 
 HL = SCM_init_globs;  % See this function for details
-for f = fieldnames(HL)', p(G, f{:}, HL.(f{:})); end
-G.parse(model.HL{:});
+for f = fieldnames(HL)', p(f{:}, HL.(f{:})); end
+
+if isstruct(options), G.parse(options), else, G.parse(options{:}); end
 
 HL = G.Results;
 
+end
+
+function potassium = parse_potassium(model)
+
 %% Potassium parameters
-G = inputParser; G.KeepUnmatched = true;
+[G, p] = get_parser();
+options = model.potassium;
 
-p(G, 'tau_K', 200);    %time-constant (/s).
-p(G, 'k_decay', 0.1);  %decay rate (/s).
-p(G, 'kD', 1);         %diffusion coefficient (cm^2/s).
-p(G, 'KtoVe', 10);     %impact on excitatory population resting voltage.
-p(G, 'KtoVi', 10);     %impact on inhibitory population resting voltage.
-p(G, 'KtoD', -50);    %impact on inhibitory gap junction strength.
-p(G, 'kR', 0.15);   %scale reaction term. 
+p('tau_K', 200);    %time-constant (/s).
+p('k_decay', 0.1);  %decay rate (/s).
+p('kD', 1);         %diffusion coefficient (cm^2/s).
+p('KtoVe', 10);     %impact on excitatory population resting voltage.
+p('KtoVi', 10);     %impact on inhibitory population resting voltage.
+p('KtoD', -50);    %impact on inhibitory gap junction strength.
+p('kR', 0.15);   %scale reaction term. 
 
-parse(G, varargin{:})
+if isstruct(options), parse(G, options), else, parse(G, options{:}), end
 potassium = G.Results;
 
+end
+
+function electrodes = parse_electrodes(model)
+
 %% Electrode parameters
-G = inputParser; G.KeepUnmatched = true;
+[G, p] = get_parser();
 
 % Microscale
-p(G, 'centerNP', []);
-p(G, 'dimsNP', [10 10]);
+p('centerNP', []);
+p('dimsNP', [10 10]);
 
 % Macroscale
-p(G, 'centerEC', []);
-p(G, 'scaleEC', 4);
-p(G, 'dimsEC', [3 3]);
+p('centerEC', []);
+p('scaleEC', 4);
+p('dimsEC', [3 3]);
 
-parse(G, varargin{:});
+if isstruct(model.electrodes), parse(G, model.electrodes), else, parse(G, model.electrodes{:}); end
 electrodes = clean_electrodes(G.Results, model);
-
-%% Compile results
-res.electrodes = electrodes;
-res.model = model;
-res.IC = IC;
-res.time_constants = time_constants;
-res.HL = HL;
-res.potassium = potassium;
-res.noise = noise;
 
 end
 
 function s = clean_electrodes(s, model)
+% Make sure electrodes are in grid bounds
+
 NP = s.centerNP;
 EC = s.centerEC;
 gs = model.grid_size;
@@ -177,34 +239,23 @@ EC = min(max(EC, ceil(s.dimsEC / 2)), gs - floor(s.dimsEC / 2));
 s.centerNP = NP; s.centerEC = EC;
 end
 
-function s = clean_model(s, HL, IC, model)
-
-% set stimulus center if unset
-stim_center = s.stim_center;
-if any(stim_center<=0), stim_center = round(s.grid_size * .4); end
-s.stim_center = round(stim_center);
-
-% set time resolution
-D2 = IC.D22 * model.spatial_resolution.^2;
-if s.dt > 2e-4 && (any(D2 >= 0.87) || HL.v > 140)
-	s.dt = 2e-4;
-	warning('High D2 or HL.v; setting dt to 2e-4.');
-end
-
-
-end
-
-function IC = resize(IC, res)
+function IC = resize(IC, model)
 % Resize IC fields by bootstrapping from original values. The same subset
 % of indices is used for each field. i.e. the ICs on the whole are a
 % sub(super)-set of the default ICs.
 
-if ~all(res.grid_size == size(IC.D11))
+if ~all(model.grid_size == size(IC.D11))
 	rng(0)  % for reproducibility
-	inds = randi(numel(IC.D11), res.grid_size(1), res.grid_size(2));
+	inds = randi(numel(IC.D11), model.grid_size(1), model.grid_size(2));
 	for f = fieldnames(IC)'
 		IC.(f{:}) = IC.(f{:})(inds);
 	end
 end
+
+end
+
+function [G, p] = get_parser()
+G = inputParser; G.KeepUnmatched = true;
+p =@(varargin) addParameter(G, varargin{:});
 
 end

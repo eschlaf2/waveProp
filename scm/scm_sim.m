@@ -34,10 +34,11 @@ if ~exist('options', 'var'); options = {}; end
 
 params = init_scm_params(options{:});
 disp(params)
+PM = params.meta;
 
-[base_path, ~, ~] = fileparts(params.basename);
+[base_path, ~, ~] = fileparts(PM.basename);
 if ~exist(base_path, 'dir'), mkdir(base_path), end
-if params.SAVE, save(sprintf('%s_%d_info', params.basename, params.sim_num), 'params'); end
+if PM.SAVE, save(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'params'); end
 
 run_simulation(params)
 convert_to_mea(params)
@@ -45,8 +46,9 @@ convert_to_mea(params)
 %% Run Simulation
 function run_simulation(params)
 
+PM = params.meta;
 % Extract parameters
-basename = params.basename;
+basename = PM.basename;
 duration = params.duration;
 padding = params.padding;
 SAVE = params.SAVE;
