@@ -64,6 +64,9 @@ end
 K = sum(padding) + duration;  
 fig = [];
 for t0 = t0_start:t_step:K-1
+	if t0 > 0 && ~mod(t0, 3)
+		'hello'
+	end
 	fprintf('Running %d / %d .. ', t0, K-1);
 	last.t0 = t0;
 	source_drive = set_source_drive(t0, last, params);

@@ -41,30 +41,27 @@ function [NP, EC, time, last, fig] = seizing_cortical_field(source_del_VeRest, t
 %% Preferences and parameters
 if ~exist('params', 'var') || isempty(params), params = init_scm_params(), end
 
-visualize_results = params.visualize_results;
-visualization_rate = params.visualization_rate;
-grid_size = params.grid_size;
-spatial_resolution = params.spatial_resolution;
-noise = params.noise;
-ictal_wavefront = strcmpi(params.map_type, 'ictal_wavefront');
-map = IC.map;
-state = IC.state;
-expansion_rate = params.expansion_rate;
+PM = params.meta;
+PK = params.potassium;
+
+struct2var(params.meta);
 
 %% Parameter
 %Parameters for proportion of extracellular potassium.
-K0 = 0;         %initial value.
-tau_K = 200;    %time-constant (/s).
-k_decay = 0.1;  %decay rate (/s).
-kD = 1;         %diffusion coefficient (cm^2/s).
-KtoVe = 10;     %impact on excitatory population resting voltage.
-KtoVi = 10;     %impact on inhibitory population resting voltage.
-KtoD  = -50;    %impact on inhibitory gap junction strength.
-kR    = 0.15;   %scale reaction term. 
-    
-tau_dD  = 200;  %inhibitory gap junction time-constant (/s).
-tau_dVe = 250;  %excitatory population resting voltage time-constant (/s).
-tau_dVi = 250;  %inhibitory population resting voltage time-constant (/s).
+% K0 = 0;         %initial value.
+struct2var(params.potassium);
+
+% tau_K = 200;    %time-constant (/s).
+% k_decay = 0.1;  %decay rate (/s).
+% kD = 1;         %diffusion coefficient (cm^2/s).
+% KtoVe = 10;     %impact on excitatory population resting voltage.
+% KtoVi = 10;     %impact on inhibitory population resting voltage.
+% KtoD  = -50;    %impact on inhibitory gap junction strength.
+% kR    = 0.15;   %scale reaction term. 
+%     
+% tau_dD  = 200;  %inhibitory gap junction time-constant (/s).
+% tau_dVe = 250;  %excitatory population resting voltage time-constant (/s).
+% tau_dVi = 250;  %inhibitory population resting voltage time-constant (/s).
 
 % set no. of sampling points (must be even!) along each axis of cortical grid
 Nx = grid_size(1);
@@ -75,12 +72,13 @@ dx = spatial_resolution;
 
 % D1 = zeros(Nx,Ny)+0.8/100;              %Set initial i <--> i gap-junction diffusive-coupling strength in all space (cm^2)
 % D2 = zeros(Nx,Ny)+0.8;                  %Set initial e <--> e gap-junction diffusive-coupling strength in all space (cm^2)
-D2 = IC.D22 * dx.^2;
+% D2 = IC.D22 * dx.^2;
 % K  = zeros(Nx,Ny)+K0;                   %Set initial extracellular ion concentration in all space (cm^2)
 
 % initialize constants for Seizing Cortical Model
 global HL
-HL = SCM_init_globs;
+HL = params.HL;
+% HL = SCM_init_globs;
 
 % define synaptic strengths
 rho_e = HL.ge;
@@ -90,33 +88,33 @@ rho_i = HL.gi;
 rand_state = sum(100*clock);
 rng(rand_state, 'v5normal');
 
-noise_sf = 0.2*20*noise;    % noise scale-factor
-noise_sc = 0.2;             % subcortical noise
+% noise_sf = 0.2*20*noise;    % noise scale-factor
+% noise_sc = 0.2;             % subcortical noise
 
-HL.v = 280;                 % axonal conduction velocity (cm/s), [original = 140 cm/s]
-HL.Lambda = 4.0;			% inverse-length scale for connectivity (/cm)
-HL.gamma_e = 170;           % EPSP decay rate (/s)
-HL.gamma_i = 50;            % IPSP decay rate (/s)
-HL.tau_e = 0.02;			% excit neuron time-constant (/s) [original = 0.04 s]
-HL.tau_i = 0.02;			% inhib neuron time-constant (/s) [original = 0.04 s]
+% HL.v = 280;                 % axonal conduction velocity (cm/s), [original = 140 cm/s]
+% HL.Lambda = 4.0;			% inverse-length scale for connectivity (/cm)
+% HL.gamma_e = 170;           % EPSP decay rate (/s)
+% HL.gamma_i = 50;            % IPSP decay rate (/s)
+% HL.tau_e = 0.02;			% excit neuron time-constant (/s) [original = 0.04 s]
+% HL.tau_i = 0.02;			% inhib neuron time-constant (/s) [original = 0.04 s]
 
-% set time resolution
-if all(D2 < 0.87)
-	dt = 0.4*1e-3;
-else
-	dt = 0.2*1e-3;
-end
-
-if HL.v > 140
-    dt = 0.2*1e-3;
-end
+% % set time resolution
+% if all(D2 < 0.87)
+% 	dt = 0.4*1e-3;
+% else
+% 	dt = 0.2*1e-3;
+% end
+% 
+% if HL.v > 140
+%     dt = 0.2*1e-3;
+% end
 
 % number of time-steps for simulation
 Nsteps = round(time_end/dt);
 time   = (0:Nsteps-1)'*dt + IC.t0;
 
 % 3x3 Laplacian matrix (used in grid convolution calculations)
-Laplacian = [0 1 0; 1 -4 1; 0 1 0];
+% Laplacian = [0 1 0; 1 -4 1; 0 1 0];
 
 % diffusion multipliers (these depend on spatial resolution)
 % D11 = D1/dx^2;
@@ -135,27 +133,47 @@ win = 2 * halfWin + 1;
 rEC = Nx/2 + [      -12, -12, -12,   0,  0,  0,  12, 12, 12]/3;
 cEC = Ny/2 + [      -12,   0,  12, -12,  0, 12, -12,  0, 12]/3;
 
-% Output variables for microscale, (*) denotes returned.
- QeNP = zeros(Nsteps,win,win);              %Activity of excitatory population.   (*)
- VeNP = zeros(Nsteps,win,win);              %Voltage  of excitatory population.   (*)
- QiNP = zeros(Nsteps,win,win);              %Activity of inhibitory population.
- ViNP = zeros(Nsteps,win,win);              %Voltage  of inhibitory population.
-  DNP = zeros(Nsteps,win,win);              %Inhibitory-to-inhibitory gap junction strength.
-  KNP = zeros(Nsteps,win,win);              %Extracellular potassium.
- dVeNP= zeros(Nsteps,win,win);              %Change in resting voltage of excitatory population.
- dViNP= zeros(Nsteps,win,win);              %Change in resting voltage of inhibitory population.
+% Output variables, (*) denotes returned.
+out_vars = {...
+	'Qe', ...  %Activity of excitatory population.   (*)
+	'Ve', ...  %Voltage  of excitatory population.   (*)
+	'Qi', ...  %Activity of inhibitory population.
+	'D', ...   %Inhibitory-to-inhibitory gap junction strength.
+	'K', ...   %Extracellular potassium.
+	'dVe', ... %Change in resting voltage of excitatory population.
+	'dVi', ... %Change in resting voltage of inihibitory population.
+	};
+
+% Output variables for microscale
+for v = out_vars
+	NPout.(v{:}) = zeros(Nsteps, dimsNP(1), dimsNP(2), 'single'); 
+end
+%  QeNP = zeros(Nsteps,win,win);              %Activity of excitatory population.   (*)
+%  VeNP = zeros(Nsteps,win,win);              %Voltage  of excitatory population.   (*)
+%  QiNP = zeros(Nsteps,win,win);              %Activity of inhibitory population.
+%  ViNP = zeros(Nsteps,win,win);              %Voltage  of inhibitory population.
+%   DNP = zeros(Nsteps,win,win);              %Inhibitory-to-inhibitory gap junction strength.
+%   KNP = zeros(Nsteps,win,win);              %Extracellular potassium.
+%  dVeNP= zeros(Nsteps,win,win);              %Change in resting voltage of excitatory population.
+%  dViNP= zeros(Nsteps,win,win);              %Change in resting voltage of inhibitory population.
 
 % Output variables for macroscale, (*) denotes returned.
- QeEC = zeros(Nsteps,length(rEC));      %Activity of excitatory population.   (*)
- VeEC = zeros(Nsteps,length(rEC));      %Voltage  of excitatory population.   (*)
- QiEC = zeros(Nsteps,length(rEC));      %Activity of inhibitory population.
- ViEC = zeros(Nsteps,length(rEC));      %Voltage  of inhibitory population.
-  DEC = zeros(Nsteps,length(rEC));      %Inhibitory-to-inhibitory gap junction strength.
-  KEC = zeros(Nsteps,length(rEC));      %Extracellular potassium.
- dVeEC= zeros(Nsteps,length(rEC));      %Change in resting voltage of excitatory population.
- dViEC= zeros(Nsteps,length(rEC));      %Change in resting voltage of inhibitory population.
+for v = out_vars
+	ECout.(v{:}) = zeros(Nsteps, dimsEC(1), dimsEC(2), 'single'); 
+end
+%  QeEC = zeros(Nsteps,length(rEC));      %Activity of excitatory population.   (*)
+%  VeEC = zeros(Nsteps,length(rEC));      %Voltage  of excitatory population.   (*)
+%  QiEC = zeros(Nsteps,length(rEC));      %Activity of inhibitory population.
+%  ViEC = zeros(Nsteps,length(rEC));      %Voltage  of inhibitory population.
+%   DEC = zeros(Nsteps,length(rEC));      %Inhibitory-to-inhibitory gap junction strength.
+%   KEC = zeros(Nsteps,length(rEC));      %Extracellular potassium.
+%  dVeEC= zeros(Nsteps,length(rEC));      %Change in resting voltage of excitatory population.
+%  dViEC= zeros(Nsteps,length(rEC));      %Change in resting voltage of inhibitory population.
 
 %Use as initial conditions the "last" values of previous simulation.
+
+dynamic_vars = fieldnames(IC);
+
 Qe_grid = IC.Qe;
 Qi_grid = IC.Qi;
 
@@ -231,8 +249,8 @@ end
 %% Simulation
 for i = 1: Nsteps
 	
-	if ictal_wavefront && i > 1 && diff(floor(time(i-1:i) / expansion_rate))
-		[map, state] = update_map(params, state);
+	if ictal_wavefront && diff(floor(time(i) - [dt 0] / expansion_rate))
+		[map, state] = update_fun(state);
 	end
 
     %Save the "microscale" dynamics.
@@ -358,10 +376,7 @@ for i = 1: Nsteps
     del_VeRest = min(del_VeRest_1,1.5);     %The excitatory population resting voltage cannot pass above a maximum value of 1.5.
     
 %%%%  Set the "source" locations' excitatory population resting voltage
-    ind = find(map==1);
-    for k=1:length(ind)
-        del_VeRest(ind(k)) = source_del_VeRest;
-    end
+	del_VeRest(map) = source_del_VeRest;
 
     del_ViRest = min(del_ViRest_1,0.8);     %The inhibitory population resting voltage cannot pass above a maximum value of 0.8.
     K = min(K_1,1);                         %The extracellular ion cannot pass above a maximum value of 1.0.
@@ -521,7 +536,7 @@ last.dVi = del_ViRest;
 last.K = K;
 
 last.map = map;
-last.state = state;
+if ictal_wavefront, last.state = state; end
 
 %%%% Define the output variables of simulation.
 
