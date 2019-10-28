@@ -141,29 +141,40 @@ potassium = G.Results;
 G = inputParser; G.KeepUnmatched = true;
 
 % Microscale
-p(G, 'xNP', []);
-p(G, 'yNP', []);
+p(G, 'centerNP', []);
 p(G, 'dimsNP', [10 10]);
 
 % Macroscale
-p(G, 'xEC', []);
-p(G, 'yEC', []); 
+p(G, 'centerEC', []);
 p(G, 'scaleEC', 4);
 p(G, 'dimsEC', [3 3]);
 
 parse(G, varargin{:});
 electrodes = clean_electrodes(G.Results, model);
 
+%% Compile results
+res.electrodes = electrodes;
+res.model = model;
+res.IC = IC;
+res.time_constants = time_constants;
+res.HL = HL;
+res.potassium = potassium;
+res.noise = noise;
 
 end
 
 function s = clean_electrodes(s, model)
+NP = s.centerNP;
+EC = s.centerEC;
+gs = model.grid_size;
 
-if isempty(s.xNP), s.xNP = model.Nx / 2; end
-if isempty(s.yNP), s.yNP = model.Ny / 2; end
-if isempty(s.xEC), s.xEC = model.Nx / 2; end
-if isempty(s.yEC), s.yEC = model.Ny / 2; end
+if isempty(NP), NP = gs ./ 2; end
+if isempty(EC), EC = gs ./ 2; end
+% Keep in bounds
+NP = min(max(NP, ceil(s.dimsNP / 2)), gs - floor(s.dimsNP / 2));
+EC = min(max(EC, ceil(s.dimsEC / 2)), gs - floor(s.dimsEC / 2));
 
+s.centerNP = NP; s.centerEC = EC;
 end
 
 function s = clean_model(s, HL, IC, model)
