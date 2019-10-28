@@ -71,6 +71,7 @@ rng(rand_state, 'v5normal');
 Nsteps = round(time_end/dt);
 time   = (0:Nsteps-1)'*dt + IC.t0;
 
+%% Define output variables
 % Output variables, (*) denotes returned.
 out_vars = {...
 	'Qe', ...  %Activity of excitatory population.   (*)
@@ -96,6 +97,7 @@ for v = out_vars
 	EC.(v{:}) = zeros(Nsteps, PE.dimsEC(1), PE.dimsEC(2), 'single'); 
 end
 
+%% Define dynamic variables
 %Use as initial conditions the "last" values of previous simulation.
 dynamic_vars = fieldnames(IC)';
 
