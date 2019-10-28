@@ -73,15 +73,15 @@ out_vars = {...
 	'Ve', ...  %Voltage  of excitatory population.   (*)
 	'Qi', ...  %Activity of inhibitory population.   
 	'Vi', ...  %Voltage of inhibitory population.    
-	'D22', ...   %Inhibitory-to-inhibitory gap junction strength.
+	'D22', ... %Inhibitory-to-inhibitory gap junction strength.
 	'K', ...   %Extracellular potassium.
 	'dVe', ... %Change in resting voltage of excitatory population.
 	'dVi', ... %Change in resting voltage of inhibitory population.
 	};
 
 % Indices to capture from larger grid for NP and EC
-addyNP = get_inds(M.grid_size, PE.centerNP, PE.dimsNP, 1);
-addyEC = get_inds(M.grid_size, PE.centerEC, PE.dimsEC, PE.scaleEC);
+indsNP = get_inds(M.grid_size, PE.centerNP, PE.dimsNP, 1);
+indsEC = get_inds(M.grid_size, PE.centerEC, PE.dimsEC, PE.scaleEC);
 
 % Initialize electrode output variables (structs NP, EC)
 store_electrode_values;
@@ -96,10 +96,7 @@ dynamic_vars = fieldnames(last)';
 %% Simulation
 
 for ii = 1: Nsteps
-	
-	expand_wavefront;
-	store_electrode_values;
-    
+	    
 	% Update equations (update <new> values)
 	update_wave_equations;
 	update_synaptic_flux_eq;
@@ -107,16 +104,18 @@ for ii = 1: Nsteps
 	update_firing_rates;
 	update_extracellular_ion;
 	update_gap_resting;
+	
+	% Set the "source" locations' excitatory population resting voltage
+	expand_wavefront;
+	new.dVe(new.map) = source_del_VeRest;
 
 	% UPDATE the dynamic variables (pass <new> values to <last>).
 	set_last_equal_new;
+	store_electrode_values;
 	
-	% Correct out of bounds values
+	% Correct out-of-bounds values
 	correct_OOB_values;
 	
-	% Set the "source" locations' excitatory population resting voltage
-	last.dVe(last.map) = source_del_VeRest;
-
 	% Implement no-flux boundary conditions. 
 	implement_no_flux_BCs;
 
@@ -129,7 +128,8 @@ for ii = 1: Nsteps
 end
 
 % Reduce the size of output variables.
-no_return = {'Qi', 'Vi', 'D22', 'K', 'dVe', 'dVi'};
+return_fields = {'Qe', 'Ve'};
+no_return = out_vars(~ismember(out_vars, return_fields));
 NP = rmfield(NP, no_return);
 EC = rmfield(EC, no_return);
 
@@ -137,14 +137,14 @@ EC = rmfield(EC, no_return);
 
 % 1. update wave equations
 	function update_wave_equations
-		emily.phi2_ee = ...
-			last.phi2_ee + ...
-			dt * ( ...
-				-2 * SS.v .* SS.Lambda .* last.phi2_ee ...
-				- (SS.v .* SS.Lambda).^2 .* last.phi_ee ...
-				+ (SS.v .* SS.Lambda).^2 .* last.Qe...
-			) + ...
-			dt * (SS.v / dx)^2 * del2(last.phi_ee);
+% 		emily.phi2_ee = ...
+% 			last.phi2_ee + ...
+% 			dt * ( ...
+% 				-2 * SS.v .* SS.Lambda .* last.phi2_ee ...
+% 				- (SS.v .* SS.Lambda).^2 .* last.phi_ee ...
+% 				+ (SS.v .* SS.Lambda).^2 .* last.Qe...
+% 			) + ...
+% 			dt * (SS.v / dx)^2 * del2(last.phi_ee);
 		
 		new.phi2_ee = zeros(Nx,Ny);
 		new.phi2_ee(2:Nx-1,2:Ny-1) = last.phi2_ee(2:Nx-1,2:Ny-1) + dt*(-2*SS.v.*SS.Lambda.*last.phi2_ee(2:Nx-1,2:Ny-1) ...
@@ -152,7 +152,7 @@ EC = rmfield(EC, no_return);
 								 + (SS.v.*SS.Lambda).^2.*last.Qe(2:Nx-1,2:Ny-1))...
 								 + dt*(SS.v/dx)^2*convolve2(last.phi_ee, M.Laplacian, 'valid');
 							 
-		temp = new.phi2_ee - emily.phi2_ee;
+% 		temp = new.phi2_ee - emily.phi2_ee;
 		new.phi_ee = last.phi_ee + dt*last.phi2_ee;
 
 		new.phi2_ei = zeros(Nx,Ny);
@@ -260,11 +260,11 @@ end
 			end
 		else  % ... or store
 			for v = out_vars 
-				NP.(v{:})(ii, :, :) = reshape(last.(v{:})(addyNP), [1, PE.dimsNP]); 
+				NP.(v{:})(ii, :, :) = reshape(last.(v{:})(indsNP), [1, PE.dimsNP]); 
 				
 				% Take the local mean for ECOG electrodes
 				blurEC = conv2(last.(v{:}), ones(3), 'same') ./ 9;  
-				EC.(v{:})(ii, :, :) = reshape(blurEC(addyEC), [1, PE.dimsEC]);
+				EC.(v{:})(ii, :, :) = reshape(blurEC(indsEC), [1, PE.dimsEC]);
 			end
 		end
 	end
@@ -298,7 +298,7 @@ end
 % Visualize results
 	function visualize
 		if ~exist('fig', 'var') || isempty(fig)
-			fig = create_fig(M.grid_size, addyNP, addyEC);
+			fig = create_fig(M.grid_size, indsNP, indsEC);
 		end
 		if diff(floor((time(ii) - [dt 0]) * PM.visualization_rate))
 			% Image of excitatory population activity.

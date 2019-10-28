@@ -33,18 +33,22 @@
 % Get parameters and display them (for remote run tracking)
 if ~exist('params', 'var'); params = init_scm_params(); end
 disp(params)
-PM = params.meta;
 
-% Create a directory for files if necessary; save the parameters
-[base_path, ~, ~] = fileparts(PM.basename);
-if ~exist(base_path, 'dir'), mkdir(base_path), end
-if PM.SAVE, save(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'params'); end
+create_directory(params);
+run_simulation(params);
+convert_to_mea(params.meta);
 
-% Main
-run_simulation(params)
-convert_to_mea(PM)
+%% Subroutines
+function create_directory(params)
 
-%% Run Simulation
+	PM = params.meta;
+	if ~PM.SAVE, return, end
+	
+	[base_path, ~, ~] = fileparts(PM.basename);
+	if ~exist(base_path, 'dir'), mkdir(base_path), end
+	save(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'params');
+end
+
 function run_simulation(params)
 
 PM = params.meta;
@@ -102,7 +106,6 @@ end
 
 end
 
-%% Convert to mea
 function convert_to_mea(PM)
 	files = dir(sprintf('%s_%d_*mat', PM.basename, PM.sim_num));
 	addpath(files(1).folder);
