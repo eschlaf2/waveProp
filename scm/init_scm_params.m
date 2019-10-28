@@ -10,21 +10,56 @@ function res = init_scm_params(varargin)
 % 		'IC', {'dVe', 1} ...
 % 		);
 
-% Adjust values as name-value pairs
-res.meta = parse_meta(varargin);  
+%%%% Adjust values as name-value pairs %%%%
+res.meta = parse_meta(varargin); 
+	% basename             SAVE                 sim_num
+	% t0_start             t_step               visualization_rate
+	% visualize            padding              duration
+	% subsample            ictal_source_drive   post_ictal_source_drive         
+
 res.model = parse_model(varargin);
+	% dt              electrodes      expansion_rate  grid_size       
+	% Laplacian       noise           stim_center     spatial_resolution
+	% time_constants  SS              IC              K               
 
-% Passed as unmatched parameters from parsing of model
+	
+%%%% Passed as unmatched parameters from parsing of model %%%%
 res.electrodes = parse_electrodes(res.model);
+	% centerEC        centerNP        dimsEC          dimsNP          scaleEC         
+
 res.time_constants = parse_time(res.model);
-res.potassium = parse_potassium(res.model);
+	% tau_dD          tau_dVe         tau_dVi         
+	
+res.K = parse_potassium(res.model);
+	% k_decay         kD              kR              KtoD            KtoVe
+	% KtoVi           tau_K
+
 res.noise = parse_noise(res.model);
+	% noise           noise_sc        noise_sf        
 
-% IC and HL
-res.IC = parse_IC(res.model);
-res.HL = parse_HL(res.model);
+	
+%%%% IC (initial conditions) and SS (steady states) %%%%
+res.IC = parse_IC(res.model);  
+	% D11             D22             F_ee            F_ei            F_ie
+	% F_ii            K               Phi_ee          Phi_ei
+	% Phi_ie          Phi_ii          Qe              Qi              Ve
+	% Vi              dVe             dVi             map
+	% phi2_ee         phi2_ei         phi_ee          phi_ei          state
 
-res.model = check_time_resolution(res.model, res.IC, res.HL);
+
+res.SS = parse_SS(res.model);  
+	% Lambda          Nee_a           Nee_ab          Nee_b
+	% Nee_sc          Nei_a           Nei_ab          Nei_b
+	% Nei_sc          Nie_b           Nii_b           Qe_max
+	% Qi_max          Ve_rest         Ve_rev          Vi_rest
+	% Vi_rev          d_psi_ee        d_psi_ei        d_psi_ie
+	% d_psi_ii        gamma_e         gamma_i         phi_ee_sc
+	% phi_ei_sc       rho_e           rho_i           sigma_e
+	% sigma_i         tau_e           tau_i           theta_e
+	% theta_i         v
+
+
+res.model = check_time_resolution(res.model, res.IC, res.SS);
 
 end
 
@@ -35,38 +70,36 @@ function meta = parse_meta(options)
 p('basename', 'SCM/SCM/SCM');
 p('sim_num', 0);
 p('SAVE', true);  % Save output
-p('visualize_results', false);  %Set this variable to true to create plots during simulation.
+p('visualize', false);  %Set this variable to true to create plots during simulation.
 p('visualization_rate', 10);  % Show this many frames per second
 p('t_step', 1);  % Simulate t_step second intervals
 p('t0_start', 0);  % Continue from previous sim (IC will use last from file number t0_start-1)
+p('duration', 90);  % Seizure duration
+p('padding', [10 30], @(x) isnumeric(x) & numel(x) == 2);  % Padding before and after seizure
+p('ictal_source_drive', 3);
+p('post_ictal_source_drive', 1.5);
+p('subsample', Inf);  % Allow subsampling when making mea
 
 parse(G, options{:});
 meta = G.Results;
 end
 
 function model = parse_model(options)
-%% Seizure definition
-[G, p] = get_parser();
 
-p('duration', 90);  % Seizure duration
-p('padding', [10 30], @(x) isnumeric(x) & numel(x) == 2);  % Padding before and after seizure
+[G, p] = get_parser();
 
 % Model parameters
 allMapTypes = {'ictal_wavefront', 'fixed_point_source'};
-p('map_type', 'ictal_wavefront', @(x) validate(x, allMapTypes));  % Ictal source 
 p('stim_center', [0 0], @(x) numel(x) == 2);
 p('grid_size', [100 100], @(x) ~mod(x, 2) && numel(x) == 2);  % size of grid to simulate (must be even)
 p('dt', 2e-4);
 p('Laplacian', [0 1 0; 1 -4 1; 0 1 0]);
-p('ictal_source_drive', 3);
-p('post_ictal_source_drive', 1.5);
-p('subsample_rate', Inf);  % Allow subsampling when making mea
 p('spatial_resolution', .3);  % (mm) 
-p('expansion_rate', 3);  % every 3 seconds expand the wavefront
+p('expansion_rate', 3, @(x) x > 0);  % every 3 seconds expand the wavefront; set to Inf for fixed source
 p('IC', {});  % Initial conditions of the sim (enter options as name-value pairs)
-p('HL', {});  % Constants that define the locations of steady states
+p('SS', {});  % Constants that define the locations of steady states
 p('time_constants', {});  % tau parameters controlling rates
-p('potassium', {});  % Potassium (K-related) parameters
+p('K', {});  % Potassium (K-related) parameters
 p('noise', {});  % Noise parameters
 p('electrodes', {});  % electrode positions
 
@@ -74,7 +107,7 @@ p('electrodes', {});  % electrode positions
 parse(G, options{:});
 model = G.Results;
 if isempty(model.time_constants), model.time_constants = G.Unmatched; end
-if isempty(model.potassium), model.potassium = G.Unmatched; end
+if isempty(model.K), model.K = G.Unmatched; end
 if isempty(model.electrodes), model.electrodes = G.Unmatched; end
 if isempty(model.noise), model.noise = G.Unmatched; end
 
@@ -169,27 +202,27 @@ time_constants = G.Results;
 
 end
 
-function HL = parse_HL(model)
+function SS = parse_SS(model)
+% Steady state constants
 
-%% Steady state constants
 [G, p] = get_parser(); 
 G.CaseSensitive = true;
-options = model.HL;
+options = model.SS;
 
-HL = SCM_init_globs;  % See this function for details
-for f = fieldnames(HL)', p(f{:}, HL.(f{:})); end
+SS = SCM_init_globs;  % See this function for details
+for f = fieldnames(SS)', p(f{:}, SS.(f{:})); end
 
 if isstruct(options), G.parse(options), else, G.parse(options{:}); end
 
-HL = G.Results;
+SS = G.Results;
 
 end
 
 function potassium = parse_potassium(model)
+% Potassium parameters
 
-%% Potassium parameters
 [G, p] = get_parser();
-options = model.potassium;
+options = model.K;
 
 p('tau_K', 200);    %time-constant (/s).
 p('k_decay', 0.1);  %decay rate (/s).

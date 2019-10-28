@@ -30,9 +30,8 @@
 % Department of Mathematics and Statistics, Boston University, USA.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if ~exist('options', 'var'); options = {}; end
+if ~exist('params', 'var'); params = init_scm_params(); end
 
-params = init_scm_params(options{:});
 disp(params)
 PM = params.meta;
 
@@ -41,61 +40,73 @@ if ~exist(base_path, 'dir'), mkdir(base_path), end
 if PM.SAVE, save(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'params'); end
 
 run_simulation(params)
-convert_to_mea(params)
+convert_to_mea(PM)
 
 %% Run Simulation
 function run_simulation(params)
 
 PM = params.meta;
-% Extract parameters
-basename = PM.basename;
-duration = params.duration;
-padding = params.padding;
-SAVE = params.SAVE;
-sim_num = params.sim_num;
-t_step = params.t_step;
-t0_start = params.t0_start;
+
+% Extract variables from meta-parameters
+BASENAME = PM.basename;
+DURATION = PM.duration;
+PADDING = PM.padding;
+SAVE = PM.SAVE;
+SIM_NUM = PM.sim_num;
+T_STEP = PM.t_step;
+T0_START = PM.t0_start;
 
 % Create stimulus map
-if t0_start > 0
-	load(sprintf('%s_%d_%03d', basename, sim_num, t0_start - 1), 'last')
+if T0_START > 0
+	% If not starting a fresh sim, use previously saved <last>
+	load(sprintf('%s_%d_%03d', BASENAME, SIM_NUM, T0_START - 1), 'last')
 else
+	% ... otherwise, start a fresh sim
 	last = params.IC;  %Load the initial conditions to start.
 end
 
-K = sum(padding) + duration;  
+K = sum(PADDING) + DURATION;  
 fig = [];
-for t0 = t0_start:t_step:K-1
-	if t0 > 0 && ~mod(t0, 3)
+for t0 = PM.t0_start:PM.t_step:K-1  % For each step
+	
+	if t0 > 0 && ~mod(t0, 3)  % DEBUGGING
 		'hello'
 	end
-	fprintf('Running %d / %d .. ', t0, K-1);
-	last.t0 = t0;
-	source_drive = set_source_drive(t0, last, params);
-
-	[NP, EC, time, last, fig] = ...
-		seizing_cortical_field(source_drive, t_step, last, fig, params);
-	time = time - padding(1);
 	
-	% Save the results of this run.
+	% ... show progress, 
+	fprintf('Running %d / %d .. ', t0, K-1);  
+	
+	% ... set start time adjustment,
+	last.t0 = t0;  
+	
+	% ... get appropriate source drive,
+	source_drive = set_source_drive(t0, last, PM);  
+	
+	% ... run simulation for duration T_STEP,
+	[NP, EC, time, last, fig] = ...  
+		seizing_cortical_field(source_drive, T_STEP, last, fig, params);
+	time = time - PADDING(1);  % ... correct output time for padding,
+	
+	% ... save the results of this run,
 	if SAVE
 		fprintf('Saving .. ')
-		fname = checkname(sprintf('%s_%d_%03d', basename, sim_num, t0*t_step));
+		fname = checkname(sprintf('%s_%d_%03d', BASENAME, SIM_NUM, t0*T_STEP));
 		save(fname, 'NP','EC','time','last');
 	end
 	
-	fprintf('Done.\n')
+	% ... update progress.
+	fprintf('Done.\n')  
 end
 
 end
 
 %% Convert to mea
-
-function convert_to_mea(params)
-	files = dir(sprintf('%s_%d_*mat', params.basename, params.sim_num));
+function convert_to_mea(PM)
+	files = dir(sprintf('%s_%d_*mat', PM.basename, PM.sim_num));
 	addpath(files(1).folder);
+	load(files(1).name, 'last');
 	cmap = bone;
-	im = round(rescale(params.IC.Ve) * (length(cmap) - 1)) + 1;
+	im = round(rescale(last.Ve) * (length(cmap) - 1)) + 1;
 	mov(numel(files) - 1) = im2frame(im, cmap);
 	[data, tt] = deal(cell(numel(files) - 1 , 1));
 	
@@ -111,13 +122,10 @@ function convert_to_mea(params)
 		data{ind} = NP.Qe;
 		tt{ind} = time;
 	end
-	mov(cellfun(@isempty, {mov.cdata})) = [];
-	data(cellfun(@isempty, data)) = [];
-	tt(cellfun(@isempty, tt)) = [];
 	
 	data_mat = cat(1, data{:});
 	time = cat(1, tt{:});
-	sample_rate = min(round(1/mean(diff(time))/1e3)*1e3, params.subsample_rate);
+	sample_rate = min(round(1/mean(diff(time))/1e3)*1e3, PM.subsample);
 	dt = 1 / sample_rate;
 	nt = size(data_mat, 1);
 	inds = interp1(time, 1:nt, time(1):dt:time(end), 'nearest');
@@ -128,29 +136,29 @@ function convert_to_mea(params)
 	mea = create_mea( ...
 		data_mat, ... 
 		'SamplingRate', sample_rate, ... 
-		'Padding', params.padding, ...
-		'Name', ['SCM Seizure ' num2str(params.sim_num)], ...
+		'Padding', PM.padding, ...
+		'Name', ['SCM Seizure ' num2str(PM.sim_num)], ...
 		'Time', time, ... 
 		'Path', sprintf('%s/SCM/SCM_Seizure%d_Neuroport_%d_%d.mat', ...
-			pwd, params.sim_num, params.padding) ...	 
+			pwd, PM.sim_num, PM.padding) ...	 
 		);
 	
 	save(mea.Path, '-struct', 'mea');
-	m = matfile(sprintf('%s_%d_info', params.basename, params.sim_num), 'Writable', true);
+	m = matfile(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'Writable', true);
 	m.Ve_movie = mov;
 	
 end
 
-%% Sub routines
+%% Helpers
 function [source_drive] = set_source_drive(t, last, params)
 
-if t < params.padding(1)  % preseizure
-	source_drive = mean(last.dVe(:));
-elseif t >= params.padding(1) && t < (params.padding(1) + params.duration)  % seizure
-	source_drive = params.ictal_source_drive; 
-else  % postseizure
-	source_drive = params.post_ictal_source_drive;
-end
+	if t < params.padding(1)  % preseizure
+		source_drive = mean(last.dVe(:));
+	elseif t >= params.padding(1) && t < (params.padding(1) + params.duration)  % seizure
+		source_drive = params.ictal_source_drive; 
+	else  % postseizure
+		source_drive = params.post_ictal_source_drive;
+	end
 
 end
 
