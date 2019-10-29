@@ -1,4 +1,3 @@
-% default_params
 function res = init_scm_params(varargin)
 % All parameters except IC and SS can be adjusted by passing name-value
 % pairs. To modify HL and IC, the value passed to either name should be a
