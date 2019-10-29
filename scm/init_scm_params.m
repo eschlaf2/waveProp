@@ -88,10 +88,10 @@ meta = G.Results;
 end
 
 function model = parse_model(options)
+% Model parameters
 
 [G, p] = get_parser();
 
-% Model parameters
 p('stim_center', [0 0], @(x) numel(x) == 2);
 p('grid_size', [100 100], @(x) ~mod(x, 2) && numel(x) == 2);  % size of grid to simulate (must be even)
 p('dt', 2e-4);
