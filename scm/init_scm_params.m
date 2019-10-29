@@ -76,7 +76,7 @@ p('visualize', false);  %Set this variable to true to create plots during simula
 p('visualization_rate', 10);  % Show this many frames per second
 p('t_step', 1);  % Simulate t_step second intervals
 p('t0_start', 0);  % Continue from previous sim (IC will use last from file number t0_start-1)
-p('duration', 90);  % Seizure duration
+p('duration', 190);  % Seizure duration
 p('padding', [10 30], @(x) isnumeric(x) & numel(x) == 2);  % Padding before and after seizure
 p('ictal_source_drive', 3);
 p('post_ictal_source_drive', 1.5);
