@@ -70,7 +70,7 @@ function meta = parse_meta(options)
 [G, p] = get_parser();
 
 p('basename', 'SCM/SCM/SCM');
-p('sim_num', 0);
+p('sim_num', []);
 p('SAVE', true);  % Save output
 p('visualize', false);  %Set this variable to true to create plots during simulation.
 p('visualization_rate', 10);  % Show this many frames per second
@@ -85,6 +85,13 @@ p('subsample', Inf);  % Allow subsampling when making mea
 
 parse(G, options{:});
 meta = G.Results;
+
+s = 0;
+while isempty(meta.sim_num)
+	if isempty(dir([meta.basename '_' num2str(s) '*.mat'])), meta.sim_num = s; end
+	s = s+1;
+end
+
 end
 
 function model = parse_model(options)
