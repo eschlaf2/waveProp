@@ -10,6 +10,7 @@ r('Data');
 % Optional
 p('Time', []);
 p('Padding', [10 10]);
+p('Duration', []);
 p('SamplingRate', Inf);
 p('Path', [pwd filesep 'mea.mat']);
 p('Position', []);
@@ -29,6 +30,8 @@ mea = check_time(mea, tol);
 end
 
 function mea = check_time(mea, tol)
+% Compare Time and SamplingRate for consistency. 
+% Add duration
 
 switch isinf(mea.SamplingRate) + isempty(mea.Time)
 	case 2
@@ -45,6 +48,7 @@ switch isinf(mea.SamplingRate) + isempty(mea.Time)
 		t = mea.Time();
 		assert(abs(1/diff(t(1:2)) - mea.SamplingRate) < tol, 'Time and SamplingRate mismatch.');
 end
+mea.Duration = t(end) - mea.Padding(2);
 
 end
 
