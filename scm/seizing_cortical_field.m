@@ -62,11 +62,11 @@ rng(rand_state, 'v5normal');
 
 % number of time-steps for simulation
 Nsteps = round(time_end / dt);
-time   = (0:Nsteps-1)' * dt;
+time = ( 0 : Nsteps - 1 )' * dt;
 
 % noise-amplitude coefficients for subcortical flux (note 1/sqrt(dt) factor)
-B_ee = PN.noise_sf * sqrt(PN.noise_sc* SS.phi_ee_sc / dt);
-B_ei = PN.noise_sf * sqrt(PN.noise_sc* SS.phi_ei_sc / dt);
+B_ee = PN.noise_sf * sqrt(PN.noise_sc * SS.phi_ee_sc / dt);
+B_ei = PN.noise_sf * sqrt(PN.noise_sc * SS.phi_ei_sc / dt);
 
 %% Define output variables
 
@@ -88,11 +88,11 @@ indsNP = get_inds(M.grid_size, PE.centerNP, PE.dimsNP, 1);
 indsEC = get_inds(M.grid_size, PE.centerEC, PE.dimsEC, PE.scaleEC);
 
 % Initialize electrode output variables (structs NP, EC)
-store_electrode_values;
+get_electrode_values;
 
 %% Define dynamic variables
-
 %Use as initial conditions the "last" values of previous simulation.
+
 last = IC;  % initialize
 new = struct;  % initialize
 dynamic_vars = fieldnames(last)';
@@ -115,7 +115,7 @@ for ii = 1: Nsteps
 
 	% UPDATE the dynamic variables (pass <new> values to <last>).
 	set_last_equal_new;
-	store_electrode_values;
+	get_electrode_values;
 	
 	% Correct out-of-bounds values
 	correct_OOB_values;
@@ -128,7 +128,7 @@ for ii = 1: Nsteps
 		error('Sigmoid generated NaNs!! (Either increase dx or reduce dt)');
 	end
       
-	if PM.visualize, visualize; end
+	visualize;
 end
 
 % Reduce the size of output variables.
@@ -137,6 +137,7 @@ no_return = out_vars(~ismember(out_vars, return_fields));
 NP = rmfield(NP, no_return);
 EC = rmfield(EC, no_return);
 
+% ------------------------------------------------------------------------
 %% Nested dynamics functions
 
 % 1. update wave equations
@@ -295,7 +296,7 @@ EC = rmfield(EC, no_return);
 %% Nested logistical functions
 
 % Store electrode values
-	function store_electrode_values
+	function get_electrode_values
 		
 		if ~exist('NP', 'var')  % Initialize
 			for v = out_vars
@@ -341,6 +342,7 @@ EC = rmfield(EC, no_return);
 
 % Visualize results
 	function visualize
+		if ~PM.visualize, return, end
 		if ~exist('fig', 'var') || isempty(fig)
 			fig = create_fig(M.grid_size, indsNP, indsEC);
 		end
@@ -387,6 +389,7 @@ EC = rmfield(EC, no_return);
 
 end
 
+% ------------------------------------------------------------------------
 %% Supplementary functions
 
 %------------------------------------------------------------------------
@@ -443,3 +446,4 @@ function inds = get_inds(grid_size, center, dims, scale)
 end
 
 %------------------------------------------------------------------------
+
