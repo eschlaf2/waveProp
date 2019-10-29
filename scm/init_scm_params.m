@@ -14,7 +14,8 @@ function res = init_scm_params(varargin)
 		% basename             SAVE                 sim_num
 		% t0_start             t_step               visualization_rate
 		% visualize            padding              duration
-		% subsample            ictal_source_drive   post_ictal_source_drive         
+		% subsample            ictal_source_drive   post_ictal_source_drive
+		% return_fields
 
 	res.model = parse_model(varargin);
 		% dt              electrodes      expansion_rate  grid_size       
@@ -79,6 +80,7 @@ p('duration', 90);  % Seizure duration
 p('padding', [10 30], @(x) isnumeric(x) & numel(x) == 2);  % Padding before and after seizure
 p('ictal_source_drive', 3);
 p('post_ictal_source_drive', 1.5);
+p('return_fields', {'Qe', 'Ve'});  % Qe required to make mea
 p('subsample', Inf);  % Allow subsampling when making mea
 
 parse(G, options{:});

@@ -94,7 +94,7 @@ get_electrode_values;
 %Use as initial conditions the "last" values of previous simulation.
 
 last = IC;  % initialize
-new = struct;  % initialize
+new = last;  % initialize
 dynamic_vars = fieldnames(last)';
 
 %% Simulation
@@ -109,9 +109,9 @@ for ii = 1: Nsteps
 	update_extracellular_ion;
 	update_gap_resting;
 	
-	% Set the "source" locations' excitatory population resting voltage
-	expand_wavefront;
-	new.dVe(new.map) = source_del_VeRest;
+	% Set the "source" locations' excitatory population resting voltage and
+	% expand the wavefront
+	update_source;
 
 	% UPDATE the dynamic variables (pass <new> values to <last>).
 	set_last_equal_new;
@@ -131,9 +131,8 @@ for ii = 1: Nsteps
 	visualize;
 end
 
-% Reduce the size of output variables.
-return_fields = {'Qe', 'Ve'};
-no_return = out_vars(~ismember(out_vars, return_fields));
+% Return requested variables.
+no_return = out_vars(~ismember(out_vars, PM.return_fields));
 NP = rmfield(NP, no_return);
 EC = rmfield(EC, no_return);
 
@@ -286,11 +285,13 @@ EC = rmfield(EC, no_return);
 		new.dVi = last.dVi + dt / PT.tau_dVi * ( PK.KtoVi * last.K );
 	end
 
-% Expand wavefront
-	function expand_wavefront
-		if diff(floor(time(ii) - [dt 0] * M.expansion_rate))
+% Update source and expand wavefront
+	function update_source
+		expand = diff(floor(time(ii) - [dt 0] * M.expansion_rate));
+		if expand
 			[new.map, new.state] = update_map(last.state);
 		end
+		new.dVe(new.map) = source_del_VeRest;
 	end
 
 %% Nested logistical functions
