@@ -75,23 +75,18 @@ K = sum(PADDING) + DURATION;
 fig = [];
 for t0 = PM.t0_start:PM.t_step:K-1  % For each step
 	
-	if t0 > 0 && ~mod(t0, 3)  % DEBUGGING
-		'hello'
-	end
-	
 	% ... show progress, 
 	fprintf('Running %d / %d .. ', t0, K-1);  
-	
-	% ... set start time adjustment,
-	last.t0 = t0;  
-	
+		
 	% ... get appropriate source drive,
 	source_drive = set_source_drive(t0, last, PM);  
 	
 	% ... run simulation for duration T_STEP,
 	[NP, EC, time, last, fig] = ...  
 		seizing_cortical_field(source_drive, T_STEP, last, fig, params);
-	time = time - PADDING(1);  % ... correct output time for padding,
+	
+	% ... correct output time for padding and start time,
+	time = time - PADDING(1) + t0;  
 	
 	% ... save the results of this run,
 	if SAVE
