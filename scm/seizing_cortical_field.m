@@ -275,7 +275,7 @@ EC = rmfield(EC, no_return);
 			+ dt / PK.tau_K * ( ...
 				- PK.k_decay * last.K ...  % decay term.
 				+ PK.kR * ...              % reaction term.
-					( new.Qe + new.Qi ) ./ ( 1 + exp( -( new.Qe + new.Qi ) + 15) ) ...
+					( last.Qe + last.Qi ) ./ ( 1 + exp( -( last.Qe + last.Qi ) + 15) ) ...
 				+ PK.kD * del2_(last.K) ... % diffusion term.
 			);
 	end
@@ -334,22 +334,26 @@ EC = rmfield(EC, no_return);
 	function visualize
 		if ~PM.visualize, return, end
 		if ~exist('fig', 'var') || isempty(fig)
-			fig = create_fig(M.grid_size, indsNP, indsEC);
+			fig = create_fig(out_vars, M.grid_size, indsNP, indsEC);
 		end
 		if diff(floor((time(ii) - [dt 0]) * PM.visualization_rate))
-			% Image of excitatory population activity.
-			set(fig.ih(1), 'cdata', last.Qe);
-
-			% Image of inhibitory population activity.
-			set(fig.ih(2), 'cdata', last.Ve);
-
-			% Image of extracellular ion proportion.
-			set(fig.ih(3), 'cdata', last.K)
-			set(fig.th(3), 'string', sprintf('K %2f', mean(last.K(:))))
-
-			% Image of inhibitory gap junction strength.
-			set(fig.ih(4), 'cdata', last.Qe + last.Qi);  
+			for sp = 1:numel(fig.ih)
+				set(fig.ih(sp), 'cdata', last.(out_vars{sp}))
+			end
 			
+% 			% Image of excitatory population activity.
+% 			set(fig.ih(1), 'cdata', last.Qe);
+% 
+% 			% Image of inhibitory population activity.
+% 			set(fig.ih(2), 'cdata', last.Ve);
+% 
+% 			% Image of extracellular ion proportion.
+% 			set(fig.ih(3), 'cdata', last.K)
+% 			set(fig.th(3), 'string', sprintf('K %2f', mean(last.K(:))))
+% 
+% 			% Image of inhibitory gap junction strength.
+% 			set(fig.ih(4), 'cdata', last.Qe + last.Qi);  
+% 			
 			set(fig.ah, 'string', sprintf('T = %0.3f', time(ii)));
 			drawnow;
 		end
@@ -394,19 +398,23 @@ Y = conv2(X, L, 'valid');
 end
 
 %------------------------------------------------------------------------
-function fig = create_fig(grid_size, addyNP, addyEC)
-	titles = {'Qe', 'Ve', 'K', 'Qe + Qi'};
-	clims = {[0 30], [0 30], [0 1], [0 30]};
+function fig = create_fig(out_vars, grid_size, addyNP, addyEC)
+% 	titles = {'Qe', 'Ve', 'K', 'Qe + Qi'};
+	titles = out_vars;
+	N = numel(titles);
+% 	clims = {[0 30], [0 30], [0 1], [0 30]};
 	fig.fig = figure;
-	h = gobjects(4, 1);
-	th = gobjects(4, 1);
-	ih = gobjects(4, 1);
+	h = gobjects(N, 1);
+	th = gobjects(N, 1);
+	ih = gobjects(N, 1);
 	% Image of excitatory population activity.
+	nr = floor(sqrt(N));
+	nc = ceil(N / nr);
 	for ii = 1:4
-		h(ii) = subplot(2,2,ii);
-		ih(ii) = imagesc(zeros(grid_size), clims{ii});
+		h(ii) = subplot(nr,nc,ii);
+		ih(ii) = imagesc(zeros(grid_size));
 		th(ii) = title(titles{ii});
-		colormap bone; axis equal; axis tight; axis ij;
+		colormap bone; axis equal; axis tight; axis ij; colorbar;
 	end
 
 	% Indicate electrode positions.
@@ -421,8 +429,8 @@ function fig = create_fig(grid_size, addyNP, addyEC)
 	kN = convhull(xN(:), yN(:));
 	plot(h(1), xE(kE), yE(kE), '-', 'color', colorEC);
 	plot(h(1), xN(kN), yN(kN), '-', 'color', colorNP);
-	legend({'EC', 'NP'}, 'location', 'southeast')
-	legend('boxoff')
+	legend(h(1), {'EC', 'NP'}, 'location', 'southeast')
+	legend(h(1), 'boxoff')
 
 	hold(h(1), 'off')
 	ah = annotation('textbox', [0 .99 0 0], 'string', 'T = ', ...

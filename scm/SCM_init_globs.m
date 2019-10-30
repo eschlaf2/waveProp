@@ -52,8 +52,6 @@ H.d_psi_ii = -1/(H.Vi_rev - H.Vi_rest);
 
 H.v = 280;                 % axonal conduction velocity (cm/s), [original = 140 cm/s]
 H.Lambda = 4.0;			% inverse-length scale for connectivity (/cm)
-H.gamma_e = 170;           % EPSP decay rate (/s)
-H.gamma_i = 50;            % IPSP decay rate (/s)
 H.tau_e = 0.02;			% excit neuron time-constant (/s) [original = 0.04 s]
 H.tau_i = 0.02;			% inhib neuron time-constant (/s) [original = 0.04 s]
 
