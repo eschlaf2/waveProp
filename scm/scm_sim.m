@@ -74,7 +74,7 @@ end
 K = sum(PADDING) + DURATION;  
 fig = [];
 for t0 = PM.t0_start:PM.t_step:K-1  % For each step
-	
+	tic
 	% Update time offset
 	params.t0 = t0;
 	
@@ -97,7 +97,7 @@ for t0 = PM.t0_start:PM.t_step:K-1  % For each step
 		fname = checkname(sprintf('%s_%d_%03d', BASENAME, SIM_NUM, t0*T_STEP));
 		save(fname, 'NP','EC','time','last');
 	end
-	
+	toc
 	% ... update progress.
 	fprintf('Done.\n')  
 end

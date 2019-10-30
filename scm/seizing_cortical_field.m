@@ -48,6 +48,7 @@ PE = params.electrodes;
 PT = params.time_constants;
 PN = params.noise;
 SS = params.SS;
+MX = params.MX;
 
 %% A few convenience variables
 
@@ -289,12 +290,12 @@ EC = rmfield(EC, no_return);
 
 % Correct out of bounds values
 	function correct_OOB_values
-		new.D22 = max(new.D22,0.1);                   %The inhibitory gap junctions cannot pass below a minimum value of 0.1.
+		new.D22 = max(new.D22,MX.D22_min);                   %The inhibitory gap junctions cannot pass below a minimum value of 0.1.
 		new.D11 = new.D22/100;                          %See definition in [Steyn-Ross et al PRX 2013, Table I].
 
-		new.dVe = min(new.dVe,1.5);     %The excitatory population resting voltage cannot pass above a maximum value of 1.5.
-		new.dVi = min(new.dVi,0.8);     %The inhibitory population resting voltage cannot pass above a maximum value of 0.8.
-		new.K = min(new.K,1);                         %The extracellular ion cannot pass above a maximum value of 1.0.
+		new.dVe = min(new.dVe, MX.dVe_max);     %The excitatory population resting voltage cannot pass above a maximum value of 1.5.
+		new.dVi = min(new.dVi, MX.K_max);     %The inhibitory population resting voltage cannot pass above a maximum value of 0.8.
+		new.K = min(new.K, MX.K_max);                         %The extracellular ion cannot pass above a maximum value of 1.0.
 
 	end
 

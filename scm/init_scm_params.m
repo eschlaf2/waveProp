@@ -59,6 +59,9 @@ function res = init_scm_params(varargin)
 		% phi_ei_sc       rho_e           rho_i           sigma_e
 		% sigma_i         tau_e           tau_i           theta_e
 		% theta_i         v
+		
+	res.MX = parse_bounds(res.model);
+		% D22_min         dVe_max         dVi_max         K_max
 
 
 res.model = check_time_resolution(res.model, res.IC, res.SS);
@@ -101,7 +104,7 @@ function model = parse_model(options)
 [G, p] = get_parser();
 
 p('stim_center', [0 0], @(x) numel(x) == 2);
-p('grid_size', [100 100], @(x) ~mod(x, 2) && numel(x) == 2);  % size of grid to simulate (must be even)
+p('grid_size', [100 100], @(x) ~all(mod(x, 2)) && numel(x) == 2);  % size of grid to simulate (must be even)
 p('dt', 2e-4);
 % p('Laplacian', [0 1 0; 1 -4 1; 0 1 0]);  *** switched to calling del2 **
 p('spatial_resolution', .3);  % (mm) 
@@ -112,6 +115,7 @@ p('time_constants', {});  % tau parameters controlling rates
 p('K', {});  % Potassium (K-related) parameters
 p('noise', {});  % Noise parameters
 p('electrodes', {});  % electrode positions
+p('bounds', {});  % Variables with integration boundaries
 
 % Parse
 parse(G, options{:});
@@ -127,6 +131,20 @@ if isempty(model.noise), model.noise = G.Unmatched; end
 stim_center = model.stim_center;
 if any(stim_center<=0), stim_center = round(model.grid_size * .4); end
 model.stim_center = round(stim_center);
+
+end
+
+function bounds = parse_bounds(options)
+
+[G, p] = get_parser();
+
+p('D22_min', 0.1)  % The inhibitory gap junctions cannot pass below a minimum value of 0.1.
+p('dVe_max', 1.5)   % The excitatory population resting voltage cannot pass above a maximum value of 1.5.
+p('dVi_max', 0.8);  %The inhibitory population resting voltage cannot pass above a maximum value of 0.8.
+p('K_max',1); 
+
+if isstruct(options), G.parse(options), else, G.parse(options{:}); end
+bounds = G.Results;
 
 end
 
@@ -297,6 +315,7 @@ if ~all(model.grid_size == size(IC.D11))
 	rng(0)  % for reproducibility
 	inds = randi(numel(IC.D11), model.grid_size(1), model.grid_size(2));
 	for f = fieldnames(IC)'
+		if ismember(f, {'map', 'state'}), continue, end
 		IC.(f{:}) = IC.(f{:})(inds);
 	end
 end
