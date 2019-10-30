@@ -3,26 +3,20 @@ function [map,state] = update_map(state)
 %% Initialization
 if isstruct(state) 
 	Nx = state.grid_size(1); Ny = state.grid_size(2);
-	[map, state] = deal(false(Nx, Ny));
-	return
-end
 
-%% Create source
-
-if ~any(state(:))
-	
 	%center of initial source map.
 	xCenter = state.stim_center(1); 
 	yCenter = state.stim_center(2); 
-	
+
+	map = false(Nx,Ny);
+
 	%set the initial map.
 	map(xCenter + (-1:1), yCenter + (-1:1)) = 1;
-	state = map;
-	
+	state = map;                                %Not used in this case.
 	return
 end
 
-%% Grow source
+%% Update
 
 shrink_factor = 0.5;
 [Nx, Ny] = size(state);
