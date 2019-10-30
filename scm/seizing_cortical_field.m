@@ -111,7 +111,7 @@ for ii = 1: Nsteps
 	
 	% Set the "source" locations' excitatory population resting voltage and
 	% expand the wavefront
-	update_source;
+	update_source
 
 	% UPDATE the dynamic variables (pass <new> values to <last>).
 	set_last_equal_new;
@@ -154,7 +154,7 @@ EC = rmfield(EC, no_return);
 			+ dt * ( ...
 				- 2*SS.v .* SS.Lambda .* last.phi2_ei ...
 				- (SS.v .* SS.Lambda).^2 .* last.phi_ei ...
-				+ (SS.v.*SS.Lambda).^2 .* last.Qe...
+				+ (SS.v .* SS.Lambda).^2 .* last.Qe...
 			) ...
 			+ dt * (SS.v / dx)^2 * del2(last.phi_ei);
 							 
@@ -287,7 +287,8 @@ EC = rmfield(EC, no_return);
 
 % Update source and expand wavefront
 	function update_source
-		expand = diff(floor(time(ii) - [dt 0] * M.expansion_rate));
+		if source_del_VeRest == 0, return, end
+		expand = diff( floor((time(ii) - [dt 0]) * M.expansion_rate) );
 		if expand
 			[new.map, new.state] = update_map(last.state);
 		end
