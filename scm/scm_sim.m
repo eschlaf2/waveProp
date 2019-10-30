@@ -32,7 +32,7 @@
 
 % Get parameters and display them (for remote run tracking)
 if ~exist('params', 'var'); params = init_scm_params(); end
-disp(params)
+disp(params.meta)
 
 create_directory(params);
 run_simulation(params);
@@ -143,17 +143,20 @@ function convert_to_mea(PM)
 			pwd, PM.sim_num, PM.padding) ...	 
 		);
 	
+	fprintf('Saving %s ... ', mea.Path);
 	save(mea.Path, '-struct', 'mea');
 	m = matfile(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'Writable', true);
 	m.Ve_movie = mov;
 	
+	fprintf('Done.\n')
+	
 end
 
 %% Helpers
-function [source_drive] = set_source_drive(t, last, params)
+function [source_drive, map] = set_source_drive(t, last, params)
 
 	if t < params.padding(1)  % preseizure
-		source_drive = mean(last.dVe(:));
+		source_drive = 0;
 	elseif t >= params.padding(1) && t < (params.padding(1) + params.duration)  % seizure
 		source_drive = params.ictal_source_drive; 
 	else  % postseizure
