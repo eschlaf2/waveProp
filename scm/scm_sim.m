@@ -32,7 +32,7 @@
 
 % Get parameters and display them (for remote run tracking)
 if ~exist('params', 'var'); params = init_scm_params(); end
-disp(params)
+disp(params.meta)
 
 create_directory(params);
 run_simulation(params);
@@ -75,18 +75,21 @@ K = sum(PADDING) + DURATION;
 fig = [];
 for t0 = PM.t0_start:PM.t_step:K-1  % For each step
 	
+	% Update time offset
+	params.t0 = t0;
+	
 	% ... show progress, 
 	fprintf('Running %d / %d .. ', t0, K-1);  
 		
 	% ... get appropriate source drive,
-	source_drive = set_source_drive(t0, last, PM);  
+	source_drive = set_source_drive(t0, PM);  
 	
 	% ... run simulation for duration T_STEP,
 	[NP, EC, time, last, fig] = ...  
 		seizing_cortical_field(source_drive, T_STEP, last, fig, params);
 	
 	% ... correct output time for padding and start time,
-	time = time - PADDING(1) + t0;  
+	time = time - PADDING(1);  
 	
 	% ... save the results of this run,
 	if SAVE
@@ -107,7 +110,8 @@ function convert_to_mea(PM)
 	load(files(1).name, 'last');
 	cmap = bone;
 	im = round(rescale(last.Ve) * (length(cmap) - 1)) + 1;
-	mov(numel(files) - 1) = im2frame(im, cmap);
+	movQ(numel(files) - 1) = im2frame(im, cmap);
+	movV(numel(files) - 1) = im2frame(im, cmap);
 	[data, tt] = deal(cell(numel(files) - 1 , 1));
 	
 	for f = files'
@@ -117,8 +121,9 @@ function convert_to_mea(PM)
 		ind = strsplit(f.name, {'_', '.'});
 		ind = str2double(ind{end - 1}) + 1;
 		disp(ind)
-		im = round(rescale(last.Ve) * (length(cmap) - 1)) + 1;
-		mov(ind) = im2frame(im, cmap);
+		im = round(rescale(last.Qe) * (length(cmap) - 1)) + 1;
+		movQ(ind) = im2frame(im, cmap);
+		movV(ind) = im2frame(round(rescale(last.Ve) * (length(cmap) - 1)) + 1, cmap);
 		data{ind} = NP.Qe;
 		tt{ind} = time;
 	end
@@ -143,17 +148,21 @@ function convert_to_mea(PM)
 			pwd, PM.sim_num, PM.padding) ...	 
 		);
 	
+	fprintf('Saving %s ... ', mea.Path);
 	save(mea.Path, '-struct', 'mea');
 	m = matfile(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'Writable', true);
-	m.Ve_movie = mov;
+	m.Qe_movie = movQ;
+	m.Ve_movie = movV;
+	
+	fprintf('Done.\n')
 	
 end
 
 %% Helpers
-function [source_drive] = set_source_drive(t, last, params)
+function [source_drive] = set_source_drive(t, params)
 
 	if t < params.padding(1)  % preseizure
-		source_drive = mean(last.dVe(:));
+		source_drive = 0;
 	elseif t >= params.padding(1) && t < (params.padding(1) + params.duration)  % seizure
 		source_drive = params.ictal_source_drive; 
 	else  % postseizure
