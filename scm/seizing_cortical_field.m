@@ -100,7 +100,7 @@ dynamic_vars = fieldnames(last)';
 %% Simulation
 
 for ii = 1: Nsteps
-	    
+	new = last;
 	% Update equations (update <new> values)
 	update_wave_equations;
 	update_synaptic_flux_eq;
@@ -114,14 +114,15 @@ for ii = 1: Nsteps
 	update_source
 
 	% UPDATE the dynamic variables (pass <new> values to <last>).
-	set_last_equal_new;
+% 	set_last_equal_new;
+	last = new;
 	get_electrode_values;
 	
 	% Correct out-of-bounds values
 	correct_OOB_values;
 	
 	% Implement no-flux boundary conditions. 
-	implement_no_flux_BCs;
+% 	implement_no_flux_BCs;
 
 	% sanity check!
 	if any(any(isnan(last.Qe)))
@@ -148,7 +149,7 @@ EC = rmfield(EC, no_return);
 				- (SS.v .* SS.Lambda).^2 .* last.phi_ee ...
 				+ (SS.v .* SS.Lambda).^2 .* last.Qe...
 			) ...
-			+ dt * (SS.v / dx)^2 * del2(last.phi_ee);
+			+ dt * (SS.v / dx)^2 * del2_(last.phi_ee);
 		 
 		new.phi2_ei = last.phi2_ei ...
 			+ dt * ( ...
@@ -156,7 +157,7 @@ EC = rmfield(EC, no_return);
 				- (SS.v .* SS.Lambda).^2 .* last.phi_ei ...
 				+ (SS.v .* SS.Lambda).^2 .* last.Qe...
 			) ...
-			+ dt * (SS.v / dx)^2 * del2(last.phi_ei);
+			+ dt * (SS.v / dx)^2 * del2_(last.phi_ei);
 							 
 		new.phi_ee = last.phi_ee + dt * last.phi2_ee;
 		new.phi_ei = last.phi_ei + dt * last.phi2_ei;
@@ -221,7 +222,7 @@ EC = rmfield(EC, no_return);
 				+ last.dVe ...
 				+ SS.rho_e * Psi_ee(last.Ve) .* last.Phi_ee ...      %E-to-E
                 + SS.rho_i * Psi_ie(last.Ve) .* last.Phi_ie ...      %I-to-E
-				+ last.D11 .* del2(last.Ve) ...
+				+ last.D11 .* del2_(last.Ve) ...
 			);
 		new.Vi = last.Vi ...
 			+ dt / SS.tau_i * ( ...
@@ -229,7 +230,7 @@ EC = rmfield(EC, no_return);
 				+ last.dVi ...
 				+ SS.rho_e * Psi_ei(last.Vi) .* last.Phi_ei ...      %E-to-I
 				+ SS.rho_i * Psi_ii(last.Vi) .* last.Phi_ii ...      %I-to-I
-				+ last.D22 .* del2(last.Vi) ...
+				+ last.D22 .* del2_(last.Vi) ...
 			);
 	end
 
@@ -273,7 +274,7 @@ EC = rmfield(EC, no_return);
 				- PK.k_decay * last.K ...  % decay term.
 				+ PK.kR * ...              % reaction term.
 					( new.Qe + new.Qi ) ./ ( 1 + exp( -( new.Qe + new.Qi ) + 15) ) ...
-				+ PK.kD * del2(last.K) ... % diffusion term.
+				+ PK.kD * del2_(last.K) ... % diffusion term.
 			);
 	end
 
@@ -310,7 +311,7 @@ EC = rmfield(EC, no_return);
 				NP.(v{:})(ii, :, :) = reshape(last.(v{:})(indsNP), [1, PE.dimsNP]); 
 				
 				% Take the local mean for ECOG electrodes
-				blurEC = conv2(last.(v{:}), ones(3), 'same') ./ 9;  
+				blurEC = conv2(last.(v{:}), ones(3) ./ 9, 'same');  
 				EC.(v{:})(ii, :, :) = reshape(blurEC(indsEC), [1, PE.dimsEC]);
 			end
 		end
@@ -397,6 +398,47 @@ end
 
 % ------------------------------------------------------------------------
 %% Supplementary functions
+
+% 4. update the firing rates
+	function [Qe, Qi] = firing_rate_dynamics(Ve, Vi, SS)
+		
+		Qe = ...
+			SS.Qe_max * ( ...
+				1 ./ ( 1 + ...
+					exp(-pi / ( sqrt(3) * SS.sigma_e ) .* ( Ve - SS.theta_e )) ...
+				) ...
+			) ...     %The E voltage must be big enough,
+			- SS.Qe_max * ( ...
+				1 ./ ( 1 + ...
+					exp(-pi / ( sqrt(3) * SS.sigma_e ) .* ( Ve - ( SS.theta_e + 30 ) )) ...
+				) ...
+			);   %... but not too big.
+			
+		Qi = ...
+			SS.Qi_max * ( ...
+				1 ./ (1 + ...
+					exp(-pi / ( sqrt(3) * SS.sigma_i ) .* ( Vi - SS.theta_i )) ...
+				) ...
+			) ...     %The I voltage must be big enough,
+			- SS.Qi_max * ( ...
+				1 ./ ( 1 + ...
+					exp(-pi / ( sqrt(3) * SS.sigma_i ) .* ( Vi - ( SS.theta_i + 30 ) )) ...
+				) ...
+			);   %... but not too big.
+		
+	end
+
+
+%------------------------------------------------------------------------
+function Y = del2_(X)
+
+X = [X(1, :); X(1, :); X; X(end, :); X(end, :)];
+X = [X(:, 1), X(:, 1), X, X(:, end), X(:, end)];
+L = [0 1 0; 1 -4 1; 0 1 0];
+Y = conv2(X, L, 'valid');
+Y = Y(2:end-1, 2:end-1);
+
+end
 
 %------------------------------------------------------------------------
 function fig = create_fig(grid_size, addyNP, addyEC)
