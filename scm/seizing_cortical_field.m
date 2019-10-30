@@ -62,7 +62,7 @@ rng(rand_state, 'v5normal');
 
 % number of time-steps for simulation
 Nsteps = round(time_end / dt);
-time = ( 0 : Nsteps - 1 )' * dt;
+time = ( 0 : Nsteps - 1 )' * dt + params.t0;
 
 % noise-amplitude coefficients for subcortical flux (note 1/sqrt(dt) factor)
 B_ee = PN.noise_sf * sqrt(PN.noise_sc * SS.phi_ee_sc / dt);

@@ -62,6 +62,7 @@ function res = init_scm_params(varargin)
 
 
 res.model = check_time_resolution(res.model, res.IC, res.SS);
+res.t0 = res.meta.t0_start;
 
 end
 
