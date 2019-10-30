@@ -320,7 +320,11 @@ EC = rmfield(EC, no_return);
 	function implement_no_flux_BCs
 		for v = dynamic_vars
 			temp = last.(v{:});
-			last.(v{:}) = padarray(temp(2:end-1, 2:end-1), [1 1], 'replicate');
+			temp(:, 1) = temp(:, 2);
+			temp(:, end) = temp(:, end - 1);
+			temp(1, :) = temp(2, :);
+			temp(end, :) = temp(end - 1, :);
+			last.(v{:}) = temp;
 		end
 	end
 
