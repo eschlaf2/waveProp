@@ -288,7 +288,7 @@ EC = rmfield(EC, no_return);
 % Update source and expand wavefront
 	function update_source
 		if source_del_VeRest == 0, return, end
-		expand = diff( floor((time(ii) - [dt 0]) * M.expansion_rate) );
+		expand = time(ii) > 0 && diff( floor((time(ii) - [dt 0]) * M.expansion_rate) );
 		if expand
 			[new.map, new.state] = update_map(last.state);
 		end
