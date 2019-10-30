@@ -76,12 +76,13 @@ out_vars = {...
 	'Qe', ...  %Activity of excitatory population.   (*)
 	'Ve', ...  %Voltage  of excitatory population.   (*)
 	'Qi', ...  %Activity of inhibitory population.   
-	'Vi', ...  %Voltage of inhibitory population.    
-	'D22', ... %Inhibitory-to-inhibitory gap junction strength.
 	'K', ...   %Extracellular potassium.
-	'dVe', ... %Change in resting voltage of excitatory population.
-	'dVi', ... %Change in resting voltage of inhibitory population.
 	};
+% 	'Vi', ...  %Voltage of inhibitory population.    
+% 	'D22', ... %Inhibitory-to-inhibitory gap junction strength.
+% 	'dVe', ... %Change in resting voltage of excitatory population.
+% 	'dVi', ... %Change in resting voltage of inhibitory population.
+% 	};
 
 % Indices to capture from larger grid for NP and EC
 indsNP = get_inds(M.grid_size, PE.centerNP, PE.dimsNP, 1);
@@ -95,7 +96,7 @@ get_electrode_values;
 
 last = IC;  % initialize
 new = last;  % initialize
-dynamic_vars = fieldnames(last)';
+
 
 %% Simulation
 
@@ -109,6 +110,9 @@ for ii = 1: Nsteps
 	update_extracellular_ion;
 	update_gap_resting;
 	
+	% Correct out-of-bounds values
+	correct_OOB_values;
+	
 	% Set the "source" locations' excitatory population resting voltage and
 	% expand the wavefront
 	update_source
@@ -117,9 +121,6 @@ for ii = 1: Nsteps
 % 	set_last_equal_new;
 	last = new;
 	get_electrode_values;
-	
-	% Correct out-of-bounds values
-	correct_OOB_values;
 	
 	% Implement no-flux boundary conditions. 
 % 	implement_no_flux_BCs;
@@ -286,6 +287,17 @@ EC = rmfield(EC, no_return);
 		new.dVi = last.dVi + dt / PT.tau_dVi * ( PK.KtoVi * last.K );
 	end
 
+% Correct out of bounds values
+	function correct_OOB_values
+		new.D22 = max(new.D22,0.1);                   %The inhibitory gap junctions cannot pass below a minimum value of 0.1.
+		new.D11 = new.D22/100;                          %See definition in [Steyn-Ross et al PRX 2013, Table I].
+
+		new.dVe = min(new.dVe,1.5);     %The excitatory population resting voltage cannot pass above a maximum value of 1.5.
+		new.dVi = min(new.dVi,0.8);     %The inhibitory population resting voltage cannot pass above a maximum value of 0.8.
+		new.K = min(new.K,1);                         %The extracellular ion cannot pass above a maximum value of 1.0.
+
+	end
+
 % Update source and expand wavefront
 	function update_source
 		if source_del_VeRest == 0, return, end
@@ -315,36 +327,6 @@ EC = rmfield(EC, no_return);
 				EC.(v{:})(ii, :, :) = reshape(blurEC(indsEC), [1, PE.dimsEC]);
 			end
 		end
-	end
-
-% Implement no-flux BCs
-	function implement_no_flux_BCs
-		for v = dynamic_vars
-			temp = last.(v{:});
-			temp(:, 1) = temp(:, 2);
-			temp(:, end) = temp(:, end - 1);
-			temp(1, :) = temp(2, :);
-			temp(end, :) = temp(end - 1, :);
-			last.(v{:}) = temp;
-		end
-	end
-
-% Update dynamic variables
-	function set_last_equal_new
-		for v = dynamic_vars
-			last.(v{:}) = new.(v{:});
-		end
-	end
-
-% Correct out of bounds values
-	function correct_OOB_values
-		last.D22 = max(last.D22,0.1);                   %The inhibitory gap junctions cannot pass below a minimum value of 0.1.
-		last.D11 = last.D22/100;                          %See definition in [Steyn-Ross et al PRX 2013, Table I].
-
-		last.dVe = min(last.dVe,1.5);     %The excitatory population resting voltage cannot pass above a maximum value of 1.5.
-		last.dVi = min(last.dVi,0.8);     %The inhibitory population resting voltage cannot pass above a maximum value of 0.8.
-		last.K = min(last.K,1);                         %The extracellular ion cannot pass above a maximum value of 1.0.
-
 	end
 
 % Visualize results
@@ -399,45 +381,15 @@ end
 % ------------------------------------------------------------------------
 %% Supplementary functions
 
-% 4. update the firing rates
-	function [Qe, Qi] = firing_rate_dynamics(Ve, Vi, SS)
-		
-		Qe = ...
-			SS.Qe_max * ( ...
-				1 ./ ( 1 + ...
-					exp(-pi / ( sqrt(3) * SS.sigma_e ) .* ( Ve - SS.theta_e )) ...
-				) ...
-			) ...     %The E voltage must be big enough,
-			- SS.Qe_max * ( ...
-				1 ./ ( 1 + ...
-					exp(-pi / ( sqrt(3) * SS.sigma_e ) .* ( Ve - ( SS.theta_e + 30 ) )) ...
-				) ...
-			);   %... but not too big.
-			
-		Qi = ...
-			SS.Qi_max * ( ...
-				1 ./ (1 + ...
-					exp(-pi / ( sqrt(3) * SS.sigma_i ) .* ( Vi - SS.theta_i )) ...
-				) ...
-			) ...     %The I voltage must be big enough,
-			- SS.Qi_max * ( ...
-				1 ./ ( 1 + ...
-					exp(-pi / ( sqrt(3) * SS.sigma_i ) .* ( Vi - ( SS.theta_i + 30 ) )) ...
-				) ...
-			);   %... but not too big.
-		
-	end
-
-
 %------------------------------------------------------------------------
 function Y = del2_(X)
+L = [0 1 0; 1 -4 1; 0 1 0];  % Laplacian
 
-X = [X(1, :); X(1, :); X; X(end, :); X(end, :)];
-X = [X(:, 1), X(:, 1), X, X(:, end), X(:, end)];
-L = [0 1 0; 1 -4 1; 0 1 0];
+% zero-flux BCs
+X = [X(1, :); X; X(end, :)];
+X = [X(:, 1), X, X(:, end)];
+
 Y = conv2(X, L, 'valid');
-Y = Y(2:end-1, 2:end-1);
-
 end
 
 %------------------------------------------------------------------------
