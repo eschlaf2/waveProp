@@ -76,7 +76,7 @@ B_ei = PN.noise_sf * sqrt(PN.noise_sc * SS.phi_ei_sc / dt);
 out_vars = {...
 	'Qe', ...  %Activity of excitatory population.   (*)
 	'Ve', ...  %Voltage  of excitatory population.   (*)
-	'Qi', ...  %Activity of inhibitory population.   
+	'map', ...  %Activity of inhibitory population.   
 	'K', ...   %Extracellular potassium.
 	};
 % 	'Vi', ...  %Voltage of inhibitory population.    
@@ -100,9 +100,9 @@ new = last;  % initialize
 
 
 %% Simulation
-
+new = last;
 for ii = 1: Nsteps
-	new = last;
+	
 	% Update equations (update <new> values)
 	update_wave_equations;
 	update_synaptic_flux_eq;
@@ -302,10 +302,11 @@ EC = rmfield(EC, no_return);
 % Update source and expand wavefront
 	function update_source
 		if source_del_VeRest == 0, return, end
-		expand = time(ii) > 0 && diff( floor((time(ii) - [dt 0]) * M.expansion_rate) );
-		if expand
-			[new.map, new.state] = update_map(last.state);
-		end
+% 		expand = time(ii) > 0 && diff( floor((time(ii) - [dt 0]) * M.expansion_rate) );
+% 		if expand
+% 			[new.map, new.state] = update_map(last.state, 1);
+% 		end
+		[new.map, new.state] = update_map(last.state, M.expansion_rate * dt);
 		new.dVe(new.map) = source_del_VeRest;
 	end
 
