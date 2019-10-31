@@ -42,7 +42,7 @@ convert_to_mea(params.meta);
 function create_directory(params)
 
 	PM = params.meta;
-	if ~PM.SAVE, return, end
+	if ~PM.save, return, end
 	
 	[base_path, ~, ~] = fileparts(PM.basename);
 	if ~exist(base_path, 'dir'), mkdir(base_path), end
@@ -57,7 +57,7 @@ PM = params.meta;
 BASENAME = PM.basename;
 DURATION = PM.duration;
 PADDING = PM.padding;
-SAVE = PM.SAVE;
+SAVE = PM.save;
 SIM_NUM = PM.sim_num;
 T_STEP = PM.t_step;
 T0_START = PM.t0_start;
@@ -166,7 +166,7 @@ function [source_drive] = set_source_drive(t, params)
 	if t < params.padding(1)  % preseizure
 		source_drive = 0;
 	elseif t >= params.padding(1) && t < (params.padding(1) + params.duration)  % seizure
-		source_drive = params.ictal_source_drive; 
+		source_drive = params.source_drive; 
 	else  % postseizure
 		source_drive = params.post_ictal_source_drive;
 	end

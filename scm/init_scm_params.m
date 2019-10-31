@@ -14,7 +14,7 @@ function res = init_scm_params(varargin)
 		% basename             SAVE                 sim_num
 		% t0_start             t_step               visualization_rate
 		% visualize            padding              duration
-		% subsample            ictal_source_drive   post_ictal_source_drive
+		% subsample            source_drive         post_ictal_source_drive
 		% return_fields
 
 	res.model = parse_model(varargin);
@@ -75,14 +75,14 @@ function meta = parse_meta(options)
 
 p('basename', 'SCM/SCM/SCM');
 p('sim_num', []);
-p('SAVE', true);  % Save output
+p('save', true);  % Save output
 p('visualize', false);  %Set this variable to true to create plots during simulation.
 p('visualization_rate', 10);  % Show this many frames per second
 p('t_step', 1);  % Simulate t_step second intervals
 p('t0_start', 0);  % Continue from previous sim (IC will use last from file number t0_start-1)
 p('duration', 190);  % Seizure duration
 p('padding', [10 30], @(x) isnumeric(x) & numel(x) == 2);  % Padding before and after seizure
-p('ictal_source_drive', 3);
+p('source_drive', 3);
 p('post_ictal_source_drive', 1.5);
 p('return_fields', {'Qe', 'Ve'});  % Qe required to make mea
 p('subsample', Inf);  % Allow subsampling when making mea
@@ -200,10 +200,10 @@ p('F_ei', IC.F_ei)
 p('F_ie', IC.F_ie)
 p('F_ii', IC.F_ii)
 
-parse(G, model.IC{:});
+if isstruct(model.IC), parse(G, model.IC), else, parse(G, model.IC{:}); end
 
 IC = G.Results;
-IC = resize(IC, model);
+IC = resize(IC, model);  % This uses bootstrapping so don't try to resize anything except resting/steady state ICs.
 
 end
 
