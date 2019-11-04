@@ -11,7 +11,7 @@ function res = init_scm_params(varargin)
 
 %%%% Adjust values as name-value pairs %%%%
 	res.meta = parse_meta(varargin); 
-		% basename             SAVE                 sim_num
+		% basename             save                 sim_num
 		% t0_start             t_step               visualization_rate
 		% padding              duration
 		% subsample            source_drive         post_ictal_source_drive

@@ -278,7 +278,7 @@ EC = rmfield(EC, no_return);
 
 % 6. Update inhibitory gap junction strength, and resting voltages.  
 	function update_gap_resting
-		new.D22 = last.D22 + dt / PT.tau_dD * ( PK.KtoD / dx^2 .* last.K - (last.D22 - SS.D2 ./ dx^2));
+		new.D22 = last.D22 + dt / PT.tau_dD * ( PK.KtoD .* last.K - (last.D22 - SS.D2 ./ dx^2));
 		new.D11 = last.D22/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
 		new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* E(last.K) - last.dVe);
 		new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* E(last.K) - last.dVi);
