@@ -27,8 +27,10 @@ end
 % mask = state(:);
 % D = squareform(pdist([xx(:), yy(:)]));
 % neighbor_mask = any(D(mask, :) <= sqrt(2));
+
 map = false(size(state));
 map(2:end-1, 2:end-1) = conv2(state, [0 1 0; 1 -4 1; 0 1 0], 'valid') > 0;
+if expansion_rate <= 0, return; end
 % map = neighbors;
 % neighbors(neighbor_mask) = true;
 p_thresh = 2^expansion_rate - 1;
