@@ -13,13 +13,13 @@ function res = init_scm_params(varargin)
 	res.meta = parse_meta(varargin); 
 		% basename             SAVE                 sim_num
 		% t0_start             t_step               visualization_rate
-		% visualize            padding              duration
+		% padding              duration
 		% subsample            source_drive         post_ictal_source_drive
 		% return_fields
 
 	res.model = parse_model(varargin);
 		% dt              electrodes      expansion_rate  grid_size       
-		% noise           stim_center     spatial_resolution
+		% noise           stim_center     dx              bounds
 		% time_constants  SS              IC              K               
 
 
@@ -60,8 +60,8 @@ function res = init_scm_params(varargin)
 		% sigma_i         tau_e           tau_i           theta_e
 		% theta_i         v
 		
-	res.MX = parse_bounds(res.model);
-		% D22_min         dVe_max         dVi_max         K_max
+	res.bounds = parse_bounds(res.model);
+		% <same as IC>
 
 
 res.model = check_time_resolution(res.model, res.IC, res.SS);
@@ -76,8 +76,7 @@ function meta = parse_meta(options)
 p('basename', 'SCM/SCM/SCM');
 p('sim_num', []);
 p('save', true);  % Save output
-p('visualize', false);  %Set this variable to true to create plots during simulation.
-p('visualization_rate', 10);  % Show this many frames per second
+p('visualization_rate', 0);  % Show this many frames per second
 p('t_step', 1);  % Simulate t_step second intervals
 p('t0_start', 0);  % Continue from previous sim (IC will use last from file number t0_start-1)
 p('duration', 190);  % Seizure duration
@@ -87,7 +86,7 @@ p('post_ictal_source_drive', 1.5);
 p('return_fields', {'Qe', 'Ve'});  % Qe required to make mea
 p('subsample', Inf);  % Allow subsampling when making mea
 
-parse(G, options{:});
+if isstruct(options), G.parse(options); else, parse(G, options{:}); end
 meta = G.Results;
 
 s = 0;
@@ -106,9 +105,10 @@ function model = parse_model(options)
 p('stim_center', [0 0], @(x) numel(x) == 2);
 p('grid_size', [100 100], @(x) ~all(mod(x, 2)) && numel(x) == 2);  % size of grid to simulate (must be even)
 p('dt', 2e-4);
-% p('Laplacian', [0 1 0; 1 -4 1; 0 1 0]);  *** switched to calling del2 **
-p('spatial_resolution', .3);  % (mm) 
-p('expansion_rate', 1/3, @(x) x > 0);  % in Hz; set to 0 for fixed source
+% p('Laplacian', [0 1 0; 1 -4 1; 0 1 0]);  *** switched to local del2
+% definition with this in a subfunction
+p('dx', .3);  % (cm) (to call each grid point an electrode we need this to be .04);
+p('expansion_rate', 1/3, @(x) x >= 0);  % in Hz; set to 0 for fixed source
 p('IC', {});  % Initial conditions of the sim (enter options as name-value pairs)
 p('SS', {});  % Constants that define the locations of steady states
 p('time_constants', {});  % tau parameters controlling rates
@@ -118,7 +118,7 @@ p('electrodes', {});  % electrode positions
 p('bounds', {});  % Variables with integration boundaries
 
 % Parse
-parse(G, options{:});
+if isstruct(options), G.parse(options); else, parse(G, options{:}); end
 model = G.Results;
 
 % Clean
@@ -134,17 +134,38 @@ model.stim_center = round(stim_center);
 
 end
 
-function bounds = parse_bounds(options)
+function bounds = parse_bounds(model)
 
-[G, p] = get_parser();
+options = model.bounds;
+[G, p] = get_parser(); G.CaseSensitive = true;
+validate = @(x) numel(x) == 2 && x(2) > x(1);
 
-p('D22_min', 0.1)  % The inhibitory gap junctions cannot pass below a minimum value of 0.1.
-p('dVe_max', 1.5)   % The excitatory population resting voltage cannot pass above a maximum value of 1.5.
-p('dVi_max', 0.8);  %The inhibitory population resting voltage cannot pass above a maximum value of 0.8.
-p('K_max',1); 
+p('D1', [-Inf Inf], validate)  % i <--> i gap-junction diffusive-coupling strength (mm^2)
+p('D2', [.009 Inf], validate)  % The inhibitory gap junctions cannot pass below a minimum value of 0.009 / dx^2.
+p('K',  [-Inf 1], validate)  % extracellular potassium concentration (mm^2)
+p('Qe', [-Inf Inf], validate)  % Activity of excitatory population.
+p('Qi', [-Inf Inf], validate)  % Activity of inhibitory population.
+p('Ve', [-Inf Inf], validate)  % Voltage  of excitatory population.
+p('Vi', [-Inf Inf], validate)  % Voltage of inhibitory population.
+p('dVe', [-Inf 1.5], validate)  % Excitatory resting potential offset (mV)
+p('dVi', [-Inf 0.8], validate)  % Inhibitory resting potential offset (mV)
+p('Phi_ee', [-Inf Inf], validate)  % e <--> e synaptic flux
+p('Phi_ei', [-Inf Inf], validate)  % e <--> i synaptic flux
+p('Phi_ie', [-Inf Inf], validate)  % i <--> e synaptic flux
+p('Phi_ii', [-Inf Inf], validate)  % i <--> i synaptic flux
+p('phi2_ee', [-Inf Inf], validate)  % Wave dynamics
+p('phi2_ei', [-Inf Inf], validate)
+p('phi_ee', [-Inf Inf], validate)
+p('phi_ei', [-Inf Inf], validate)
+p('F_ee', [-Inf Inf], validate)  % flux dynamics
+p('F_ei', [-Inf Inf], validate)
+p('F_ie', [-Inf Inf], validate)
+p('F_ii', [-Inf Inf], validate)
 
 if isstruct(options), G.parse(options), else, G.parse(options{:}); end
 bounds = G.Results;
+bounds.D11 = bounds.D1 ./ model.dx.^2;
+bounds.D22 = bounds.D2 ./ model.dx.^2;
 
 end
 
@@ -153,13 +174,11 @@ function noise = parse_noise(model)
 [G, p] = get_parser();
 options = model.noise;
 
-p('noise', 0.5);  % Noise level
-p('noise_sf', []);  % noise scale-factor
+p('noise_sf', 2);  % noise scale-factor [default: 2, original: 4]
 p('noise_sc', 0.2);  % subcortical noise
 
 if isstruct(options), G.parse(options), else, G.parse(options{:}); end
 noise = G.Results;
-if isempty(noise.noise_sf); noise.noise_sf = 0.2*20*noise.noise; end
 
 end
 
@@ -173,37 +192,38 @@ function IC = parse_IC(model)
 G = inputParser; G.CaseSensitive = true;
 p = @(varargin) addParameter(G, varargin{:});  % convenience function
 
-IC = load('default_scm_ICs.mat');
-[map, state] = update_map(model);
+% IC = load('default_scm_ICs.mat');
+SS = SCM_init_globs;
 
-p('map', map);  % Source of ictal activity (on/off)
-p('state', state);  % Seizure state (ictal/non-ictal)
-p('D11', IC.D11)  % i <--> i gap-junction diffusive-coupling strength (mm^2)
-p('D22', IC.D22)  % e <--> e gap-junction diffusive-coupling strength in all space (mm^2)
-p('K', IC.K)  % extracellular potassium concentration (mm^2)
-p('Qe', IC.Qe)  % Activity of excitatory population.
-p('Qi', IC.Qi)  % Activity of inhibitory population.
-p('Ve', IC.Ve)  % Voltage  of excitatory population.
-p('Vi', IC.Vi)  % Voltage of inhibitory population.
-p('dVe', IC.dVe)  % Excitatory resting potential offset (mV)
-p('dVi', IC.dVi)  % Inhibitory resting potential offset (mV)
-p('Phi_ee', IC.Phi_ee)  % e <--> e synaptic flux
-p('Phi_ei', IC.Phi_ei)  % e <--> i synaptic flux
-p('Phi_ie', IC.Phi_ie)  % i <--> e synaptic flux
-p('Phi_ii', IC.Phi_ii)  % i <--> i synaptic flux
-p('phi2_ee', IC.phi2_ee)  % Wave dynamics
-p('phi2_ei', IC.phi2_ei)
-p('phi_ee', IC.phi_ee)
-p('phi_ei', IC.phi_ei)
-p('F_ee', IC.F_ee)  % flux dynamics
-p('F_ei', IC.F_ei)
-p('F_ie', IC.F_ie)
-p('F_ii', IC.F_ii)
+p('map', nan);  % Source of ictal activity (on/off)
+p('state', nan);  % Seizure state (ictal/non-ictal)
+p('D11', SS.D2 / 100 / model.dx.^2)  % i <--> i gap-junction diffusive-coupling strength (mm^2)
+p('D22', SS.D2 / model.dx.^2)  % e <--> e gap-junction diffusive-coupling strength in all space (mm^2)
+p('K', 0)  % extracellular potassium concentration (mm^2)
+p('Qe', 0)  % Activity of excitatory population.
+p('Qi', 0)  % Activity of inhibitory population.
+p('Ve', SS.Ve_rest)  % Voltage  of excitatory population.
+p('Vi', SS.Vi_rest)  % Voltage of inhibitory population.
+p('dVe', -1)  % Excitatory resting potential offset (mV)
+p('dVi', .1)  % Inhibitory resting potential offset (mV)
+p('Phi_ee', 0)  % e <--> e synaptic flux
+p('Phi_ei', 0)  % e <--> i synaptic flux
+p('Phi_ie', 0)  % i <--> e synaptic flux
+p('Phi_ii', 0)  % i <--> i synaptic flux
+p('phi2_ee', 0)  % Wave dynamics
+p('phi2_ei', 0)
+p('phi_ee', 0)
+p('phi_ei', 0)
+p('F_ee', 0)  % flux dynamics
+p('F_ei', 0)
+p('F_ie', 0)
+p('F_ii', 0)
 
 if isstruct(model.IC), parse(G, model.IC), else, parse(G, model.IC{:}); end
 
 IC = G.Results;
-IC = resize(IC, model);  % This uses bootstrapping so don't try to resize anything except resting/steady state ICs.
+if isnan(IC.state), [IC.map, IC.state] = update_map(model); end
+IC = resize(IC, model);  
 
 end
 
@@ -211,7 +231,7 @@ function model = check_time_resolution(model, IC, SS)
 % reduce time resolution if gap-junction diffusive coupling strength (D22)
 % or axonal velocity (v) is high
 
-	D2 = IC.D22 * model.spatial_resolution.^2;
+	D2 = IC.D22 * model.dx.^2;
 	if model.dt > 2e-4 && (any(D2(:) >= 0.87) || SS.v(:) > 140)
 		model.dt = 2e-4;
 		warning('High D2 or HL.v; setting dt to 2e-4.');
@@ -266,6 +286,10 @@ p('KtoVi', 10);     %impact on inhibitory population resting voltage.
 p('KtoD', -50);    %impact on inhibitory gap junction strength.
 p('kR', 0.15);   %scale reaction term. 
 
+% Potassium excitability function
+p('k_peak', .5);  % K concentration at which voltage offset is greatest
+p('k_width', .1);  % Width of K concentration peak
+
 if isstruct(options), parse(G, options), else, parse(G, options{:}), end
 potassium = G.Results;
 
@@ -307,18 +331,16 @@ s.centerNP = NP; s.centerEC = EC;
 end
 
 function IC = resize(IC, model)
-% Resize IC fields by bootstrapping from original values. The same subset
-% of indices is used for each field. i.e. the ICs on the whole are a
-% sub(super)-set of the default ICs.
-
-if ~all(model.grid_size == size(IC.D11))
-	rng(0)  % for reproducibility
-	inds = randi(numel(IC.D11), model.grid_size(1), model.grid_size(2));
+% 
 	for f = fieldnames(IC)'
-		if ismember(f, {'map', 'state'}), continue, end
-		IC.(f{:}) = IC.(f{:})(inds);
+		if numel(IC.(f{:})) == 1
+			IC.(f{:}) = IC.(f{:}) * ones(model.grid_size);
+		else
+			if ~all(size(IC.(f{:})) == model.grid_size)
+				error('IC parameter ''%s'' is the wrong size', f{:});
+			end
+		end
 	end
-end
 
 end
 
