@@ -140,8 +140,8 @@ options = model.bounds;
 [G, p] = get_parser(); G.CaseSensitive = true;
 validate = @(x) numel(x) == 2 && x(2) > x(1);
 
-p('D1', [-Inf Inf], validate)  % i <--> i gap-junction diffusive-coupling strength (mm^2)
-p('D2', [.009 Inf], validate)  % The inhibitory gap junctions cannot pass below a minimum value of 0.009 / dx^2.
+p('Dee', [-Inf Inf], validate)  % i <--> i gap-junction diffusive-coupling strength (mm^2)
+p('Dii', [.009 Inf], validate)  % The inhibitory gap junctions cannot pass below a minimum value of 0.009 / dx^2.
 p('K',  [-Inf 1], validate)  % extracellular potassium concentration (mm^2)
 p('Qe', [-Inf Inf], validate)  % Activity of excitatory population.
 p('Qi', [-Inf Inf], validate)  % Activity of inhibitory population.
@@ -164,8 +164,8 @@ p('F_ii', [-Inf Inf], validate)
 
 if isstruct(options), G.parse(options), else, G.parse(options{:}); end
 bounds = G.Results;
-bounds.D11 = bounds.D1 ./ model.dx.^2;
-bounds.D22 = bounds.D2 ./ model.dx.^2;
+% bounds.D11 = bounds.D1 ./ model.dx.^2;
+% bounds.D22 = bounds.D2 ./ model.dx.^2;
 
 end
 
@@ -197,8 +197,8 @@ SS = SCM_init_globs;
 
 p('map', nan);  % Source of ictal activity (on/off)
 p('state', nan);  % Seizure state (ictal/non-ictal)
-p('D11', SS.D2 / 100 / model.dx.^2)  % i <--> i gap-junction diffusive-coupling strength (mm^2)
-p('D22', SS.D2 / model.dx.^2)  % e <--> e gap-junction diffusive-coupling strength in all space (mm^2)
+p('Dee', SS.Dii / 100)  % i <--> i gap-junction diffusive-coupling strength (electrodes)
+p('Dii', SS.Dii)  % e <--> e gap-junction diffusive-coupling strength in all space (electrodes)
 p('K', 0)  % extracellular potassium concentration (mm^2)
 p('Qe', 0)  % Activity of excitatory population.
 p('Qi', 0)  % Activity of inhibitory population.
@@ -231,8 +231,7 @@ function model = check_time_resolution(model, IC, SS)
 % reduce time resolution if gap-junction diffusive coupling strength (D22)
 % or axonal velocity (v) is high
 
-	D2 = IC.D22 * model.dx.^2;
-	if model.dt > 2e-4 && (any(D2(:) >= 0.87) || SS.v(:) > 140)
+	if model.dt > 2e-4 && (any(IC.Dii(:) >= 0.87) || SS.v(:) > 140)
 		model.dt = 2e-4;
 		warning('High D2 or HL.v; setting dt to 2e-4.');
 	end
