@@ -71,22 +71,23 @@ else
 	last = params.IC;  %Load the initial conditions to start.
 end
 
-K = sum(PADDING) + DURATION;  
+K = sum(PADDING) + DURATION;
 fig = [];
-for t0 = PM.t0_start:PM.t_step:K-1  % For each step
+for t0 = PM.t0_start:T_STEP:K-1  % For each step
 	tic
 	% Update time offset
 	params.t0 = t0;
 	
 	% ... show progress, 
-	fprintf('Running %d / %d .. ', t0, K-1);  
+	fprintf('Running %d / %d .. ', t0, floor(K-1));  
 		
 	% ... get appropriate source drive,
 	source_drive = set_source_drive(t0, PM);  
 	
 	% ... run simulation for duration T_STEP,
 	[NP, EC, time, last, fig] = ...  
-		seizing_cortical_field(source_drive, T_STEP, last, fig, params);
+		seizing_cortical_field(source_drive, min(T_STEP, K - t0 - 1), last, fig, params);
+	if fig.quit_early, break, end
 	
 	% ... correct output time for padding and start time,
 	time = time - PADDING(1);  
