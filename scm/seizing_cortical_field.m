@@ -36,7 +36,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %---------------------------------------------------------------------
-function [NP, EC, time, last, fig] = seizing_cortical_field(source_del_VeRest, time_end, IC, fig, params)
+function [NP, EC, time, last, fig] = seizing_cortical_field(~, time_end, IC, fig, params)
 
 %% Preferences and parameters
 if ~exist('params', 'var') || isempty(params), params = init_scm_params(), end
@@ -48,13 +48,13 @@ PE = params.electrodes;
 PT = params.time_constants;
 PN = params.noise;
 SS = params.SS;
-MX = params.MX;
+MX = params.bounds;
 
 %% A few convenience variables
 
 Nx = M.grid_size(1);
 Ny = M.grid_size(2);
-dx = M.spatial_resolution;
+dx = M.dx;
 dt = M.dt;
 
 % initialize random number generator (from input argument)
@@ -75,9 +75,10 @@ B_ei = PN.noise_sf * sqrt(PN.noise_sc * SS.phi_ei_sc / dt);
 % Some are visualized, some are returned.
 out_vars = {...
 	'Qe', ...  %Activity of excitatory population.   (*)
-	'Ve', ...  %Voltage  of excitatory population.   (*)
-	'map', ...  %Activity of inhibitory population.   
+	'dVe', ...  %Voltage  of excitatory population.   (*)
+	'D11', ...  %Activity of inhibitory population.   
 	'K', ...   %Extracellular potassium.
+	'Ve', ...
 	};
 % 	'Vi', ...  %Voltage of inhibitory population.    
 % 	'D22', ... %Inhibitory-to-inhibitory gap junction strength.
@@ -118,18 +119,15 @@ for ii = 1: Nsteps
 	% expand the wavefront
 	update_source
 
-	% UPDATE the dynamic variables (pass <new> values to <last>).
-% 	set_last_equal_new;
-	last = new;
-	get_electrode_values;
-	
-	% Implement no-flux boundary conditions. 
-% 	implement_no_flux_BCs;
-
 	% sanity check!
 	if any(any(isnan(last.Qe)))
 		error('Sigmoid generated NaNs!! (Either increase dx or reduce dt)');
 	end
+	
+	% UPDATE the dynamic variables (pass <new> values to <last>).
+% 	set_last_equal_new;
+	last = new;
+	get_electrode_values;
       
 	visualize;
 end
@@ -263,51 +261,52 @@ EC = rmfield(EC, no_return);
 				) ...
 			);   %... but not too big.
 		
-		%%% DOUBLE CHECK THIS %%%
-		last.Qe = new.Qe;
-		last.Qi = new.Qi;
 	end
 
 % 5. Update extracellular ion.
 	function update_extracellular_ion
 		new.K = ...
 			last.K ...
-			+ dt / PK.tau_K * ( ...
-				- PK.k_decay * last.K ...  % decay term.
-				+ PK.kR * ...              % reaction term.
-					( last.Qe + last.Qi ) ./ ( 1 + exp( -( last.Qe + last.Qi ) + 15) ) ...
-				+ PK.kD * del2_(last.K) ... % diffusion term.
-			);
+			+ dt / PK.tau_K .* ( ...
+				- PK.k_decay .* last.K ...  % decay term.
+				+ PK.kR .* ...              % reaction term.
+					1 ./ ( 1 + exp( -( last.Qe + last.Qi ) + 15) ) ...
+			) ...
+			+ dt * PK.kD * del2_(last.K);  % diffusion term.
+			
 	end
 
 % 6. Update inhibitory gap junction strength, and resting voltages.  
 	function update_gap_resting
-		new.D22 = last.D22 + dt / PT.tau_dD * ( PK.KtoD *last.K );
-		new.D11 = last.D11;
-		new.dVe = last.dVe + dt / PT.tau_dVe * ( PK.KtoVe * last.K );
-		new.dVi = last.dVi + dt / PT.tau_dVi * ( PK.KtoVi * last.K );
+		new.D22 = last.D22 + dt / PT.tau_dD * ( PK.KtoD / dx^2 .* last.K - (last.D22 - SS.D2 ./ dx^2));
+		new.D11 = last.D22/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
+		new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* E(last.K) - last.dVe);
+		new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* E(last.K) - last.dVi);
 	end
 
 % Correct out of bounds values
 	function correct_OOB_values
-		new.D22 = max(new.D22,MX.D22_min);                   %The inhibitory gap junctions cannot pass below a minimum value of 0.1.
-		new.D11 = new.D22/100;                          %See definition in [Steyn-Ross et al PRX 2013, Table I].
-
-		new.dVe = min(new.dVe, MX.dVe_max);     %The excitatory population resting voltage cannot pass above a maximum value of 1.5.
-		new.dVi = min(new.dVi, MX.K_max);     %The inhibitory population resting voltage cannot pass above a maximum value of 0.8.
-		new.K = min(new.K, MX.K_max);                         %The extracellular ion cannot pass above a maximum value of 1.0.
-
+		
+		for f = fieldnames(last)'
+			f = f{:}; %#ok<FXSET>
+			if ismember(f, {'map', 'state'}) || all(isinf(MX.(f))), continue, end
+			new.(f) = min(max(new.(f), MX.(f)(1)), MX.(f)(2));
+		end
+		
 	end
 
 % Update source and expand wavefront
 	function update_source
-		if source_del_VeRest == 0, return, end
-% 		expand = time(ii) > 0 && diff( floor((time(ii) - [dt 0]) * M.expansion_rate) );
-% 		if expand
-% 			[new.map, new.state] = update_map(last.state, 1);
-% 		end
-		[new.map, new.state] = update_map(last.state, M.expansion_rate * dt);
-		new.dVe(new.map) = source_del_VeRest;
+		if time(ii) > 0 
+		if time(ii) <= PM.duration
+			[new.map, new.state] = update_map(last.state, M.expansion_rate * dt);
+			new.dVe(new.map) = PM.source_drive; 
+		else
+			new.map = last.map; new.state = last.state;
+			if isnan(PM.post_ictal_source_drive), return; end			
+			new.dVe(new.map) = PM.post_ictal_source_drive;
+		end
+		end
 	end
 
 %% Nested logistical functions
@@ -333,53 +332,48 @@ EC = rmfield(EC, no_return);
 
 % Visualize results
 	function visualize
-		if ~PM.visualize, return, end
-		if ~exist('fig', 'var') || isempty(fig)
-			fig = create_fig(out_vars, M.grid_size, indsNP, indsEC);
-		end
-		if diff(floor((time(ii) - [dt 0]) * PM.visualization_rate))
-			for sp = 1:numel(fig.ih)
-				set(fig.ih(sp), 'cdata', last.(out_vars{sp}))
+		if PM.visualization_rate > 0
+			if ~exist('fig', 'var') || isempty(fig)
+				fig = create_fig(out_vars, M.grid_size, indsNP, indsEC);
 			end
-			
-% 			% Image of excitatory population activity.
-% 			set(fig.ih(1), 'cdata', last.Qe);
-% 
-% 			% Image of inhibitory population activity.
-% 			set(fig.ih(2), 'cdata', last.Ve);
-% 
-% 			% Image of extracellular ion proportion.
-% 			set(fig.ih(3), 'cdata', last.K)
-% 			set(fig.th(3), 'string', sprintf('K %2f', mean(last.K(:))))
-% 
-% 			% Image of inhibitory gap junction strength.
-% 			set(fig.ih(4), 'cdata', last.Qe + last.Qi);  
-% 			
-			set(fig.ah, 'string', sprintf('T = %0.3f', time(ii)));
-			drawnow;
+			if diff(floor((time(ii) - [dt 0]) * PM.visualization_rate))
+				for sp = 1:numel(fig.ih)
+					set(fig.ih(sp), 'cdata', last.(out_vars{sp}))
+					colorbar
+				end
+
+				set(fig.ah, 'string', sprintf('T = %0.3f', time(ii)));
+				drawnow;
+			end
 		end
 	end
 
 %% Nested weighting functions
 
+% Excitability (voltage offset) as a function of potassium
+	function y = E(K)
+		y = 1 ./ ( 1 + exp( -5*(2*sqrt(K) - 1) ) ) + ...  % sigmoid
+		10 * exp( -( (K - PK.k_peak) ./ (PK.k_width) ).^2 );  % gaussian
+	end
+
 % e-to-e reversal-potential weighting function
 	function weight = Psi_ee(V)
-		weight = (SS.Ve_rev - V)/(SS.Ve_rev - SS.Ve_rest);
+		weight = (SS.Ve_rev - V)./(SS.Ve_rev - SS.Ve_rest);
 	end
 
 % e-to-i reversal-potential weighting function
 	function weight = Psi_ei(V)
-		weight = (SS.Ve_rev - V)/(SS.Ve_rev - SS.Vi_rest);
+		weight = (SS.Ve_rev - V)./(SS.Ve_rev - SS.Vi_rest);
 	end
 
 % i-to-e reversal-potential weighting function
 	function weight = Psi_ie(V)
-		weight = (SS.Vi_rev - V)/(SS.Vi_rev - SS.Ve_rest);
+		weight = (SS.Vi_rev - V)./(SS.Vi_rev - SS.Ve_rest);
 	end
 
 % i-to-i reversal potential weighting function
 	function weight = Psi_ii(V)
-		weight = (SS.Vi_rev - V)/(SS.Vi_rev - SS.Vi_rest);
+		weight = (SS.Vi_rev - V)./(SS.Vi_rev - SS.Vi_rest);
 	end
 
 end
@@ -389,29 +383,38 @@ end
 
 %------------------------------------------------------------------------
 function Y = del2_(X)
-L = [0 1 0; 1 -4 1; 0 1 0];  % Laplacian
+% L = [0 1 0; 1 -4 1; 0 1 0];  % 5-point stencil Laplacian
+a = .25; b = .5;
+L = [a b a; b -3 b; a b a];  % 9-point stencil Laplacian
 
 % zero-flux BCs
-X = [X(1, :); X; X(end, :)];
-X = [X(:, 1), X, X(:, end)];
+X = [X(1, :); X(1, :); X; X(end, :); X(end, :)];
+X = [X(:, 1), X(:, 1), X, X(:, end), X(:, end)];
 
 Y = conv2(X, L, 'valid');
+Y = Y(2:end-1, 2:end-1);
 end
 
 %------------------------------------------------------------------------
 function fig = create_fig(out_vars, grid_size, addyNP, addyEC)
-% 	titles = {'Qe', 'Ve', 'K', 'Qe + Qi'};
+	stop_at = 'seizing_cortical_field>update_gap_resting';
 	titles = out_vars;
 	N = numel(titles);
 % 	clims = {[0 30], [0 30], [0 1], [0 30]};
 	fig.fig = figure;
+	fig.quit_early = false;
+	% Create 'Quit' pushbutton in figure window
+	uicontrol('units','normal','position',[.45 .02 .13 .07], ...
+	    'callback',['dbstop in ' stop_at],...
+	    'fontsize',10,'string','Debug');
+	dbclear seizing_cortical_field>visualize
 	h = gobjects(N, 1);
 	th = gobjects(N, 1);
 	ih = gobjects(N, 1);
 	% Image of excitatory population activity.
 	nr = floor(sqrt(N));
 	nc = ceil(N / nr);
-	for ii = 1:4
+	for ii = 1:N
 		h(ii) = subplot(nr,nc,ii);
 		ih(ii) = imagesc(zeros(grid_size));
 		th(ii) = title(titles{ii});
