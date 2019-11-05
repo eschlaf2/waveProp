@@ -73,18 +73,8 @@ B_ei = PN.noise_sf * sqrt(PN.noise_sc * SS.phi_ei_sc / dt);
 
 % Output variables, (*) denotes returned.
 % Some are visualized, some are returned.
-out_vars = {...
-	'Qe', ...  %Activity of excitatory population.   (*)
-	'dVe', ...  %Voltage  of excitatory population.   (*)
-	'Dii', ...  %Activity of inhibitory population.   
-	'K', ...   %Extracellular potassium.
-	'Ve', ...
-	};
-% 	'Vi', ...  %Voltage of inhibitory population.    
-% 	'D22', ... %Inhibitory-to-inhibitory gap junction strength.
-% 	'dVe', ... %Change in resting voltage of excitatory population.
-% 	'dVi', ... %Change in resting voltage of inhibitory population.
-% 	};
+
+out_vars = PM.out_vars;
 
 % Indices to capture from larger grid for NP and EC
 indsNP = get_inds(M.grid_size, PE.centerNP, PE.dimsNP, 1);
@@ -280,8 +270,8 @@ EC = rmfield(EC, no_return);
 	function update_gap_resting
 		new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K - (last.Dii - SS.Dii));
 		new.Dee = last.Dii/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
-		new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* E(last.K) - last.dVe);
-		new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* E(last.K) - last.dVi);
+		new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* E(last.K) - last.dVe - 1);
+		new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* E(last.K) - last.dVi - 1);
 	end
 
 % Correct out of bounds values
@@ -352,8 +342,8 @@ EC = rmfield(EC, no_return);
 
 % Excitability (voltage offset) as a function of potassium
 	function y = E(K)
-		y = 1 ./ ( 1 + exp( -5*(2*sqrt(K) - 1) ) ) + ...  % sigmoid
-		10 * exp( -( (K - PK.k_peak) ./ (PK.k_width) ).^2 );  % gaussian
+		y = 1 ./ ( 1 + exp( -5*(2*sqrt(K) - 1) ) ); %+ ...  % sigmoid
+% 		10 * exp( -( (K - PK.k_peak) ./ (PK.k_width) ).^2 );  % gaussian
 	end
 
 % e-to-e reversal-potential weighting function
@@ -383,16 +373,17 @@ end
 
 %------------------------------------------------------------------------
 function Y = del2_(X)
+
 % L = [0 1 0; 1 -4 1; 0 1 0];  % 5-point stencil Laplacian
 a = .25; b = .5;
 L = [a b a; b -3 b; a b a];  % 9-point stencil Laplacian
 
 % zero-flux BCs
-X = [X(1, :); X(1, :); X; X(end, :); X(end, :)];
-X = [X(:, 1), X(:, 1), X, X(:, end), X(:, end)];
+	X = [repmat(X(1, :), 2, 1); X; repmat(X(end, :), 2, 1)];
+	X = [repmat(X(:, 1), 1, 2), X, repmat(X(:, end), 1, 2)];
 
-Y = conv2(X, L, 'valid');
-Y = Y(2:end-1, 2:end-1);
+	Y = conv2(X, L, 'valid');
+	Y = Y(2:end-1, 2:end-1);
 end
 
 %------------------------------------------------------------------------
