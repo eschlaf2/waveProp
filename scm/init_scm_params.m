@@ -40,14 +40,6 @@ function res = init_scm_params(varargin)
 
 
 %%%% IC (initial conditions) and SS (steady states) %%%%
-	res.IC = parse_IC(res.model);  
-		% D11             D22             K               
-		% F_ee            F_ei            F_ie            F_ii
-		% Phi_ee          Phi_ei          Phi_ie          Phi_ii          
-		% phi2_ee         phi2_ei         phi_ee          phi_ei
-		% Qe              Qi              Ve              Vi
-		% dVe             dVi             map             state
-
 
 	res.SS = parse_SS(res.model);  
 		% Lambda          Nee_a           Nee_ab          Nee_b
@@ -60,6 +52,14 @@ function res = init_scm_params(varargin)
 		% sigma_i         tau_e           tau_i           theta_e
 		% theta_i         v
 		
+	res.IC = parse_IC(res.model, res.SS);  
+		% D11             D22             K               
+		% F_ee            F_ei            F_ie            F_ii
+		% Phi_ee          Phi_ei          Phi_ie          Phi_ii          
+		% phi2_ee         phi2_ei         phi_ee          phi_ei
+		% Qe              Qi              Ve              Vi
+		% dVe             dVi             map             state
+
 	res.bounds = parse_bounds(res.model);
 		% <same as IC>
 
@@ -141,7 +141,7 @@ options = model.bounds;
 validate = @(x) numel(x) == 2 && x(2) > x(1);
 
 p('Dee', [-Inf Inf], validate)  % i <--> i gap-junction diffusive-coupling strength (mm^2)
-p('Dii', [.009 Inf], validate)  % The inhibitory gap junctions cannot pass below a minimum value of 0.009 / dx^2.
+p('Dii', [.009 1], validate)  % The inhibitory gap junctions cannot pass below a minimum value of 0.009 / dx^2.
 p('K',  [-Inf 1], validate)  % extracellular potassium concentration (mm^2)
 p('Qe', [-Inf Inf], validate)  % Activity of excitatory population.
 p('Qi', [-Inf Inf], validate)  % Activity of inhibitory population.
@@ -182,7 +182,7 @@ noise = G.Results;
 
 end
 
-function IC = parse_IC(model)
+function IC = parse_IC(model, SS)
 %% Initial conditions
 % These are the same as in Waikato-Kramer except that dVe defaults to -1
 % instead of 1 (original IC in <map_type='ictal_wavefront'> scenario).
@@ -192,12 +192,9 @@ function IC = parse_IC(model)
 G = inputParser; G.CaseSensitive = true;
 p = @(varargin) addParameter(G, varargin{:});  % convenience function
 
-% IC = load('default_scm_ICs.mat');
-SS = SCM_init_globs;
-
 p('map', nan);  % Source of ictal activity (on/off)
 p('state', nan);  % Seizure state (ictal/non-ictal)
-p('Dee', SS.Dii / 100)  % i <--> i gap-junction diffusive-coupling strength (electrodes)
+p('Dee', SS.Dee)  % i <--> i gap-junction diffusive-coupling strength (electrodes)
 p('Dii', SS.Dii)  % e <--> e gap-junction diffusive-coupling strength in all space (electrodes)
 p('K', 0)  % extracellular potassium concentration (mm^2)
 p('Qe', 0)  % Activity of excitatory population.
