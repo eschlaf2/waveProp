@@ -40,6 +40,7 @@ function res = init_scm_params(varargin)
 
 
 %%%% IC (initial conditions) and SS (steady states) %%%%
+
 	res.SS = parse_SS(res.model);  
 		% Lambda          Nee_a           Nee_ab          Nee_b
 		% Nee_sc          Nei_a           Nei_ab          Nei_b
@@ -60,6 +61,14 @@ function res = init_scm_params(varargin)
 		% dVe             dVi             map             state
 
 		
+	res.IC = parse_IC(res.model, res.SS);  
+		% D11             D22             K               
+		% F_ee            F_ei            F_ie            F_ii
+		% Phi_ee          Phi_ei          Phi_ie          Phi_ii          
+		% phi2_ee         phi2_ei         phi_ee          phi_ei
+		% Qe              Qi              Ve              Vi
+		% dVe             dVi             map             state
+
 	res.bounds = parse_bounds(res.model);
 		% <same as IC>
 
@@ -194,7 +203,7 @@ p = @(varargin) addParameter(G, varargin{:});  % convenience function
 
 p('map', nan);  % Source of ictal activity (on/off)
 p('state', nan);  % Seizure state (ictal/non-ictal)
-p('Dee', SS.Dii / 100)  % i <--> i gap-junction diffusive-coupling strength (electrodes)
+p('Dee', SS.Dee)  % i <--> i gap-junction diffusive-coupling strength (electrodes)
 p('Dii', SS.Dii)  % e <--> e gap-junction diffusive-coupling strength in all space (electrodes)
 p('K', 0)  % extracellular potassium concentration (mm^2)
 p('Qe', 0)  % Activity of excitatory population.
