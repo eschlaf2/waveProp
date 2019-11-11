@@ -272,16 +272,16 @@ EC = rmfield(EC, no_return);
 				+ PK.kR .* ...              % reaction term.
 					1 ./ ( 1 + exp( -( last.Qe + last.Qi ) + 15) ) ...
 			) ...
-			+ dt * PK.kD * del2_(last.K);  % diffusion term.
+			+ dt * PK.kD./dx^2 * del2_(last.K);  % diffusion term.
 			
 	end
 
 % 6. Update inhibitory gap junction strength, and resting voltages.  
 	function update_gap_resting
-		new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K - (last.Dii - SS.Dii));
+		new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* wD(last.K) - (last.Dii - SS.Dii));
 		new.Dee = last.Dii/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
-		new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* E(last.K) - last.dVe);
-		new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* E(last.K) - last.dVi);
+		new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* wdVe(last.K) - last.dVe);
+		new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
 	end
 
 % Correct out of bounds values
@@ -298,14 +298,14 @@ EC = rmfield(EC, no_return);
 % Update source and expand wavefront
 	function update_source
 		if time(ii) > 0 
-		if time(ii) <= PM.duration
-			[new.map, new.state] = update_map(last.state, M.expansion_rate * dt);
-			new.dVe(new.map) = PM.source_drive; 
-		else
-			new.map = last.map; new.state = last.state;
-			if isnan(PM.post_ictal_source_drive), return; end			
-			new.dVe(new.map) = PM.post_ictal_source_drive;
-		end
+			if time(ii) <= PM.duration
+				[new.map, new.state] = update_map(last.state, M.expansion_rate * dt);
+				new.dVe(new.map) = PM.source_drive; 
+			else
+				new.map = last.map; new.state = last.state;
+				if isnan(PM.post_ictal_source_drive), return; end			
+				new.dVe(new.map) = PM.post_ictal_source_drive;
+			end
 		end
 	end
 
@@ -351,9 +351,16 @@ EC = rmfield(EC, no_return);
 %% Nested weighting functions
 
 % Excitability (voltage offset) as a function of potassium
-	function y = E(K)
-		y = 1 ./ ( 1 + exp( -5*(2*sqrt(K) - 1) ) ) + ...  % sigmoid
-		10 * exp( -( (K - PK.k_peak) ./ (PK.k_width) ).^2 );  % gaussian
+	function y = wdVe(K)
+% 		wdVe =@(K)
+		y =  1 ./ ( 1 + exp( -(7.33*(K) - 3.5) ) );
+% 		y = 1 ./ ( 1 + exp( -5*(2*sqrt(K) - 1) ) ); %  + ...  % sigmoid
+	end
+	
+	function y = wD(K)
+% 		wD = @(K)-2 ./ (1 + exp( -(10.5 * K - 6.5))) + .5;
+% 		y = -2 ./ (1 + exp( -(10.5 * K - 6.5))) + .5;
+		y = -1 ./ (1 + exp( -( 10/.3 * (K - .85) ) )) + 1;
 	end
 
 % e-to-e reversal-potential weighting function
