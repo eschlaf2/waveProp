@@ -342,13 +342,13 @@ EC = rmfield(EC, no_return);
 
 % Excitability (voltage offset) as a function of potassium
 	function y = wdVe(K)
-% 		wdVe =@(K)
-		y =  1 ./ ( 1 + exp( -(7.33*(K) - 3.5) ) );
-% 		y = 1 ./ ( 1 + exp( -5*(2*sqrt(K) - 1) ) ); %  + ...  % sigmoid
+		[center, width] = deal(.8, .5);
+		y = 2 ./ ( 1 + exp( -( 10/width * (K - center) ) ) ) - 1;
 	end
 	
 	function y = wD(K)
-		y = -1 ./ (1 + exp( -( 10/.3 * (K - .85) ) )) + SS.Dii;
+		[center, width] = deal(.85, .3);
+		y = -1 ./ (1 + exp( -( 10/width * (K - center) ) ));
 	end
 
 % e-to-e reversal-potential weighting function
@@ -380,7 +380,9 @@ end
 function Y = del2_(X)
 
 % L = [0 1 0; 1 -4 1; 0 1 0];  % 5-point stencil Laplacian
-a = .25; b = .5;
+r = 4/3 * (1 + 1 / sqrt(2));
+b = 1 / r; a = 1 / (sqrt(2) * r);
+% a = .25; b = .5;
 L = [a b a; b -3 b; a b a];  % 9-point stencil Laplacian
 
 % zero-flux BCs
