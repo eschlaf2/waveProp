@@ -30,7 +30,7 @@ H.gamma_e = 170;  % EPSP decay rate (/s)
 H.gamma_i = 50;  % IPSP decay rate (/s)
 
 % gap-junction diffusive-coupling strength
-H.Dii = 1;          % i <--> i steady state (cm^2) [0, 1]
+H.Dii = .8;          % i <--> i initial in all space (cm^2) [0, 1]
 H.Dee = H.Dii / 100;  % e <--> e initial in all space (cm^2)
 
 % sigmoid characteristics
