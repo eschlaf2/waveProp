@@ -348,9 +348,7 @@ EC = rmfield(EC, no_return);
 	end
 	
 	function y = wD(K)
-% 		wD = @(K)-2 ./ (1 + exp( -(10.5 * K - 6.5))) + .5;
-% 		y = -2 ./ (1 + exp( -(10.5 * K - 6.5))) + .5;
-		y = -1 ./ (1 + exp( -( 10/.3 * (K - .85) ) )) + 1;
+		y = -1 ./ (1 + exp( -( 10/.3 * (K - .85) ) )) + SS.Dii;
 	end
 
 % e-to-e reversal-potential weighting function
