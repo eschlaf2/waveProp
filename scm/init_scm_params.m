@@ -36,7 +36,10 @@ function res = init_scm_params(varargin)
 		% KtoVe           KtoVi           tau_K
 
 	res.noise = parse_noise(res.model);
-		% noise           noise_sc        noise_sf        
+		% noise           noise_sc        noise_sf    
+		
+	res.sigmoids = parse_sigmoids(res.model);
+		% kdVe_center     kdVe_width      kD_center       kD_width
 
 
 %%%% IC (initial conditions) and SS (steady states) %%%%
@@ -75,6 +78,21 @@ function res = init_scm_params(varargin)
 
 res.model = check_time_resolution(res.model, res.IC, res.SS);
 res.t0 = res.meta.t0_start;
+
+end
+
+function noise = parse_sigmoids(model)
+%% Noise
+[G, p] = get_parser();
+options = model.sigmoids;
+
+p('kdVe_center', 0.8);  % center of K-->dVe sigmoid
+p('kdVe_width', .1);  % ... and width
+p('kD_center', .85);  % center of K-->Dii sigmoid
+p('kD_width', .06);  % ... and width
+
+if isstruct(options), G.parse(options), else, G.parse(options{:}); end
+noise = G.Results;
 
 end
 
@@ -126,6 +144,7 @@ p('K', {});  % Potassium (K-related) parameters
 p('noise', {});  % Noise parameters
 p('electrodes', {});  % electrode positions
 p('bounds', {});  % Variables with integration boundaries
+p('sigmoids', {});  % Sigmoids defining effect of potassium on voltage offset and gap junction capacity
 
 % Parse
 if isstruct(options), G.parse(options); else, parse(G, options{:}); end

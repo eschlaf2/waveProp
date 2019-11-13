@@ -49,6 +49,7 @@ PT = params.time_constants;
 PN = params.noise;
 SS = params.SS;
 MX = params.bounds;
+PS = params.sigmoids;
 
 %% A few convenience variables
 
@@ -342,13 +343,11 @@ EC = rmfield(EC, no_return);
 
 % Excitability (voltage offset) as a function of potassium
 	function y = wdVe(K)
-		[center, width] = deal(.8, .5);
-		y = 2 ./ ( 1 + exp( -( 10/width * (K - center) ) ) ) - 1;
+		y = 2 ./ ( 1 + exp( -( 2/PS.kdVe_width * (K - PS.kdVe_center) ) ) ) - 1;
 	end
 	
 	function y = wD(K)
-		[center, width] = deal(.85, .3);
-		y = -1 ./ (1 + exp( -( 10/width * (K - center) ) ));
+		y = -1 ./ (1 + exp( -( 2/PS.kD_width * (K - PS.kD_center) ) ));
 	end
 
 % e-to-e reversal-potential weighting function
