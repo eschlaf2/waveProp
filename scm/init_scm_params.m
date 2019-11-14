@@ -88,8 +88,8 @@ options = model.sigmoids;
 
 p('kdVe_center', 0.8);  % center of K-->dVe sigmoid
 p('kdVe_width', .1);  % ... and width
-p('kD_center', .85);  % center of K-->Dii sigmoid
-p('kD_width', .06);  % ... and width
+p('kD_center', .85);  % center of K-->Dii sigmoid [use .06 to match Kramer sim]
+p('kD_width', .06);  % ... and width [use .01 to match Kramer sim]
 
 if isstruct(options), G.parse(options), else, G.parse(options{:}); end
 noise = G.Results;
@@ -136,7 +136,7 @@ p('dt', 2e-4);
 % p('Laplacian', [0 1 0; 1 -4 1; 0 1 0]);  *** switched to local del2
 % definition with this in a subfunction
 p('dx', .3);  % (cm) (to call each grid point an electrode we need this to be .04);
-p('expansion_rate', 1/3, @(x) x >= 0);  % in Hz; set to 0 for fixed source
+p('expansion_rate', .1, @(x) x >= 0);  % in cm/s; set to 0 for fixed source
 p('IC', {});  % Initial conditions of the sim (enter options as name-value pairs)
 p('SS', {});  % Constants that define the locations of steady states
 p('time_constants', {});  % tau parameters controlling rates
@@ -145,12 +145,14 @@ p('noise', {});  % Noise parameters
 p('electrodes', {});  % electrode positions
 p('bounds', {});  % Variables with integration boundaries
 p('sigmoids', {});  % Sigmoids defining effect of potassium on voltage offset and gap junction capacity
+p('excitability_map', []);  % 
 
 % Parse
 if isstruct(options), G.parse(options); else, parse(G, options{:}); end
 model = G.Results;
 
 % Clean
+if isempty(model.excitability_map), model.excitability_map = ones(model.grid_size); end
 if isempty(model.time_constants), model.time_constants = G.Unmatched; end
 if isempty(model.K), model.K = G.Unmatched; end
 if isempty(model.electrodes), model.electrodes = G.Unmatched; end

@@ -290,7 +290,7 @@ EC = rmfield(EC, no_return);
 	function update_source
 		if time(ii) > 0 
 			if time(ii) <= PM.duration
-				[new.map, new.state] = update_map(last.state, M.expansion_rate * dt);
+				[new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx, M.excitability_map);
 				new.dVe(new.map) = PM.source_drive; 
 			else
 				new.map = last.map; new.state = last.state;
@@ -346,8 +346,9 @@ EC = rmfield(EC, no_return);
 		y = 2 ./ ( 1 + exp( -( 2/PS.kdVe_width * (K - PS.kdVe_center) ) ) ) - 1;
 	end
 	
+% Gapjunction functionality as a function of potassium
 	function y = wD(K)
-		y = -1 ./ (1 + exp( -( 2/PS.kD_width * (K - PS.kD_center) ) ));
+		y = 1 ./ (1 + exp( -( 2/PS.kD_width * (K - PS.kD_center) ) ));
 	end
 
 % e-to-e reversal-potential weighting function
@@ -379,9 +380,9 @@ end
 function Y = del2_(X)
 
 % L = [0 1 0; 1 -4 1; 0 1 0];  % 5-point stencil Laplacian
-r = 4/3 * (1 + 1 / sqrt(2));
-b = 1 / r; a = 1 / (sqrt(2) * r);
-% a = .25; b = .5;
+% r = 4/3 * (1 + 1 / sqrt(2));
+% b = 1 / r; a = 1 / (sqrt(2) * r);
+a = .25; b = .5;
 L = [a b a; b -3 b; a b a];  % 9-point stencil Laplacian
 
 % zero-flux BCs
