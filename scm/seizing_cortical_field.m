@@ -49,6 +49,7 @@ PT = params.time_constants;
 PN = params.noise;
 SS = params.SS;
 MX = params.bounds;
+PS = params.sigmoids;
 
 %% A few convenience variables
 
@@ -66,8 +67,8 @@ Nsteps = round(time_end / dt);
 time = ( 0 : Nsteps - 1 )' * dt + params.t0;
 
 % noise-amplitude coefficients for subcortical flux (note 1/sqrt(dt) factor)
-B_ee = PN.noise_sf * sqrt(PN.noise_sc * SS.phi_ee_sc / dt);
-B_ei = PN.noise_sf * sqrt(PN.noise_sc * SS.phi_ei_sc / dt);
+B_ee = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ee_sc / dt);
+B_ei = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ei_sc / dt);
 
 %% Define output variables
 
@@ -164,8 +165,8 @@ EC = rmfield(EC, no_return);
 				- last.Phi_ee ...
 				+ SS.Nee_a * last.phi_ee ...  % long range
 				+ SS.Nee_b * last.Qe ...      % short range
-				+ PN.noise_sc * SS.phi_ee_sc ... % subcortical (tonic)
-				+ B_ee * randn(Nx, Ny) ...       % subcortical (random)
+				+ PN.noise_sc .* SS.phi_ee_sc ... % subcortical (tonic)
+				+ B_ee .* randn(Nx, Ny) ...       % subcortical (random)
 			);
 		
 		new.Phi_ee = last.Phi_ee + dt * last.F_ee;
@@ -177,8 +178,8 @@ EC = rmfield(EC, no_return);
 				- last.Phi_ei ...
 				+ SS.Nei_a * last.phi_ei ...    %long range
 				+ SS.Nei_b * last.Qe ...   %short range
-				+ PN.noise_sc * SS.phi_ei_sc ...    %subcortical (tonic)
-				+ B_ei*randn(Nx, Ny)...   %subcortical (random)
+				+ PN.noise_sc .* SS.phi_ei_sc ...    %subcortical (tonic)
+				+ B_ei .* randn(Nx, Ny)...   %subcortical (random)
 			);
 		
 		new.Phi_ei = last.Phi_ei + dt * last.F_ei;
@@ -262,16 +263,21 @@ EC = rmfield(EC, no_return);
 				+ PK.kR .* ...              % reaction term.
 					1 ./ ( 1 + exp( -( last.Qe + last.Qi ) + 15) ) ...
 			) ...
-			+ dt * PK.kD * del2_(last.K);  % diffusion term.
+			+ dt * PK.kD./dx^2 * del2_(last.K);  % diffusion term.
 			
 	end
 
 % 6. Update inhibitory gap junction strength, and resting voltages.  
 	function update_gap_resting
-		new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K - (last.Dii - SS.Dii));
+		new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* wD(last.K) - (last.Dii - SS.Dii));
 		new.Dee = last.Dii/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
+<<<<<<< HEAD
 		new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* E(last.K) - last.dVe - 1);
 		new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* E(last.K) - last.dVi - 1);
+=======
+		new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* wdVe(last.K) - last.dVe);
+		new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
+>>>>>>> 0640aff2794a917fa2b4b396d406f7728dc58d88
 	end
 
 % Correct out of bounds values
@@ -288,14 +294,14 @@ EC = rmfield(EC, no_return);
 % Update source and expand wavefront
 	function update_source
 		if time(ii) > 0 
-		if time(ii) <= PM.duration
-			[new.map, new.state] = update_map(last.state, M.expansion_rate * dt);
-			new.dVe(new.map) = PM.source_drive; 
-		else
-			new.map = last.map; new.state = last.state;
-			if isnan(PM.post_ictal_source_drive), return; end			
-			new.dVe(new.map) = PM.post_ictal_source_drive;
-		end
+			if time(ii) <= PM.duration
+				[new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx, M.excitability_map);
+				new.dVe(new.map) = PM.source_drive; 
+			else
+				new.map = last.map; new.state = last.state;
+				if isnan(PM.post_ictal_source_drive), return; end			
+				new.dVe(new.map) = PM.post_ictal_source_drive;
+			end
 		end
 	end
 
@@ -341,9 +347,19 @@ EC = rmfield(EC, no_return);
 %% Nested weighting functions
 
 % Excitability (voltage offset) as a function of potassium
+<<<<<<< HEAD
 	function y = E(K)
 		y = 1 ./ ( 1 + exp( -5*(2*sqrt(K) - 1) ) ); %+ ...  % sigmoid
 % 		10 * exp( -( (K - PK.k_peak) ./ (PK.k_width) ).^2 );  % gaussian
+=======
+	function y = wdVe(K)
+		y = 2 ./ ( 1 + exp( -( 2/PS.kdVe_width * (K - PS.kdVe_center) ) ) ) - 1;
+	end
+	
+% Gapjunction functionality as a function of potassium
+	function y = wD(K)
+		y = 1 ./ (1 + exp( -( 2/PS.kD_width * (K - PS.kD_center) ) ));
+>>>>>>> 0640aff2794a917fa2b4b396d406f7728dc58d88
 	end
 
 % e-to-e reversal-potential weighting function
@@ -375,6 +391,8 @@ end
 function Y = del2_(X)
 
 % L = [0 1 0; 1 -4 1; 0 1 0];  % 5-point stencil Laplacian
+% r = 4/3 * (1 + 1 / sqrt(2));
+% b = 1 / r; a = 1 / (sqrt(2) * r);
 a = .25; b = .5;
 L = [a b a; b -3 b; a b a];  % 9-point stencil Laplacian
 

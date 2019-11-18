@@ -42,15 +42,17 @@ H.Dee = H.Dii / 100;  % e <--> e initial in all space (cm^2)
 [H.Nee_a, H.Nei_a] = deal(2000, 2000);			% cortico-cortical
 [H.Nee_b, H.Nei_b] = deal(800, 800);
 [H.Nie_b, H.Nii_b] = deal(600, 600);
-[H.Nee_sc,H.Nei_sc]= deal(50, 50);              % subcortical
+% [H.Nee_sc,H.Nei_sc]= deal(50, 50);              % subcortical
 
 % Nee and Nie totals for cortico-cortical plus intracortical
 H.Nee_ab = H.Nee_a + H.Nee_b;
 H.Nei_ab = H.Nei_a + H.Nei_b;
 
 % default subcortical fluxes
-H.phi_ee_sc = H.Nee_sc * H.Qe_max;  % original [300]
-H.phi_ei_sc = H.Nei_sc * H.Qe_max;  % original [300]
+% H.phi_ee_sc = H.Nee_sc * H.Qe_max;  % original [300]
+% H.phi_ei_sc = H.Nei_sc * H.Qe_max;  % original [300]
+H.phi_ee_sc = 150;  % original [300]
+H.phi_ei_sc = 150;  % original [300]
 
 % axonal conduction velocity (cm/s), 
 H.v = 280;  % [original = 140 cm/s]

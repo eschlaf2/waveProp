@@ -76,7 +76,7 @@ fig = [];
 for t0 = PM.t0_start:T_STEP:K-1  % For each step
 	tic
 	% Update time offset
-	params.t0 = t0;
+	params.t0 = t0 - PADDING(1);
 	
 	% ... show progress, 
 	fprintf('Running %d / %d .. ', t0, floor(K-1));  
@@ -88,9 +88,6 @@ for t0 = PM.t0_start:T_STEP:K-1  % For each step
 	[NP, EC, time, last, fig] = ...  
 		seizing_cortical_field(source_drive, min(T_STEP, K - t0 - 1), last, fig, params);
 	if fig.quit_early, break, end
-	
-	% ... correct output time for padding and start time,
-	time = time - PADDING(1);  
 	
 	% ... save the results of this run,
 	if SAVE

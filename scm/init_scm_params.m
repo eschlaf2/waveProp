@@ -36,7 +36,10 @@ function res = init_scm_params(varargin)
 		% KtoVe           KtoVi           tau_K
 
 	res.noise = parse_noise(res.model);
-		% noise           noise_sc        noise_sf        
+		% noise           noise_sc        noise_sf    
+		
+	res.sigmoids = parse_sigmoids(res.model);
+		% kdVe_center     kdVe_width      kD_center       kD_width
 
 
 %%%% IC (initial conditions) and SS (steady states) %%%%
@@ -51,6 +54,15 @@ function res = init_scm_params(varargin)
 		% phi_ei_sc       rho_e           rho_i           sigma_e
 		% sigma_i         tau_e           tau_i           theta_e
 		% theta_i         v
+
+	res.IC = parse_IC(res.model, res.SS);  
+		% D11             D22             K               
+		% F_ee            F_ei            F_ie            F_ii
+		% Phi_ee          Phi_ei          Phi_ie          Phi_ii          
+		% phi2_ee         phi2_ei         phi_ee          phi_ei
+		% Qe              Qi              Ve              Vi
+		% dVe             dVi             map             state
+
 		
 	res.IC = parse_IC(res.model, res.SS);  
 		% D11             D22             K               
@@ -66,6 +78,21 @@ function res = init_scm_params(varargin)
 
 res.model = check_time_resolution(res.model, res.IC, res.SS);
 res.t0 = res.meta.t0_start;
+
+end
+
+function noise = parse_sigmoids(model)
+%% Noise
+[G, p] = get_parser();
+options = model.sigmoids;
+
+p('kdVe_center', 0.8);  % center of K-->dVe sigmoid
+p('kdVe_width', .1);  % ... and width
+p('kD_center', .85);  % center of K-->Dii sigmoid [use .06 to match Kramer sim]
+p('kD_width', .06);  % ... and width [use .01 to match Kramer sim]
+
+if isstruct(options), G.parse(options), else, G.parse(options{:}); end
+noise = G.Results;
 
 end
 
@@ -109,7 +136,7 @@ p('dt', 2e-4);
 % p('Laplacian', [0 1 0; 1 -4 1; 0 1 0]);  *** switched to local del2
 % definition with this in a subfunction
 p('dx', .3);  % (cm) (to call each grid point an electrode we need this to be .04);
-p('expansion_rate', 1/3, @(x) x >= 0);  % in Hz; set to 0 for fixed source
+p('expansion_rate', .1, @(x) x >= 0);  % in cm/s; set to 0 for fixed source
 p('IC', {});  % Initial conditions of the sim (enter options as name-value pairs)
 p('SS', {});  % Constants that define the locations of steady states
 p('time_constants', {});  % tau parameters controlling rates
@@ -117,12 +144,15 @@ p('K', {});  % Potassium (K-related) parameters
 p('noise', {});  % Noise parameters
 p('electrodes', {});  % electrode positions
 p('bounds', {});  % Variables with integration boundaries
+p('sigmoids', {});  % Sigmoids defining effect of potassium on voltage offset and gap junction capacity
+p('excitability_map', []);  % 
 
 % Parse
 if isstruct(options), G.parse(options); else, parse(G, options{:}); end
 model = G.Results;
 
 % Clean
+if isempty(model.excitability_map), model.excitability_map = ones(model.grid_size); end
 if isempty(model.time_constants), model.time_constants = G.Unmatched; end
 if isempty(model.K), model.K = G.Unmatched; end
 if isempty(model.electrodes), model.electrodes = G.Unmatched; end
@@ -141,9 +171,9 @@ options = model.bounds;
 [G, p] = get_parser(); G.CaseSensitive = true;
 validate = @(x) numel(x) == 2 && x(2) > x(1);
 
-p('Dee', [-Inf Inf], validate)  % i <--> i gap-junction diffusive-coupling strength (mm^2)
-p('Dii', [.009 1], validate)  % The inhibitory gap junctions cannot pass below a minimum value of 0.009 / dx^2.
-p('K',  [-Inf 1], validate)  % extracellular potassium concentration (mm^2)
+p('Dee', [-Inf Inf], validate)  % i <--> i gap-junction diffusive-coupling strength (cm^2)
+p('Dii', [.009 Inf], validate)  % The inhibitory gap junctions cannot pass below a minimum value of 0.009 / dx^2.
+p('K',  [-Inf 1], validate)  % extracellular potassium concentration (cm^2)
 p('Qe', [-Inf Inf], validate)  % Activity of excitatory population.
 p('Qi', [-Inf Inf], validate)  % Activity of inhibitory population.
 p('Ve', [-Inf Inf], validate)  % Voltage  of excitatory population.
