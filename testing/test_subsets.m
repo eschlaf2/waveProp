@@ -29,6 +29,7 @@ switch upper(method(1))
 		method = 'events';
 end
 
+if ~exist('method_full', 'var'); method_full = method; end
 
 % Get wave fits from full method
 full = load(sprintf('%s_wave_prop.mat', fname), method_full);
