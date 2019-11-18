@@ -3,7 +3,7 @@ data=load('testing/subsets/CUCX4_2_M.mat', '*stats');
 f = fieldnames(data);
 nF = numel(f);
 dim = 1;  % dim=1: returns stats for each wave time; 
-          % dim=2: returns states for each trial
+          % dim=2: returns stats for each trial
 
 % Convenience
 mn =@(data) mean(data, dim, 'omitnan');
@@ -130,7 +130,8 @@ ci = mn + [1 -1] .* summary.dr(:, 2);
 x = 1:numel(mn);
 
 plot(x .* [1; 1], ci', 'r-', x, mn, '*')
-xticklabels(cellfun(@(x) x(1:5), f', 'uni', 0))
+xticklabels(cellfun(@(x) x(3:5), f', 'uni', 0))
+xticks(x);
 title('Detection rates')
 ylabel('Proportion');
 
