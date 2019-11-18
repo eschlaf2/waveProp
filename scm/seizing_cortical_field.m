@@ -67,8 +67,8 @@ Nsteps = round(time_end / dt);
 time = ( 0 : Nsteps - 1 )' * dt + params.t0;
 
 % noise-amplitude coefficients for subcortical flux (note 1/sqrt(dt) factor)
-B_ee = PN.noise_sf * sqrt(PN.noise_sc * SS.phi_ee_sc / dt);
-B_ei = PN.noise_sf * sqrt(PN.noise_sc * SS.phi_ei_sc / dt);
+B_ee = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ee_sc / dt);
+B_ei = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ei_sc / dt);
 
 %% Define output variables
 
@@ -165,8 +165,8 @@ EC = rmfield(EC, no_return);
 				- last.Phi_ee ...
 				+ SS.Nee_a * last.phi_ee ...  % long range
 				+ SS.Nee_b * last.Qe ...      % short range
-				+ PN.noise_sc * SS.phi_ee_sc ... % subcortical (tonic)
-				+ B_ee * randn(Nx, Ny) ...       % subcortical (random)
+				+ PN.noise_sc .* SS.phi_ee_sc ... % subcortical (tonic)
+				+ B_ee .* randn(Nx, Ny) ...       % subcortical (random)
 			);
 		
 		new.Phi_ee = last.Phi_ee + dt * last.F_ee;
@@ -178,8 +178,8 @@ EC = rmfield(EC, no_return);
 				- last.Phi_ei ...
 				+ SS.Nei_a * last.phi_ei ...    %long range
 				+ SS.Nei_b * last.Qe ...   %short range
-				+ PN.noise_sc * SS.phi_ei_sc ...    %subcortical (tonic)
-				+ B_ei*randn(Nx, Ny)...   %subcortical (random)
+				+ PN.noise_sc .* SS.phi_ei_sc ...    %subcortical (tonic)
+				+ B_ei .* randn(Nx, Ny)...   %subcortical (random)
 			);
 		
 		new.Phi_ei = last.Phi_ei + dt * last.F_ei;
