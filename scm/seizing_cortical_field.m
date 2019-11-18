@@ -292,6 +292,9 @@ EC = rmfield(EC, no_return);
 			if time(ii) <= PM.duration
 				[new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx, M.excitability_map);
 				new.dVe(new.map) = PM.source_drive; 
+				if isempty(PM.source), return, end
+				which_source = mod(round(time(ii) / 2), size(PM.source, 3)) + 1;
+				new.dVe(PM.source(:, :, which_source)) = PM.source_drive;
 			else
 				new.map = last.map; new.state = last.state;
 				if isnan(PM.post_ictal_source_drive), return; end			
