@@ -5,11 +5,11 @@ rng default
 pat = 'FHN'; seizure = 0; 
 nTrials = 5;
 sig_thresh = .05;
-noise_levels = 2.^(5:-1:-2);  % SNR levels to test
+noise_levels = (5:-1:-2);  % SNR levels to test
 
 % Setup
-outfile = matfile(sprintf('testing%spinknoise%s%s_%d_%s', ...
-	filesep, filesep, pat, seizure, method), 'Writable', true);
+outfile = matfile(checkname(sprintf('testing%spinknoise%s%s_%d_%s', ...
+	filesep, filesep, pat, seizure, method)), 'Writable', true);
 mea = load(sprintf('%s%s%s_Seizure%d_Neuroport_10_10.mat', ...
 	pat, filesep, pat, seizure));
 mea.params = init_mea_params();
@@ -66,12 +66,12 @@ for snr = noise_levels
 	for trial = 1:nTrials  % For each trial
 		
 		% Add noise
-		mea.Data = mea.Data + noise(cn(), snr);
+		mea.Data = mea.Data + noise(cn(), 2^snr);
 		
 		% Compute the wave fits and save to outfile
 		fits = wave_prop(mea, method);
 		fits = rmfield(fits, {'data', 'position'});
-		fieldname = checkname(sprintf('snr%02g_%d', snr, trial));
+		fieldname = checkname(sprintf('snr%02d_%d', snr, trial));
 		outfile.(fieldname) = fits;  % save details
 		
 		% Store stats of fits compared to full
