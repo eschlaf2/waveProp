@@ -13,24 +13,30 @@ if isstruct(state)
 	%set the initial map.
 % 	map(xCenter + (-1:1), yCenter + (-1:1)) = 1;
 	map(xCenter, yCenter) = 1;
-	state = map; 
+	state = zeros([Nx, Ny]);
+	state(map) = 1;
 	return
 end
 
 %% Update
 
-if expansion_rate <= 0, map = state; return; end
+if expansion_rate <= 0, map = logical(state); return; end
 
-map = false(size(state));
-map(2:end-1, 2:end-1) = conv2(state, [0 1 0; 1 -4 1; 0 1 0], 'valid') > 0;
-p_thresh = 2^expansion_rate - 1;
+% boundary = zeros(size(state));
+boundary = conv2(state > 0, [0 1 0; 1 -4 1; 0 1 0], 'same') > 0;
 if exist('excitability_map', 'var')
-	recruitment = ( (rand(size(state)) .* excitability_map > (1 - p_thresh)) & map );
-	map = map & excitability_map;
+	p_thresh = 2.^(expansion_rate * excitability_map) - 1;
+	boundary = boundary .* excitability_map;
 else
-	recruitment = ( (rand(size(state)) > (1 - p_thresh)) & map );
+	p_thresh = 2^expansion_rate - 1;
 end
-state = recruitment | state;
+dice = rand(size(state));
+new_recruits = (dice < 2^expansion_rate - 1) & boundary & (state == 0);
+ictal = dice < p_thresh & (state == 1);
+
+state(new_recruits) = 1;
+state(ictal) = 2;
+map = state == 1;
 
 
 end
