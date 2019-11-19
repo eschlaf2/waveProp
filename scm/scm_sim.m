@@ -87,7 +87,6 @@ for t0 = PM.t0_start:T_STEP:K-1  % For each step
 	% ... run simulation for duration T_STEP,
 	[NP, EC, time, last, fig] = ...  
 		seizing_cortical_field(source_drive, min(T_STEP, K - t0 - 1), last, fig, params);
-	if fig.quit_early, break, end
 	
 	% ... save the results of this run,
 	if SAVE
