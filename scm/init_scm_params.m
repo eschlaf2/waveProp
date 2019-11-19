@@ -113,6 +113,7 @@ p('post_ictal_source_drive', 1.5);
 p('subsample', Inf);  % Allow subsampling when making mea
 p('return_fields', {'Qe', 'Ve'});  % Qe required to make mea
 p('out_vars', {'Qe', 'Ve'});  % Define which variables you would like to visualize (can be any in IC)
+p('source', []); % Define fixed, rotating sources of excitation
 
 if isstruct(options), G.parse(options); else, parse(G, options{:}); end
 meta = G.Results;
@@ -136,7 +137,7 @@ p('dt', 2e-4);
 % p('Laplacian', [0 1 0; 1 -4 1; 0 1 0]);  *** switched to local del2
 % definition with this in a subfunction
 p('dx', .3);  % (cm) (to call each grid point an electrode we need this to be .04);
-p('expansion_rate', .1, @(x) x >= 0);  % in cm/s; set to 0 for fixed source
+p('expansion_rate', .1, @(x) x >= 0);  % in cm^2/s; set to 0 for fixed source
 p('IC', {});  % Initial conditions of the sim (enter options as name-value pairs)
 p('SS', {});  % Constants that define the locations of steady states
 p('time_constants', {});  % tau parameters controlling rates
