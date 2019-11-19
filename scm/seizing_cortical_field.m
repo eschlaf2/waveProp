@@ -213,7 +213,7 @@ EC = rmfield(EC, no_return);
 				+ last.dVe ...
 				+ SS.rho_e * Psi_ee(last.Ve) .* last.Phi_ee ...      %E-to-E
                 + SS.rho_i * Psi_ie(last.Ve) .* last.Phi_ie ...      %I-to-E
-				+ last.Dee/dx.^2 .* del2_(last.Ve) ...
+				+ last.Dee/dx^2 .* del2_(last.Ve) ...
 			);
 		new.Vi = last.Vi ...
 			+ dt / SS.tau_i * ( ...
@@ -290,7 +290,7 @@ EC = rmfield(EC, no_return);
 	function update_source
 		if time(ii) > 0 
 			if time(ii) <= PM.duration
-				[new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx, M.excitability_map);
+				[new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx^2, M.excitability_map);
 				new.dVe(new.map) = PM.source_drive; 
 				if isempty(PM.source), return, end
 				which_source = mod(round(time(ii) / 2), size(PM.source, 3)) + 1;
