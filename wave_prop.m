@@ -227,9 +227,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			
 			pos_inds = 1:numCh;
 			data = time_point;
-			pos_inds(non_decreasing) = [];
-			data(non_decreasing) = [];
-			position(non_decreasing, :) = [];
+			data(non_decreasing) = nan;
 			
 			if numel(unique(data)) < 3, continue, end
 
@@ -295,8 +293,11 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		if any(strcmpi(metric, {'maxdescent', 'deviance', 'rising', 'falling'}))
 			valid = ~isnan(data);
 			hold on; plot(dataToPlot(valid), ...
-                temp(sub2ind(size(temp), ...
-                data(valid)', pos_inds(valid))), 'r*'); hold off
+                temp(sub2ind( ...
+					size(temp), ...
+					data(valid)', pos_inds(valid)) ...
+				), 'r*'); 
+			hold off
 		end
 		try
             frame1 = getframe(h);
