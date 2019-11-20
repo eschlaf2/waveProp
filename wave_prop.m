@@ -219,12 +219,18 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
 			temp = temp - temp(1, :);  % set first time point as baseline (for visualization early)
 			
-			[~, data] = min(diff(temp, 1, 1));  % Find time of maximal descent
-			data(temp(data) > 0) = nan;
-			data = data(:);
+			[change, time_point] = min(diff(temp, 1, 1));  % Find time of maximal descent
+			non_decreasing = change >= 0;
             tt = TimeMs(inds);
-			dataToPlot = tt(data) - (t - half_win);
+			dataToPlot = tt(time_point(:)) - (t - half_win);
+			dataToPlot(non_decreasing) = nan;
+			
 			pos_inds = 1:numCh;
+			data = time_point;
+			pos_inds(non_decreasing) = [];
+			data(non_decreasing) = [];
+			position(non_decreasing, :) = [];
+			
 			if numel(unique(data)) < 3, continue, end
 
 		case 'delays'
