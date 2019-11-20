@@ -15,20 +15,11 @@ function [wave_fit, mea] = wave_prop(mea, metric, varargin)
 %					(default: 50) [ms]
 
 %% Parse inputs
-p = inputParser;
-allMetrics = {...
-	'delays', 'maxdescent', 'events', ...
-	'deviance', 'rising', 'falling'};
-validMetrics = @(x) any(validatestring(x, allMetrics));
 
-addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile'));
-addRequired(p, 'metric', validMetrics);
+% Main
+[mea, metric] = parse_inputs(mea, metric, varargin{:});
 
-parse(p, mea, metric, varargin{:})
-struct2var(p.Results)
-
-if ~isfield(mea, 'params'), mea.params = init_mea_params(); end
-
+% Parameters
 fit_method = mea.params.fit_method;
 half_win = mea.params.half_win;
 exclude = mea.params.exclude;
@@ -37,19 +28,9 @@ T = mea.params.T;
 band = mea.params.delay_band;
 show_plots = mea.params.show_plots;
 
-%% Convert mea to struct if it is not writable
-if ~isstruct(mea)
-	if ~exist(mea.Properties.Source, 'file')
-		error('File not found');
-	elseif ~mea.Properties.Writable
-		mea = load(mea.Properties.Source);
-		mea.Time = mea.Time();
-	end
-end
-
-if exclude  % exclude non-spiking channels
-	mea = exclude_channels(mea);
-end
+%%
+% exclude non-spiking channels
+if exclude, mea = exclude_channels(mea); end
 
 %% Assign wave fitting method
 switch lower(fit_method)
@@ -64,6 +45,26 @@ end
 [wave_fit, mea] = compute_waves(mea, fit_wave, show_plots, metric, ...
 	T, half_win, thresh, band);
 
+
+%% Nested functions
+
+	function [mea, metric] = parse_inputs(mea, metric, varargin)
+		p = inputParser;
+	allMetrics = {...
+		'delays', 'maxdescent', 'events', ...
+		'deviance', 'rising', 'falling'};
+	validMetrics = @(x) any(validatestring(x, allMetrics));
+
+	addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile'));
+	addRequired(p, 'metric', validMetrics);
+
+	parse(p, mea, metric, varargin{:})
+	mea = p.Results.mea;
+	metric = p.Results.metric;
+
+	if ~isfield(mea, 'params'), mea.params = init_mea_params(); end
+
+	end
 end
 
 function [wave_fit, mea] = compute_waves(mea, fit_wave, show_plots, ...
