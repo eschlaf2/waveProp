@@ -64,4 +64,5 @@ artefact_inds = find(artefacts);
 if nargout == 3
 	mea.artefact_inds = artefact_inds;
 	mea.event_inds = event_inds;
+	mea.event_mat_size = size(data);
 end
