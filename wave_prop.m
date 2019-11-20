@@ -92,8 +92,7 @@ catch ME
 	end
 end
 
-Time = mea.Time;
-Time = Time();
+Time = mea.Time();
 POS = (position - min(position)) ./ ... 
 	arrayfun(@(ii) min(diff(unique(position(:, ii)))), [1 2]) + 1;% set to integers 1 .. n
 
@@ -180,81 +179,77 @@ p = nan(1, numWaves);     % certainty
 for ii = 1:numWaves  % estimate wave velocity for each discharge
 	position = POS;
 	t = computeTimes(ii);
-	if show_plots, img = nan(max(POS)); end
+	
 	switch metric
 		case 'events'
 			
-% 			inds = logical((TimeMs >= t - halfWin) .* (TimeMs <= t + halfWin));
-			inds = logical((spike_times >= t - half_win) .* ...            % Get spike times within halfWin ms
-				(spike_times <= t + half_win));                            % ... of discharge at time t
-% 			dataToPlot = nan(numCh, 1);
+			inds = logical( ...
+					(spike_times >= t - half_win) & ...  % Get spike times within halfWin ms
+					(spike_times <= t + half_win)...  % ... of discharge at time t
+				);                            
 			pos_inds = chInds(inds);
             st = spike_times(inds);
-            temp = arrayfun(@(ii) mean(st(pos_inds == ii)), 1:numCh);  % Find the mean spike time on each channel
-			dataToPlot = temp - (t - half_win) + 1;  % imagesc mean spike time on each channel
-% 			[~, pos_inds, data] = find(spike_times(inds, :));              % 
-			data = spike_times(inds);
-			temp = data(:)';
+            time_series_data = arrayfun(@(ii) mean(st(pos_inds == ii)), 1:numCh);  % Find the mean spike time on each channel
+			im_data = time_series_data - (t - half_win) + 1;  % imagesc mean spike time on each channel
+			fit_data = spike_times(inds);
+			time_series_data = fit_data(:)';
 			position = position(pos_inds, :);
-            if numel(data) == 0, continue, end
+            if numel(fit_data) == 0, continue, end
 		
 		case {'rising'; 'falling'; 'deviance'}
 			inds = (TimeMs >= t - half_win) & (TimeMs <= t + half_win);  % Select the window around the event time
-			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
-			temp = (temp - temp(1, :));  % Set initial value as baseline
-            if thresh == -Inf, threshI = quantile(max(dir*temp), .25) / 2; 
+			time_series_data = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
+			time_series_data = (time_series_data - time_series_data(1, :));  % Set initial value as baseline
+            if thresh == -Inf, threshI = quantile(max(dir*time_series_data), .25) / 2; 
             else, threshI = thresh; end
-			data = arrayfun(@(ii) ...  % Find where each channel deviates thresh from baseline
-				find([dir * (temp(:, ii)); threshI] - threshI >= 0, 1), 1:size(temp, 2));
-			data(data > size(temp, 1)) = size(temp, 1);
-			data = data(:);
+			fit_data = arrayfun(@(ii) ...  % Find where each channel deviates thresh from baseline
+				find([dir * (time_series_data(:, ii)); threshI] - threshI >= 0, 1), 1:size(time_series_data, 2));
+			fit_data(fit_data > size(time_series_data, 1)) = size(time_series_data, 1);
+			fit_data = fit_data(:);
 			tt = TimeMs(inds);
-            dataToPlot = data;
-			dataToPlot(~isnan(data)) = ...
-                tt(data(~isnan(data))) - (t - half_win);  % Convert to time (ms)
+            im_data = fit_data;
+			im_data(~isnan(fit_data)) = ...
+                tt(fit_data(~isnan(fit_data))) - (t - half_win);  % Convert to time (ms)
 			pos_inds = 1:numCh;
-            if numel(unique(data)) < 3, continue, end
+            if numel(unique(fit_data)) < 3, continue, end
 			
 		case 'maxdescent'
 			
 			inds = logical((TimeMs >= t - half_win) .* (TimeMs <= t + half_win));  % Select the window around the event time
-			temp = lfp(inds, :);
-			temp = temp - temp(1, :);  % set first time point as baseline (for visualization early)
+			time_series_data = lfp(inds, :);
+			time_series_data = time_series_data - time_series_data(1, :);  % set first time point as baseline (for visualization early)
 			
-			[change, time_point] = min(diff(temp, 1, 1));  % Find time of maximal descent
+			[change, time_point] = min(diff(time_series_data, 1, 1));  % Find time of maximal descent
 			non_decreasing = change >= 0;
-			bdry = (time_point == 1) | (time_point == size(temp, 1) - 1);
+			bdry = (time_point == 1) | (time_point == size(time_series_data, 1) - 1);
             tt = TimeMs(inds);
-			dataToPlot = tt(time_point(:)) - (t - half_win);
-			dataToPlot(non_decreasing | bdry) = nan;
+			im_data = tt(time_point(:)) - (t - half_win);
+			im_data(non_decreasing | bdry) = nan;
 			
 			pos_inds = 1:numCh;
-			data = time_point;
-			data(non_decreasing | bdry) = nan;
+			fit_data = time_point;
+			fit_data(non_decreasing | bdry) = nan;
 			
-			if numel(unique(data)) < 3, continue, end
+			if numel(unique(fit_data)) < 3, continue, end
 
 		case 'delays'
 
 			inds = and((TimeMs >= t - T / 2 * 1e3), ...
 				(TimeMs <= t + T / 2 * 1e3));  % Select the window around the event time
 			params.T = range(TimeMs(inds)) / 1e3;
-% 			inds = compute_inds(ii) : (compute_inds(ii) + T * samplingRate - 1);
-			if inds(end) > size(lfp, 1)
-				break;
-			end
+			if inds(end) > size(lfp, 1), break; end
 			fprintf('Estimating waves at time %d/%d\n', ii, numWaves)
-			temp = lfp(inds, :);
+			time_series_data = lfp(inds, :);
 			[coh, phi, freq, coh_conf] = ...
-				compute_coherence(temp, params, 'pairs', center);          % compute the coherence over the selected interval
+				compute_coherence(time_series_data, params, 'pairs', center);          % compute the coherence over the selected interval
 			[delay, ~, ~] = compute_delay(coh, coh_conf, -phi, freq);      % compute delays on each electrode based on coherence
-			data = 1e3 * delay(center,:)';                                 % we use delays relative to the center (converted to ms)
-			dataToPlot = data + half_win;
+			fit_data = 1e3 * delay(center,:)';                                 % we use delays relative to the center (converted to ms)
+			im_data = fit_data + half_win;
 			pos_inds = 1:numCh;
     end
     
     % Use the largest cluster of data points
-    	dataS = sort(data(:));
+	dataS = sort(fit_data(:));
 	dataS(isnan(dataS)) = [];  % excluded nan values
 	diff_sorted = diff(dataS);  % calculate gaps between nearby data points
 	big_gaps = isoutlier(unique(diff_sorted));  % find large gaps between datapoints
@@ -263,77 +258,85 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 	[~, largest] = max(cluster_sizes);  % choose the largest cluster
 
 	bounds = dataS(divides(largest+[0 1]) + [1; 0]);
-	data(data < bounds(1) | data > bounds(2)) = nan;
+	fit_data(fit_data < bounds(1) | fit_data > bounds(2)) = nan;
     
-    dataout{ii} = data;
+    dataout{ii} = fit_data;
     positionout{ii} = position;
-	[beta(:, ii), V(:, ii), p(ii)] = fit_wave(data, position);
+	[beta(:, ii), V(:, ii), p(ii)] = fit_wave(fit_data, position);
 	
-	if isnan(p(ii))
-		% don't waste time (risk errors) plotting if a wave can't be fit
-		continue
-	end
-	if show_plots
-		figure(h); clf
-		[p1, p2] = plot_wave_fit(position, data, beta(:, ii));
-		title(p1, sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
-		title(p2, sprintf('p=%.2g', p(ii)))
-		
-% 		figure(h(2));
-		img(addy) = dataToPlot;
-		subplot(236); 
-		p3 = imagesc(img', [-1 2*half_win]); axis xy
-        colormap(h, 1 - parula(2 * half_win + 2));
-		xlabel('X'); ylabel('Y');
-		colorbar();
-		cmap = h.Colormap;
-		cInds = round(dataToPlot) + 1;
-		cInds = min(max(cInds, 1), 2*half_win+2);
-		if strcmpi(metric, 'events'), cInds = cInds(pos_inds); end
-		
-		subplot(2,3,4:5);
-		plot_details(temp, pos_inds, cmap, cInds, metric); 
-		axis tight; grid on;
-		title(sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
-		if any(strcmpi(metric, {'maxdescent', 'deviance', 'rising', 'falling'}))
-			valid = ~isnan(data);
-			hold on; plot(dataToPlot(valid), ...
-                temp(sub2ind( ...
-					size(temp), ...
-					data(valid(:)), pos_inds(valid(:))) ...
-				), 'r*'); 
-			hold off
-		end
-		try
-            frame1 = getframe(h);
-        catch ME
-            disp(ii)
-            disp(ME);
-            disp(ME.stack);
-            continue
-        end
-		writeVideo(v, frame1)
-		
-	end
+	% don't waste time (risk errors) plotting if a wave can't be fit
+	if isnan(p(ii)), continue, end
+	
+	generate_plots;
 	
 end
-Z = angle([1 1i] * V);
-% Zu = unwrap(Z);
 
 if show_plots, close(v); end
 
-wave_fit.beta = beta;
-wave_fit.V = V;
-wave_fit.p = p;
-wave_fit.Z = Z;
-% wave_fit.Zu = Zu;
-wave_fit.computeTimes = computeTimes;
-wave_fit.Name = Name;
-wave_fit.data = dataout;
-wave_fit.position = positionout;
+compile_results;
+
+	
+%% Nested functions
+function generate_plots
+	if ~show_plots, return, end
+	figure(h); clf
+	img = nan(max(POS));
+	[p1, p2] = plot_wave_fit(position, fit_data, beta(:, ii));
+	title(p1, sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
+	title(p2, sprintf('p=%.2g', p(ii)))
+
+% 		figure(h(2));
+	img(addy) = im_data;
+	subplot(236); 
+	p3 = imagesc(img', [-1 2*half_win]); axis xy
+	colormap(h, 1 - parula(2 * half_win + 2));
+	xlabel('X'); ylabel('Y');
+	colorbar();
+	cmap = h.Colormap;
+	cInds = round(im_data) + 1;
+	cInds = min(max(cInds, 1), 2*half_win+2);
+	if strcmpi(metric, 'events'), cInds = cInds(pos_inds); end
+
+	subplot(2,3,4:5);
+	plot_details(time_series_data, pos_inds, cmap, cInds, metric); 
+	axis tight; grid on;
+	title(sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
+	if any(strcmpi(metric, {'maxdescent', 'deviance', 'rising', 'falling'}))
+		valid = ~isnan(fit_data);
+		hold on; plot(im_data(valid), ...
+			time_series_data(sub2ind( ...
+				size(time_series_data), ...
+				fit_data(valid(:)), pos_inds(valid(:))) ...
+			), 'r*'); 
+		hold off
+	end
+	try
+		frame1 = getframe(h);
+	catch ME
+		disp(ii)
+		disp(ME);
+		disp(ME.stack);
+		continue
+	end
+	writeVideo(v, frame1)
+
+end
+
+function compile_results
+	Z = angle([1 1i] * V);
+	wave_fit.beta = beta;
+	wave_fit.V = V;
+	wave_fit.p = p;
+	wave_fit.Z = Z;
+	% wave_fit.Zu = Zu;
+	wave_fit.computeTimes = computeTimes;
+	wave_fit.Name = Name;
+	wave_fit.data = dataout;
+	wave_fit.position = positionout;
 
 
-mea.wave_fit = wave_fit;
+	mea.wave_fit = wave_fit;
+end
 
 end
 
