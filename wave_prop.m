@@ -115,6 +115,7 @@ switch metric
 		[computeTimes, mea] = get_waveTimes(mea);
 		[lfp, skipfactor, mea] = get_lfp(mea);
 		TimeMs = downsample(Time, skipfactor) * 1e3;
+		lfp = smoothdata(lfp, 'movmean', 5);  % A little smoothing to get rid of artefacts
 	case 'events'
 		[computeTimes, mea] = get_waveTimes(mea);                          % Get discharge times
 		if ~any(strcmpi(properties(mea), 'event_inds'))                    % If event times aren't already computed
@@ -216,7 +217,6 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		case 'maxdescent'
 			
 			inds = logical((TimeMs >= t - half_win) .* (TimeMs <= t + half_win));  % Select the window around the event time
-			temp = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
 			temp = temp - temp(1, :);  % set first time point as baseline (for visualization early)
 			
 			[change, time_point] = min(diff(temp, 1, 1));  % Find time of maximal descent
