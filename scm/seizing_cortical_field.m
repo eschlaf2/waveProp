@@ -271,13 +271,8 @@ EC = rmfield(EC, no_return);
 	function update_gap_resting
 		new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* wD(last.K) - (last.Dii - SS.Dii));
 		new.Dee = last.Dii/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
-<<<<<<< HEAD
-		new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* E(last.K) - last.dVe - 1);
-		new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* E(last.K) - last.dVi - 1);
-=======
 		new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* wdVe(last.K) - last.dVe);
 		new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
->>>>>>> 0640aff2794a917fa2b4b396d406f7728dc58d88
 	end
 
 % Correct out of bounds values
@@ -350,11 +345,6 @@ EC = rmfield(EC, no_return);
 %% Nested weighting functions
 
 % Excitability (voltage offset) as a function of potassium
-<<<<<<< HEAD
-	function y = E(K)
-		y = 1 ./ ( 1 + exp( -5*(2*sqrt(K) - 1) ) ); %+ ...  % sigmoid
-% 		10 * exp( -( (K - PK.k_peak) ./ (PK.k_width) ).^2 );  % gaussian
-=======
 	function y = wdVe(K)
 		y = 2 ./ ( 1 + exp( -( 2/PS.kdVe_width * (K - PS.kdVe_center) ) ) ) - 1;
 	end
@@ -362,7 +352,6 @@ EC = rmfield(EC, no_return);
 % Gapjunction functionality as a function of potassium
 	function y = wD(K)
 		y = 1 ./ (1 + exp( -( 2/PS.kD_width * (K - PS.kD_center) ) ));
->>>>>>> 0640aff2794a917fa2b4b396d406f7728dc58d88
 	end
 
 % e-to-e reversal-potential weighting function
