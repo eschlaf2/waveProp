@@ -217,6 +217,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 		case 'maxdescent'
 			
 			inds = logical((TimeMs >= t - half_win) .* (TimeMs <= t + half_win));  % Select the window around the event time
+			temp = lfp(inds, :);
 			temp = temp - temp(1, :);  % set first time point as baseline (for visualization early)
 			
 			[change, time_point] = min(diff(temp, 1, 1));  % Find time of maximal descent
