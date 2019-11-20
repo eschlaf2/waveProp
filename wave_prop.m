@@ -227,9 +227,9 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			
 			pos_inds = 1:numCh;
 			data = time_point;
-			pos_inds(non_decreasing) = [];
-			data(non_decreasing) = [];
-			position(non_decreasing, :) = [];
+			pos_inds(non_decreasing) = nan;
+			data(non_decreasing) = nan;
+			position(non_decreasing, :) = nan;
 			
 			if numel(unique(data)) < 3, continue, end
 
