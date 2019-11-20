@@ -222,14 +222,14 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			
 			[change, time_point] = min(diff(temp, 1, 1));  % Find time of maximal descent
 			non_decreasing = change >= 0;
-			bdry = (time_point == 1) || (time_point == size(temp, 1) - 1);
+			bdry = (time_point == 1) | (time_point == size(temp, 1) - 1);
             tt = TimeMs(inds);
 			dataToPlot = tt(time_point(:)) - (t - half_win);
-			dataToPlot(non_decreasing || bdry) = nan;
+			dataToPlot(non_decreasing | bdry) = nan;
 			
 			pos_inds = 1:numCh;
 			data = time_point;
-			data(non_decreasing || bdry) = nan;
+			data(non_decreasing | bdry) = nan;
 			
 			if numel(unique(data)) < 3, continue, end
 
