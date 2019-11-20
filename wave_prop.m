@@ -254,13 +254,14 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
     
     % Use the largest cluster of data points
     dataS = sort(data(:));
-    diffdata = diff(dataS);  % calculate gaps between data points
-    gaps = [0; ...
-        find(diffdata > max(2*std(diffdata, 'omitnan'), 4)); ...
-        numel(data)];  % find large gaps between datapoints
-    [~, cM] = max(diff(gaps));  % find the largest group without a gap
-    bounds = dataS(gaps(cM:cM+1) + [1; 0]);
-    data(data < bounds(1) | data > bounds(2)) = nan;
+	diff_sorted = diff(dataS);  % calculate gaps between nearby data points
+	big_gaps = isoutlier(diff_sorted);  % find large gaps between datapoints
+	gaps = [0; ...  % where do gaps occur in data
+		dataS(big_gaps(:)); ...
+		numel(data)];  
+	[~, cM] = max(diff(gaps));  % find the largest group without a gap
+	bounds = gaps(cM:cM+1) + [1; 0];
+	data(data < bounds(1) | data > bounds(2)) = nan;
     
     dataout{ii} = data;
     positionout{ii} = position;
