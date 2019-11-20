@@ -1,5 +1,5 @@
 % default_params
-function [res, G] = init_fhn_params(varargin)
+function [res, G] = init_mea_params(varargin)
 
 %% parsing functions
 G = inputParser;  % Define the parser
