@@ -220,6 +220,7 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 			temp = temp - temp(1, :);  % set first time point as baseline (for visualization early)
 			
 			[~, data] = min(diff(temp, 1, 1));  % Find time of maximal descent
+			data(temp(data) > 0) = nan;
 			data = data(:);
             tt = TimeMs(inds);
 			dataToPlot = tt(data) - (t - half_win);
