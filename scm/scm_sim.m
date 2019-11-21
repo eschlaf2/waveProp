@@ -144,7 +144,8 @@ function convert_to_mea(PM)
 		'Path', sprintf('%s/SCM/SCM_Seizure%d_Neuroport_%d_%d.mat', ...
 			pwd, PM.sim_num, PM.padding) ...	 
 		);
-	
+	mea.event_inds = rate2events(mea);
+	mea.event_mat_shape = size(mea.Data);
 	fprintf('Saving %s ... ', mea.Path);
 	save(mea.Path, '-struct', 'mea');
 	m = matfile(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'Writable', true);
@@ -158,6 +159,13 @@ function convert_to_mea(PM)
 end
 
 %% Helpers
+function event_inds = rate2events(mea)
+	lambda = rescale(single(mea.Data), 0, 220);  % range is based on MG49_43
+	X = rand(size(lambda));
+	events = X > exp(-lambda / mea.SamplingRate);
+	event_inds = find(events);
+end
+
 function [source_drive] = set_source_drive(t, params)
 
 	if t < params.padding(1)  % preseizure
