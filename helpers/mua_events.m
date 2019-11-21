@@ -43,7 +43,7 @@ for ch = 1:size(data, 2)
 	if any(isnan(temp))
 		i = find(isnan(temp), 1);
 		while i
-			i_next = find(~isnan(temp(i:end)), 1) + i;
+			i_next = find(~isnan(temp(i:end)), 1) + i - 1;
 			y = interp1([i - 1; i_next], [temp(i - 1); temp(i_next)], i:i_next - 1);
 			temp(i:i_next - 1) = y;
 			i = find(isnan(temp),1);
