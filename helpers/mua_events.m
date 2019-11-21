@@ -1,4 +1,4 @@
-function [event_inds, artefact_inds, mea] = mua_events(mea)
+function [event_inds, artefact_inds, mea, shape] = mua_events(mea)
 % Takes a structure or matfile as input and computes event times. Events
 % are defined as peaks in MUA more than EVENT_THRESH standard deviations from the
 % baseline in the negative direction and at least MIN_DIST ms apart
@@ -58,11 +58,12 @@ for ch = 1:size(data, 2)
 end
 
 % store results to mea
+shape = size(data);
 event_inds = find(events);
 artefact_inds = find(artefacts);
 
-if nargout == 3
+if nargout > 2
 	mea.artefact_inds = artefact_inds;
 	mea.event_inds = event_inds;
-	mea.event_mat_size = size(data);
+	mea.event_mat_size = shape;
 end

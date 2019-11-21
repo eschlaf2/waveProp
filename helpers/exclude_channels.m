@@ -31,6 +31,8 @@ function mea = exclude_channels(mea)
 	ch = 1:size(mea.Data, 2);                                            % All channels
 	ch(mea.BadChannels) = [];                                            % ... minus those already excluded
 	mea.BadChannels = sort([mea.BadChannels(:); ch(exclude_channels)']);  % ... gives all bad channels
+	if isfield(mea, 'lfp'), mea.lfp(:, exclude_channels) = []; end
+	if isfield(mea, 'mua'), mea.mua(:, exclude_channels) = []; end
 	disp('Channels excluded from analysis:')
 	disp(ch(exclude_channels));
 

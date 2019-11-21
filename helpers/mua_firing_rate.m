@@ -4,7 +4,7 @@ function [fr, mea] = mua_firing_rate(mea)
 
 % Load necessary variables (faster with matfile objects)
 if ~isstruct(mea), mea = load(mea.Properties.Source); end
-if ~isfield(mea, 'event_inds'), mea.event_inds = mua_events(mea); end
+if ~isfield(mea, 'event_inds'), [~, ~, mea, ~] = mua_events(mea); end
 
 event_inds = mea.event_inds;
 samplingRate = mea.SamplingRate;
