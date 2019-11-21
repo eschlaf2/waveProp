@@ -145,7 +145,7 @@ function convert_to_mea(PM)
 			pwd, PM.sim_num, PM.padding) ...	 
 		);
 	mea.event_inds = rate2events(mea);
-	mea.event_mat_shape = size(mea.Data);
+	mea.event_mat_size = size(mea.Data);
 	fprintf('Saving %s ... ', mea.Path);
 	save(mea.Path, '-struct', 'mea');
 	m = matfile(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'Writable', true);
