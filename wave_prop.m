@@ -78,176 +78,241 @@ function [wave_fit, mea] = compute_waves(mea, fit_wave, show_plots, ...
 % All time units should be converted to ms for consistency
 
 
-%% Pull variables from mea
-position = mea.Position;
+%% Set static loop variables
 
-try
-	position(mea.BadChannels, :) = [];
-catch ME
-	switch ME.message
-		case 'Reference to non-existent field ''BadChannels''.'
-			disp('No bad channels found.')
-		otherwise
-			rethrow(ME)
-	end
-end
+NAME = sprintf('%s_wave_prop_%s', mea.Name, metric);
+[COMPUTE_TIMES, mea] = get_waveTimes(mea);
+[TIME_MS, POS, LFP, RF, E, D, PLT] = set_globs;
 
-Time = mea.Time();
-POS = (position - min(position)) ./ ... 
-	arrayfun(@(ii) min(diff(unique(position(:, ii)))), [1 2]) + 1;% set to integers 1 .. n
-
-% Load method specific variables
-switch metric
-	case {'rising'; 'falling'; 'deviance'}
-		[computeTimes, mea] = get_waveTimes(mea);
-		[lfp, skipfactor, mea] = get_lfp(mea);
-% 		lfp = lfp - mean(lfp, 2);
-		TimeMs = downsample(Time, skipfactor) * 1e3;
-		lfp = lfp ./ std(lfp(TimeMs < 0, :));
-        if strcmpi(metric, 'rising')
-            dir = 1;
-            if thresh == Inf, thresh = 10; end
-        else
-            dir = -1;
-            if thresh == Inf, thresh = 20; end
-        end
-	case 'maxdescent'
-		[computeTimes, mea] = get_waveTimes(mea);
-		[lfp, skipfactor, mea] = get_lfp(mea);
-		TimeMs = downsample(Time, skipfactor) * 1e3;
-		lfp = smoothdata(lfp, 'movmean', 5);  % A little smoothing to get rid of artefacts
-	case 'events'
-		[computeTimes, mea] = get_waveTimes(mea);                          % Get discharge times
-		if ~any(strcmpi(properties(mea), 'event_inds'))                    % If event times aren't already computed
-			[~, ~, mea] = mua_events(mea);                                 % ... compute them
-		end
-		[nT, numCh] = size(mea.mua);
-		[timeInds, chInds] = ind2sub([nT, numCh], mea.event_inds);         % Get the indices and channels of each spike
-		TimeMs = Time * 1000;                                              % Convert times to ms
-		spike_times = TimeMs(timeInds);                                    % Get the spike times in ms
-        warning off MATLAB:scatteredInterpolant:DupPtsAvValuesWarnId
-	case 'delays'
-		[computeTimes, mea] = get_waveTimes(mea);  % Get discharge times
-		
-		% Get band appropriate lfp
-		filterband = ceil(band + [-.5 .5] .* band);
-		if filterband(2) >= round(mea.SamplingRate / 2)
-			filterband(2) = round(mea.SamplingRate / 2) - 1; 
-		end
-		b = fir1(150, 2 * filterband(2) / mea.SamplingRate);  % lo-pass to just over upper band
-		lfp = single(filtfilt(b, 1, double(mea.Data)));
-		skipfactor = round(mea.SamplingRate / max(1e3, 2*filterband(2)));
-		lfp = downsample(lfp, skipfactor);
-		lfp(:, mea.BadChannels) = [];
-		Time = downsample(Time, skipfactor);
-		mea.lfp = lfp; mea.skipfactor = skipfactor;
-		TimeMs = Time * 1e3;
-% 		compute_inds = arrayfun(@(t) find([TimeMs(:); Inf] >= t, 1), computeTimes);
-		[params, ~] = set_coherence_params(Time, T, band);
-		plotTitles = strrep(mea.Name, '_', ' ');
-% 		computeTimes = TimeMs(compute_inds);
-% 		samplingRate = mea.SamplingRate / skipfactor;
-		[~, center] = min(sum((position - mean(position)).^2, 2));         % find the most central electrode
-end
-		
-% Sizing variables
-numCh = length(position);
-numWaves = numel(computeTimes);
+% Convenience variables
+NUM_WAVES = numel(COMPUTE_TIMES);
 
 assignin('base', 'mea', mea);
-%% Open a video file if PLOT is set to true
-
-Name = sprintf('%s_wave_prop_%s', mea.Name, metric);
-if show_plots
-	v = VideoWriter(Name);
-	plotTitles = [strrep(mea.Name, '_', ' ') ' (' metric ')'];
-% 	v.FrameRate = 50;
-	open(v); 
-	h = figure; fullwidth(true);
-	
-	addy = sub2ind(max(POS), POS(:, 1), POS(:, 2));
-end
 
 %% Estimate wave direction at each discharge time
 
 % Initialize arrays
-beta = nan(3, numWaves);  % fit parameters
-V = nan(2, numWaves);     % wave velocity (psuedo-inverse of beta)
-p = nan(1, numWaves);     % certainty
-[dataout, positionout] = deal(cell(numWaves, 1));  % wave passage times
+beta = nan(3, NUM_WAVES);  % fit parameters
+V = nan(2, NUM_WAVES);     % wave velocity (psuedo-inverse of beta)
+p = nan(1, NUM_WAVES);     % certainty
+[data_out, position_out] = deal(cell(NUM_WAVES, 1));  % wave passage times
 
-for ii = 1:numWaves  % estimate wave velocity for each discharge
-	position = POS;
-	t = computeTimes(ii);
+for ii = 1:NUM_WAVES  % estimate wave velocity for each discharge
 	
+	t = COMPUTE_TIMES(ii);
+	inds = ...
+		get_time_inds;
+	pos_inds = ...
+		which_positions;
+	[fit_data, time_series_data, im_data] = ...
+		get_data;
+	
+	if numel(unique(fit_data)) < 3, continue, end
+	
+	reduced_data = ...
+		use_largest_cluster;
+	
+    data_out{ii} = reduced_data;
+    position_out{ii} = POS(pos_inds, :);
+	
+	[beta(:, ii), V(:, ii), p(ii)] = ...
+		fit_wave(reduced_data, POS(pos_inds, :));
+	
+	% don't waste time (risk errors) plotting if a wave can't be fit
+	if isnan(p(ii)), continue, end
+	
+	generate_plots;
+	
+end
+
+compile_results;
+
+	
+%% Nested functions
+
+% Setup
+function [time_ms, position, lfp, RF, E, D, plt] = set_globs
+	
+	% Common variables
+	position = mea.Position;
+	if isfield(mea, 'BadChannels'), position(mea.BadChannels, :) = []; end
+	time = mea.Time();
+	time_ms = time * 1e3;
+	% POS = (position - min(position)) ./ ... 
+	% 	arrayfun(@(ii) min(diff(unique(position(:, ii)))), [1 2]) + 1;  % set to integers 1 .. n
+
+	% Method specific variables
+	lfp = [];  % maxdescent, rising, falling, deviance, delays
+	RF = [];  % rising, falling
+	E = [];  % events variables
+	D = [];  % delays variables
+	plt = [];  % plotting variables
+	
+	if ismember(lower(metric), {'maxdescent', 'rising', 'falling', 'deviance'})
+		[lfp, skipfactor, mea] = get_lfp(mea);
+		lfp = smoothdata(lfp, 'movmean', 5);  % A little smoothing to get rid of artefacts
+		time_ms = downsample(time_ms, skipfactor);
+	end
+	
+	% Method specific variables
+	switch metric
+		case {'rising'; 'falling'; 'deviance'}
+			lfp = lfp ./ std(lfp(time_ms < 0, :));
+			if strcmpi(metric, 'rising')
+				RF.dir = 1;
+				if thresh == Inf, thresh = 10; end
+			else
+				RF.dir = -1;
+				if thresh == Inf, thresh = 20; end
+			end
+		case 'events'
+			if ~isfield(mea, 'event_inds')  % If event times aren't already computed
+				[~, ~, mea] = mua_events(mea);  % ... compute them
+			end
+			[time_idx, E.ch_idx] = ind2sub(mea.event_mat_size, mea.event_inds);         % Get the indices and channels of each spike
+			E.spike_times = time_ms(time_idx);                                    % Get the spike times in ms
+			warning off MATLAB:scatteredInterpolant:DupPtsAvValuesWarnId
+			
+		case 'delays'
+			% Get band appropriate lfp
+			filterband = ceil(band + [-.5 .5] .* band);
+			if filterband(2) >= round(mea.SamplingRate / 2)
+				filterband(2) = round(mea.SamplingRate / 2) - 1; 
+			end
+			b = fir1(150, 2 * filterband(2) / mea.SamplingRate);  % lo-pass to just over upper band
+			lfp = single(filtfilt(b, 1, double(mea.Data)));
+			skipfactor = round(mea.SamplingRate / max(1e3, 2*filterband(2)));
+			lfp = downsample(lfp, skipfactor);
+			lfp(:, mea.BadChannels) = [];
+			[mea.lfp, mea.skipfactor] = deal(lfp, skipfactor);
+			
+			time_ms = downsample(time_ms, skipfactor);
+			
+			[D.params, ~] = set_coherence_params(time, T, band);
+			[~, D.center] = min(sum((position - mean(position)).^2, 2));         % find the most central electrode
+	end
+	
+	% Plotting variables
+	if show_plots
+		plt.v = VideoWriter(NAME);
+		plt.plot_titles = [strrep(mea.Name, '_', ' ') ' (' metric ')'];
+		open(plt.v); 
+		plt.h = figure; fullwidth(true);
+		plt.addy = sub2ind(max(position), position(:, 1), position(:, 2));
+	end
+	
+end
+
+
+% Analysis
+function inds = get_time_inds
+
+	switch metric
+		case 'events'
+			% Get spike times within half_in ms
+			inds = (E.spike_times >= t - half_win) & (E.spike_times <= t + half_win);  % ... of discharge at time t                            
+
+		case {'rising'; 'falling'; 'deviance'}
+			inds = (TIME_MS >= t - half_win) & (TIME_MS <= t + half_win);  % Select the window around the event time
+		case 'maxdescent'
+			% Select time points within half_win ms of the event time
+			inds = logical((TIME_MS >= t - half_win) & (TIME_MS <= t + half_win));  
+
+		case 'delays'
+			% Select time_points within T/2 s of the event time
+			inds = (TIME_MS >= t - T / 2 * 1e3) & (TIME_MS <= t + T / 2 * 1e3);  
+	end
+end
+
+function pos_inds = which_positions
+
+	if strcmpi(metric, 'events')
+		pos_inds = E.ch_idx(inds);
+	else
+		pos_inds = 1:length(POS);
+	end
+
+end
+
+function [fit_data, time_series_data, im_data] = get_data
+% Returns data to be fit depending on the metric (method)
+% EVENTS
+%     fit_data: spike times on each channel (though really this is
+%         treated identically to the mean spike time on each channel.
+%     im_data: mean spike time on each channel relative to window start
+%     time_series_data: flattened fit_data to be plotted as a
+%         raster
+% RISING/FALLING/DEVIANCE
+%     fit_data: time of threshold crossing in the rising, falling,
+%         or agnostic (deviance) direction
+%     im_data: same as fit_data
+%     time_series_data: baseline adjusted lfp traces
+% MAXDESCENT
+%     fit_data: time of maximal descent in lfp (traces with max
+%         descent on the boundary or traces that are non-decreasing
+%         are excluded.
+%     im_data: same as fit_data
+%     time_series_data: baseline adjusted lfp traces
+% DELAYS
+%     fit_data: time delay (ms) of each electrode relative to the
+%         central electrode
+%     im_data: same as fit_data
+%     time_series_data: lfp traces
+
 	switch metric
 		case 'events'
 			
-			inds = logical( ...
-					(spike_times >= t - half_win) & ...  % Get spike times within halfWin ms
-					(spike_times <= t + half_win)...  % ... of discharge at time t
-				);                            
-			pos_inds = chInds(inds);
-            st = spike_times(inds);
-            time_series_data = arrayfun(@(ii) mean(st(pos_inds == ii)), 1:numCh);  % Find the mean spike time on each channel
-			im_data = time_series_data - (t - half_win) + 1;  % imagesc mean spike time on each channel
-			fit_data = spike_times(inds);
-			time_series_data = fit_data(:)';
-			position = position(pos_inds, :);
-            if numel(fit_data) == 0, continue, end
+            fit_data = E.spike_times(inds);
+			im_data = nan(length(POS), 1);
+			[G, ID] = findgroups(pos_inds);
+			im_data(ID) = splitapply(@mean, fit_data(:), G) - (t - half_win) + 1;
+			time_series_data = reshape(fit_data(:), 1, []);
 		
 		case {'rising'; 'falling'; 'deviance'}
-			inds = (TimeMs >= t - half_win) & (TimeMs <= t + half_win);  % Select the window around the event time
-			time_series_data = (smoothdata(lfp(inds, :), 'movmean', 5));  % A little smoothing to get rid of artefacts
+			
+			time_series_data = LFP(inds, :);
 			time_series_data = (time_series_data - time_series_data(1, :));  % Set initial value as baseline
-            if thresh == -Inf, threshI = quantile(max(dir*time_series_data), .25) / 2; 
-            else, threshI = thresh; end
+			if thresh == -Inf
+				threshI = quantile(max(RF.dir * time_series_data), .25) / 2; 
+			else
+				threshI = thresh; 
+			end
+			tt = TIME_MS(inds);
 			fit_data = arrayfun(@(ii) ...  % Find where each channel deviates thresh from baseline
-				find([dir * (time_series_data(:, ii)); threshI] - threshI >= 0, 1), 1:size(time_series_data, 2));
+				find([RF.dir * (time_series_data(:, ii)); threshI] - threshI >= 0, 1), 1:size(time_series_data, 2));
 			fit_data(fit_data > size(time_series_data, 1)) = size(time_series_data, 1);
 			fit_data = fit_data(:);
-			tt = TimeMs(inds);
-            im_data = fit_data;
-			im_data(~isnan(fit_data)) = ...
-                tt(fit_data(~isnan(fit_data))) - (t - half_win);  % Convert to time (ms)
-			pos_inds = 1:numCh;
-            if numel(unique(fit_data)) < 3, continue, end
+			im_data = tt(fit_data) - (t - half_win);    % Convert to time (ms) from window start
 			
 		case 'maxdescent'
 			
-			inds = logical((TimeMs >= t - half_win) .* (TimeMs <= t + half_win));  % Select the window around the event time
-			time_series_data = lfp(inds, :);
+			time_series_data = LFP(inds, :);
 			time_series_data = time_series_data - time_series_data(1, :);  % set first time point as baseline (for visualization early)
 			
 			[change, time_point] = min(diff(time_series_data, 1, 1));  % Find time of maximal descent
-			non_decreasing = change >= 0;
-			bdry = (time_point == 1) | (time_point == size(time_series_data, 1) - 1);
-            tt = TimeMs(inds);
-			im_data = tt(time_point(:)) - (t - half_win);
+			non_decreasing = change >= 0;  % Find non-decreasing traces
+			bdry = (time_point == 1) | (time_point == size(time_series_data, 1) - 1);  % ... and traces with max descent on the boundary (these are often not part of the wave and confuse the analysis)
+            tt = TIME_MS(inds);
+			im_data = tt(time_point(:)) - (t - half_win);  % convert to time from window start
 			im_data(non_decreasing | bdry) = nan;
 			
-			pos_inds = 1:numCh;
 			fit_data = time_point;
 			fit_data(non_decreasing | bdry) = nan;
 			
-			if numel(unique(fit_data)) < 3, continue, end
-
 		case 'delays'
 
-			inds = and((TimeMs >= t - T / 2 * 1e3), ...
-				(TimeMs <= t + T / 2 * 1e3));  % Select the window around the event time
-			params.T = range(TimeMs(inds)) / 1e3;
-			if inds(end) > size(lfp, 1), break; end
-			fprintf('Estimating waves at time %d/%d\n', ii, numWaves)
-			time_series_data = lfp(inds, :);
+			D.params.T = range(TIME_MS(inds)) / 1e3;
+			fprintf('Estimating waves at time %d/%d\n', ii, NUM_WAVES)
+			time_series_data = LFP(inds, :);
 			[coh, phi, freq, coh_conf] = ...
-				compute_coherence(time_series_data, params, 'pairs', center);          % compute the coherence over the selected interval
+				compute_coherence(time_series_data, D.params, 'pairs', D.center);          % compute the coherence over the selected interval
 			[delay, ~, ~] = compute_delay(coh, coh_conf, -phi, freq);      % compute delays on each electrode based on coherence
-			fit_data = 1e3 * delay(center,:)';                                 % we use delays relative to the center (converted to ms)
+			fit_data = 1e3 * delay(D.center, :)';                                 % we use delays relative to the center (converted to ms)
 			im_data = fit_data + half_win;
-			pos_inds = 1:numCh;
-    end
-    
+	end
+end
+
+function reduced_data = use_largest_cluster
     % Use the largest cluster of data points
 	dataS = sort(fit_data(:));
 	dataS(isnan(dataS)) = [];  % excluded nan values
@@ -258,51 +323,41 @@ for ii = 1:numWaves  % estimate wave velocity for each discharge
 	[~, largest] = max(cluster_sizes);  % choose the largest cluster
 
 	bounds = dataS(divides(largest+[0 1]) + [1; 0]);
-	fit_data(fit_data < bounds(1) | fit_data > bounds(2)) = nan;
-    
-    dataout{ii} = fit_data;
-    positionout{ii} = position;
-	[beta(:, ii), V(:, ii), p(ii)] = fit_wave(fit_data, position);
-	
-	% don't waste time (risk errors) plotting if a wave can't be fit
-	if isnan(p(ii)), continue, end
-	
-	generate_plots;
-	
+	reduced_data = fit_data;
+	reduced_data(fit_data < bounds(1) | fit_data > bounds(2)) = nan;
 end
 
-if show_plots, close(v); end
 
-compile_results;
-
-	
-%% Nested functions
+% Output
 function generate_plots
 	if ~show_plots, return, end
-	figure(h); clf
+	figure(PLT.h); clf
 	img = nan(max(POS));
-	[p1, p2] = plot_wave_fit(position, fit_data, beta(:, ii));
-	title(p1, sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
+	
+	% Top plots (wave fit and projection)
+	[p1, p2] = plot_wave_fit(POS(pos_inds, :), reduced_data, beta(:, ii));
+	title(p1, sprintf('%s\n %0.3f s', PLT.plot_titles, t / 1e3));
 	title(p2, sprintf('p=%.2g', p(ii)))
-
-% 		figure(h(2));
-	img(addy) = im_data;
+	
+	% Lower right plot (2D image)
+	img(PLT.addy) = im_data;
 	subplot(236); 
-	p3 = imagesc(img', [-1 2*half_win]); axis xy
-	colormap(h, 1 - parula(2 * half_win + 2));
+	imagesc(img', [-1 2*half_win]); axis xy
+	colormap(PLT.h, 1 - parula(2 * half_win + 2));
 	xlabel('X'); ylabel('Y');
 	colorbar();
-	cmap = h.Colormap;
+	cmap = PLT.h.Colormap;
 	cInds = round(im_data) + 1;
 	cInds = min(max(cInds, 1), 2*half_win+2);
 	if strcmpi(metric, 'events'), cInds = cInds(pos_inds); end
-
+	
+	% Lower left plot (time series)
 	subplot(2,3,4:5);
 	plot_details(time_series_data, pos_inds, cmap, cInds, metric); 
 	axis tight; grid on;
-	title(sprintf('%s\n %0.3f s', plotTitles, t / 1e3));
+	title(sprintf('%s\n %0.3f s', PLT.plot_titles, t / 1e3));
 	if any(strcmpi(metric, {'maxdescent', 'deviance', 'rising', 'falling'}))
-		valid = ~isnan(fit_data);
+		valid = ~isnan(reduced_data);
 		hold on; plot(im_data(valid), ...
 			time_series_data(sub2ind( ...
 				size(time_series_data), ...
@@ -311,28 +366,31 @@ function generate_plots
 		hold off
 	end
 	try
-		frame1 = getframe(h);
+		frame1 = getframe(PLT.h);
 	catch ME
 		disp(ii)
 		disp(ME);
 		disp(ME.stack);
-		continue
+		return
 	end
-	writeVideo(v, frame1)
+	writeVideo(PLT.v, frame1)
 
 end
 
 function compile_results
+	
+	if show_plots, close(PLT.v); end
+
 	Z = angle([1 1i] * V);
 	wave_fit.beta = beta;
 	wave_fit.V = V;
 	wave_fit.p = p;
 	wave_fit.Z = Z;
 	% wave_fit.Zu = Zu;
-	wave_fit.computeTimes = computeTimes;
-	wave_fit.Name = Name;
-	wave_fit.data = dataout;
-	wave_fit.position = positionout;
+	wave_fit.computeTimes = COMPUTE_TIMES;
+	wave_fit.Name = NAME;
+	wave_fit.data = data_out;
+	wave_fit.position = position_out;
 
 
 	mea.wave_fit = wave_fit;
@@ -340,7 +398,9 @@ end
 
 end
 
-function [beta, V, p] = fit_wave_bos(data, position, metric)
+%% Helpers
+
+function [beta, V, p] = fit_wave_bos(data, position, ~)
 	[beta, ~, ~, ~, ~, p] = estimate_wave(data, position);
     
     % beta is invalid if nan or if the slope is 0 in both directions
@@ -390,21 +450,11 @@ function [lfp, skipfactor, mea] = get_lfp(mea)
 	
 	new_samplingRate = 1e3;  % downsample to 1kHz
 	
-	try  % If lfp is in mea, the load, otherwise filter
-		lfp = mea.lfp;
-		if any(strcmpi(fieldnames(mea), 'skipfactor'))
-			skipfactor = mea.skipfactor;
-		else
-			skipfactor = 1;
-		end
-
-	catch ME
-		if ~strcmp(ME.identifier, 'MATLAB:nonExistentField')
-			rethrow(ME)
-		end
+	if isfield(mea, 'lfp') && isfield(mea, 'skipfactor')
+		[lfp, skipfactor] = deal(mea.lfp, mea.skipfactor);
+	else
 		lfp = filter_mea(mea, {'lfp'});
-		skipfactor = lfp.skipfactor;
-		lfp = lfp.lfp;
+		[lfp, skipfactor] = deal(lfp.lfp, lfp.skipfactor);		
 	end
 	
 	% Downsample to new_samplingRate
