@@ -160,7 +160,7 @@ end
 
 %% Helpers
 function event_inds = rate2events(mea)
-	lambda = rescale(single(mea.Data), 0, 220);  % range is based on MG49_43
+	lambda = rescale(single(mea.Data), 0, 500);  % range is based on MG49_43
 	X = rand(size(lambda));
 	events = X > exp(-lambda / mea.SamplingRate);
 	event_inds = find(events);
