@@ -146,6 +146,7 @@ function convert_to_mea(PM)
 		);
 	mea.event_inds = rate2events(mea);
 	mea.event_mat_size = size(mea.Data);
+	mea.Data = -mea.Data;
 	fprintf('Saving %s ... ', mea.Path);
 	save(mea.Path, '-struct', 'mea');
 	m = matfile(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'Writable', true);
