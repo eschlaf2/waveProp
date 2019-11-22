@@ -228,7 +228,7 @@ p('map', nan);  % Source of ictal activity (on/off)
 p('state', nan);  % Seizure state (ictal/non-ictal)
 p('Dee', SS.Dee)  % i <--> i gap-junction diffusive-coupling strength (electrodes)
 p('Dii', SS.Dii)  % e <--> e gap-junction diffusive-coupling strength in all space (electrodes)
-p('K', 0)  % extracellular potassium concentration (mm^2)
+p('K', 0)  % extracellular potassium concentration (cm^2)
 p('Qe', 0)  % Activity of excitatory population.
 p('Qi', 0)  % Activity of inhibitory population.
 p('Ve', SS.Ve_rest)  % Voltage  of excitatory population.
