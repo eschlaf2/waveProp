@@ -39,7 +39,7 @@ run_simulation(params);
 convert_to_mea(params.meta);
 
 fname = sprintf('%s/SCM/SCM_Seizure%d_Neuroport_%d_%d.mat', ...
-			pwd, PM.sim_num, PM.padding);
+			pwd, params.meta.sim_num, params.meta.padding);
 paramfile = 'tempscripts/scm_mea_options.m';
 analyze_wave_directions;
 
