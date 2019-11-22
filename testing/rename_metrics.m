@@ -8,10 +8,14 @@ map = {'maxdescent', 'M'; ...
 	'groundtruth', 'G'};
 
 if ischar(metrics)
-	metrics = map{strcmp(metrics, map(:, 1)), 2};
+	if ismember(metrics, map)
+		metrics = map{strcmp(metrics, map(:, 1)), 2};
+	end
 else
 	for ii = 1:length(metrics)
-		metrics{ii} = map{strcmp(metrics{ii}, map(:, 1)), 2};
+		if ismember(metrics{ii}, map)
+			metrics{ii} = map{strcmp(metrics{ii}, map(:, 1)), 2};
+		end
 	end
 end
 
