@@ -42,17 +42,14 @@ switch lower(fit_method)
 end
 
 %% Compute fits
-[wave_fit, mea] = compute_waves(mea, fit_wave, show_plots, metric, ...
-	T, half_win, thresh, band);
-
-
-%% Nested functions
-
-	
-end
-
-function [wave_fit, mea] = compute_waves(mea, fit_wave, show_plots, ...
-    metric, T, half_win, thresh, band)
+% [wave_fit, mea] = compute_waves(mea, fit_wave, show_plots, metric, ...
+% 	T, half_win, thresh, band);
+% 
+% 	
+% end
+% 
+% function [wave_fit, mea] = compute_waves(mea, fit_wave, show_plots, ...
+%     metric, T, half_win, thresh, band)
 %% Compute wave propagation at each discharge time as described in 
 % Liou, Jyun You, et al. ?Multivariate Regression Methods for Estimating
 % Velocity of Ictal Discharges from Human Microelectrode Recordings.?
@@ -103,7 +100,7 @@ for ii = 1:NUM_WAVES  % estimate wave velocity for each discharge
 		fit_wave(reduced_data, POS(pos_inds, :));
 	
 	% don't waste time (risk errors) plotting if a wave can't be fit
-	if isnan(p(ii)), continue, end
+% 	if isnan(p(ii)), continue, end
 	
 	generate_plots;
 	
@@ -299,10 +296,10 @@ end
 
 function reduced_data = use_largest_cluster
     % Use the largest cluster of data points for lfp methods
-	if ~ismember(metric, {'maxdescent', 'rising', 'falling', 'deviance'})
-		reduced_data = fit_data; 
-		return
-	end
+% 	if ~ismember(metric, {'maxdescent', 'rising', 'falling', 'deviance'})
+% 		reduced_data = fit_data; 
+% 		return
+% 	end
 	dataS = sort(fit_data(:));
 	dataS(isnan(dataS)) = [];  % excluded nan values
 	diff_sorted = diff(dataS);  % calculate gaps between nearby data points
