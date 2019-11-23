@@ -48,23 +48,7 @@ end
 
 %% Nested functions
 
-	function [mea, metric] = parse_inputs(mea, metric, varargin)
-		p = inputParser;
-	allMetrics = {...
-		'delays', 'maxdescent', 'events', ...
-		'deviance', 'rising', 'falling'};
-	validMetrics = @(x) any(validatestring(x, allMetrics));
-
-	addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile'));
-	addRequired(p, 'metric', validMetrics);
-
-	parse(p, mea, metric, varargin{:})
-	mea = p.Results.mea;
-	metric = p.Results.metric;
-
-	if ~isfield(mea, 'params'), mea.params = init_mea_params(); end
-
-	end
+	
 end
 
 function [wave_fit, mea] = compute_waves(mea, fit_wave, show_plots, ...
@@ -169,6 +153,7 @@ function [time_ms, position, lfp, RF, E, D, plt] = set_globs
 			if ~isfield(mea, 'event_inds')  % If event times aren't already computed
 				[~, ~, mea] = mua_events(mea);  % ... compute them
 			end
+			if ~isfield(mea, 'event_mat_size'), mea.event_mat_size = size(mea.mua); end
 			[time_idx, E.ch_idx] = ind2sub(mea.event_mat_size, mea.event_inds);         % Get the indices and channels of each spike
 			E.spike_times = time_ms(time_idx);                                    % Get the spike times in ms
 			warning off MATLAB:scatteredInterpolant:DupPtsAvValuesWarnId
@@ -188,7 +173,7 @@ function [time_ms, position, lfp, RF, E, D, plt] = set_globs
 			
 			time_ms = downsample(time_ms, skipfactor);
 			
-			[D.params, ~] = set_coherence_params(time, T, band);
+			[D.params, ~] = set_coherence_params(time_ms / 1e3, T, band);
 			[~, D.center] = min(sum((position - mean(position)).^2, 2));         % find the most central electrode
 	end
 	
@@ -313,7 +298,11 @@ function [fit_data, time_series_data, im_data] = get_data
 end
 
 function reduced_data = use_largest_cluster
-    % Use the largest cluster of data points
+    % Use the largest cluster of data points for lfp methods
+	if ~ismember(metric, {'maxdescent', 'rising', 'falling', 'deviance'})
+		reduced_data = fit_data; 
+		return
+	end
 	dataS = sort(fit_data(:));
 	dataS(isnan(dataS)) = [];  % excluded nan values
 	diff_sorted = diff(dataS);  % calculate gaps between nearby data points
@@ -553,3 +542,21 @@ function [p1, p2] = plot_wave_fit(position, data, beta)
 	
 
 end 
+
+function [mea, metric] = parse_inputs(mea, metric, varargin)
+	p = inputParser;
+allMetrics = {...
+	'delays', 'maxdescent', 'events', ...
+	'deviance', 'rising', 'falling'};
+validMetrics = @(x) any(validatestring(x, allMetrics));
+
+addRequired(p, 'mea', @(x) isstruct(x) || strcmpi(class(x), 'matlab.io.MatFile'));
+addRequired(p, 'metric', validMetrics);
+
+parse(p, mea, metric, varargin{:})
+mea = p.Results.mea;
+metric = p.Results.metric;
+
+if ~isfield(mea, 'params'), mea.params = init_mea_params(); end
+
+end
