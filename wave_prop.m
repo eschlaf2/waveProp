@@ -124,14 +124,14 @@ function [time_ms, position, lfp, RF, E, D, plt] = set_globs
 
 	% Method specific variables
 	lfp = [];  % maxdescent, rising, falling, deviance, delays
-	RF = [];  % rising, falling
+	RF.thresh = thresh;  % rising, falling
 	E = [];  % events variables
 	D = [];  % delays variables
 	plt = [];  % plotting variables
-	
+	zscore =@(X) (X - nanmean(X)) ./ nanstd(X);
 	if ismember(lower(metric), {'maxdescent', 'rising', 'falling', 'deviance'})
 		[lfp, skipfactor, mea] = get_lfp(mea);
-		lfp = smoothdata(lfp, 'movmean', 5);  % A little smoothing to get rid of artefacts
+		lfp = zscore(smoothdata(lfp, 'movmean', 5));  % A little smoothing to get rid of artefacts
 		time_ms = downsample(time_ms, skipfactor);
 	end
 	
@@ -141,10 +141,10 @@ function [time_ms, position, lfp, RF, E, D, plt] = set_globs
 			lfp = lfp ./ std(lfp(time_ms < 0, :));
 			if strcmpi(metric, 'rising')
 				RF.dir = 1;
-				if thresh == Inf, thresh = 10; end
+				if thresh == Inf, RF.thresh = 10; end
 			else
 				RF.dir = -1;
-				if thresh == Inf, thresh = 20; end
+				if thresh == Inf, RF.thresh = 20; end
 			end
 		case 'events'
 			if ~isfield(mea, 'event_inds')  % If event times aren't already computed
@@ -254,7 +254,7 @@ function [fit_data, time_series_data, im_data] = get_data
 			
 			time_series_data = LFP(inds, :);
 			time_series_data = (time_series_data - time_series_data(1, :));  % Set initial value as baseline
-			if thresh == -Inf
+			if RF.thresh == -Inf
 				threshI = quantile(max(RF.dir * time_series_data), .25) / 2; 
 			else
 				threshI = thresh; 
@@ -274,12 +274,13 @@ function [fit_data, time_series_data, im_data] = get_data
 			[change, time_point] = min(diff(time_series_data, 1, 1));  % Find time of maximal descent
 			non_decreasing = change >= 0;  % Find non-decreasing traces
 			bdry = (time_point == 1) | (time_point == size(time_series_data, 1) - 1);  % ... and traces with max descent on the boundary (these are often not part of the wave and confuse the analysis)
+			inactive = range(time_series_data) < 2;
             tt = TIME_MS(inds);
 			im_data = tt(time_point(:)) - (t - half_win);  % convert to time from window start
-			im_data(non_decreasing | bdry) = nan;
+			im_data(non_decreasing | bdry | inactive) = nan;
 			
 			fit_data = time_point;
-			fit_data(non_decreasing | bdry) = nan;
+			fit_data(non_decreasing | bdry | inactive) = nan;
 			
 		case 'delays'
 
@@ -300,7 +301,9 @@ function reduced_data = use_largest_cluster
 % 		reduced_data = fit_data; 
 % 		return
 % 	end
+
 	dataS = sort(fit_data(:));
+	if all(isnan(dataS)), reduced_data = fit_data; return; end
 	dataS(isnan(dataS)) = [];  % excluded nan values
 	diff_sorted = diff(dataS);  % calculate gaps between nearby data points
 	big_gaps = isoutlier(unique(diff_sorted));  % find large gaps between datapoints
