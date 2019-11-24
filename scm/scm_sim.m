@@ -152,6 +152,7 @@ function convert_to_mea(PM)
 		'Path', sprintf('%s/SCM/SCM_Seizure%d_Neuroport_%d_%d.mat', ...
 			pwd, PM.sim_num, PM.padding) ...	 
 		);
+	qe_mat = rescale(single(qe_mat), 0, 500);  % range is based on MG49_43
 	mea.firingRate = reshape(qe_mat, size(mea.Data));
 	mea.event_inds = rate2events(mea);
 	mea.event_mat_size = size(mea.Data);
@@ -169,7 +170,7 @@ end
 
 %% Helpers
 function event_inds = rate2events(mea)
-	lambda = rescale(single(mea.firingRate), 0, 500);  % range is based on MG49_43
+	lambda = mea.firingRate;
 	X = rand(size(lambda));
 	events = X > exp(-lambda / mea.SamplingRate);
 	event_inds = find(events);
