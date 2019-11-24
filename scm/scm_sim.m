@@ -136,7 +136,7 @@ function convert_to_mea(PM)
 	time = cat(1, tt{:});
 	sample_rate = min(round(1/mean(diff(time))/1e3)*1e3, PM.subsample);
 	dt = 1 / sample_rate;
-	nt = size(ve_mat, 1);
+	nt = size(qe_mat, 1);
 	inds = interp1(time, 1:nt, time(1):dt:time(end), 'nearest');
 	time =@() time(1):dt:time(end);
 % 	ve_mat = ve_mat(inds, :, :);
