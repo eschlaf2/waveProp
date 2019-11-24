@@ -140,6 +140,7 @@ function convert_to_mea(PM)
 	inds = interp1(time, 1:nt, time(1):dt:time(end), 'nearest');
 	time =@() time(1):dt:time(end);
 	ve_mat = ve_mat(inds, :, :);
+	qe_mat = qe_mat(inds, :, :);
 	
 	
 	mea = create_mea( ...
@@ -151,7 +152,7 @@ function convert_to_mea(PM)
 		'Path', sprintf('%s/SCM/SCM_Seizure%d_Neuroport_%d_%d.mat', ...
 			pwd, PM.sim_num, PM.padding) ...	 
 		);
-	mea.firingRate = qe_mat;
+	mea.firingRate = reshape(qe_mat, size(mea.Data));
 	mea.event_inds = rate2events(mea);
 	mea.event_mat_size = size(mea.Data);
 	fprintf('Saving %s ... ', mea.Path);
