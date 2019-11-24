@@ -114,7 +114,7 @@ function convert_to_mea(PM)
 	im = round(rescale(last.Ve) * (length(cmap) - 1)) + 1;
 	movQ(numel(files) - 1) = im2frame(im, cmap);
 	movV(numel(files) - 1) = im2frame(im, cmap);
-	[data, tt] = deal(cell(numel(files) - 1 , 1));
+	[qe, ve, tt] = deal(cell(numel(files) - 1 , 1));
 	
 	for f = files'
 		if strfind(f.name, 'info'), continue, end
@@ -126,22 +126,24 @@ function convert_to_mea(PM)
 		im = round(rescale(last.Qe) * (length(cmap) - 1)) + 1;
 		movQ(ind) = im2frame(im, cmap);
 		movV(ind) = im2frame(round(rescale(last.Ve) * (length(cmap) - 1)) + 1, cmap);
-		data{ind} = NP.Qe;
+		qe{ind} = NP.Qe;
+		ve{ind} = NP.Ve;
 		tt{ind} = time;
 	end
 	
-	data_mat = cat(1, data{:});
+	ve_mat = -cat(1, ve{:});
+	qe_mat = cat(1, qe{:});
 	time = cat(1, tt{:});
 	sample_rate = min(round(1/mean(diff(time))/1e3)*1e3, PM.subsample);
 	dt = 1 / sample_rate;
-	nt = size(data_mat, 1);
+	nt = size(ve_mat, 1);
 	inds = interp1(time, 1:nt, time(1):dt:time(end), 'nearest');
 	time =@() time(1):dt:time(end);
-	data_mat = data_mat(inds, :, :);
+	ve_mat = ve_mat(inds, :, :);
 	
 	
 	mea = create_mea( ...
-		data_mat, ... 
+		ve_mat, ... 
 		'SamplingRate', sample_rate, ... 
 		'Padding', PM.padding, ...
 		'Name', ['SCM Seizure ' num2str(PM.sim_num)], ...
@@ -149,9 +151,9 @@ function convert_to_mea(PM)
 		'Path', sprintf('%s/SCM/SCM_Seizure%d_Neuroport_%d_%d.mat', ...
 			pwd, PM.sim_num, PM.padding) ...	 
 		);
+	mea.firingRate = qe_mat;
 	mea.event_inds = rate2events(mea);
 	mea.event_mat_size = size(mea.Data);
-	mea.Data = -mea.Data;
 	fprintf('Saving %s ... ', mea.Path);
 	save(mea.Path, '-struct', 'mea');
 	m = matfile(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'Writable', true);
@@ -166,7 +168,7 @@ end
 
 %% Helpers
 function event_inds = rate2events(mea)
-	lambda = rescale(single(mea.Data), 0, 500);  % range is based on MG49_43
+	lambda = rescale(single(mea.firingRate), 0, 500);  % range is based on MG49_43
 	X = rand(size(lambda));
 	events = X > exp(-lambda / mea.SamplingRate);
 	event_inds = find(events);
