@@ -39,7 +39,7 @@
 function [NP, EC, time, last, fig] = seizing_cortical_field(~, time_end, IC, fig, params)
 
 %% Preferences and parameters
-if ~exist('params', 'var') || isempty(params), params = init_scm_params(), end
+if ~exist('params', 'var') || isempty(params), params = init_scm_params(); end
 
 PM = params.meta;
 PK = params.K;
@@ -116,7 +116,6 @@ for ii = 1: Nsteps
 	end
 	
 	% UPDATE the dynamic variables (pass <new> values to <last>).
-% 	set_last_equal_new;
 	last = new;
 	get_electrode_values;
       
@@ -293,7 +292,7 @@ EC = rmfield(EC, no_return);
 				[new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx^2, M.excitability_map);
 				new.dVe(new.map) = PM.source_drive; 
 				if isempty(PM.source), return, end
-				which_source = mod(round(time(ii) / 2), size(PM.source, 3)) + 1;
+				which_source = mod(floor(time(ii) / 2), size(PM.source, 3)) + 1;
 				new.dVe(PM.source(:, :, which_source)) = PM.source_drive;
 			else
 				new.map = last.map; new.state = last.state;
