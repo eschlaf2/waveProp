@@ -131,7 +131,7 @@ function convert_to_mea(PM)
 		tt{ind} = time;
 	end
 	
-	ve_mat = -cat(1, ve{:});
+% 	ve_mat = -cat(1, ve{:});
 	qe_mat = cat(1, qe{:});
 	time = cat(1, tt{:});
 	sample_rate = min(round(1/mean(diff(time))/1e3)*1e3, PM.subsample);
@@ -139,12 +139,12 @@ function convert_to_mea(PM)
 	nt = size(ve_mat, 1);
 	inds = interp1(time, 1:nt, time(1):dt:time(end), 'nearest');
 	time =@() time(1):dt:time(end);
-	ve_mat = ve_mat(inds, :, :);
+% 	ve_mat = ve_mat(inds, :, :);
 	qe_mat = qe_mat(inds, :, :);
 	
 	
 	mea = create_mea( ...
-		ve_mat, ... 
+		-qe_mat, ... 
 		'SamplingRate', sample_rate, ... 
 		'Padding', PM.padding, ...
 		'Name', ['SCM Seizure ' num2str(PM.sim_num)], ...
