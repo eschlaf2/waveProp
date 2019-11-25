@@ -2,7 +2,7 @@
 mea = load(sprintf('SCM/SCM_Seizure%d_Neuroport_10_10.mat', S));
 fits = load(sprintf('SCM_Seizure%d_Neuroport_10_10_wave_prop.mat', S));
 
-try close([1 10]); catch ME; end
+try close([1 2]); catch ME; end
 clear hist_fits;
 
 mea.params = fits.maxdescent.params;
