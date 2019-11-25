@@ -1,8 +1,15 @@
 % pat = 'c7';
 % Requires Circular Statistics Toolbox (plotnum case 6)
+% fid = fopen('seizures2.txt');
+% A = textscan(fid, '%s %d'); 
+% pats = A{1}; seizures = A{2};
+% for ii = numel(pats):-1:1
+% 	files(ii) = dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pats{ii}, seizures(ii)));
+% end
+% fclose(fid);
 
 if ~exist('seizure', 'var'); seizure = '*'; else, seizure = num2str(seizure); end
-if ~exist('files', 'var'); files = dir([pat '_Seizure' seizure '*_wave_prop.mat']); end
+if ~exist('files', 'var'); files = dir([pat '_Seizure' seizure '_Neuroport_10_10_wave_prop.mat']); end
 if ~exist('metrics', 'var')
 	metrics = {...
 		'delays_T0p2_fband0_50', ...
@@ -214,6 +221,7 @@ end
 		end
         stats = table(filename, whichpair, R, theta, kappa, conf, sigma, N, ...
             m1, dZ);
+		save('direction_stats', 'stats', 'metricpairs');
 		
 
 %% Comparison of metrics
