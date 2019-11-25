@@ -156,6 +156,7 @@ function convert_to_mea(PM)
 	mea.firingRate = reshape(qe_mat, size(mea.Data));
 	mea.event_inds = rate2events(mea);
 	mea.event_mat_size = size(mea.Data);
+	mea.firingRate = mua_firing_rate(mea);
 	fprintf('Saving %s ... ', mea.Path);
 	save(mea.Path, '-struct', 'mea');
 	m = matfile(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'Writable', true);
