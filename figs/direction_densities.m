@@ -2,8 +2,8 @@
 % mea = load(sprintf('SCM/SCM_Seizure%d_Neuroport_10_10.mat', S));
 % fits = load(sprintf('SCM_Seizure%d_Neuroport_10_10_wave_prop.mat', S));
 
-pat = 'MG49'; 
-seizure = 43;
+% pat = 'MG49'; 
+% seizure = 43;
 
 mea = load(sprintf('%s/%s_Seizure%d_Neuroport_10_10.mat', pat, pat, seizure));
 fits = load(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pat, seizure));
@@ -14,7 +14,7 @@ clear hist_fits;
 
 time = mea.Time();
 
-[~, mea] = mua_firing_rate(mea);
+if ~isfield(mea, 'firingRate'), [~, mea] = mua_firing_rate(mea); end
 
 f = {'delays_T10_fband1_13', 'events', 'maxdescent'};
 figure(2);
@@ -34,7 +34,6 @@ hist_fits.m = fits.maxdescent.Z(time_inds & (fits.maxdescent.p(:) < .05));
 figure(1) 
 for f = fieldnames(hist_fits)'
 	temp = [hist_fits.(f{:}), hist_fits.(f{:}) + 2*pi, hist_fits.(f{:}) - 2*pi]; 
-% 	temp = hist_fits.(f{:});
     [d, xi] = ksdensity(temp, 'bandwidth', 1.06);  % This bw came from running the function with [-pi pi] support
     plot(xi, d/max(d), 'DisplayName', f{:}); hold on;
 	xlim([-pi pi])
