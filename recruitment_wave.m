@@ -3,7 +3,11 @@ function [frSm, ch, mea] = recruitment_wave(mea)
 % wavefront.
 
 [frSm, time, ch, mea] = smooth_firingRate(mea);                                  % Smooth the firing rate and limit to active channels
+low_dev = max(frSm) <= 2;
+frSm(:, low_dev) = [];
+ch(low_dev) = [];
 recruitmentInd = arrayfun(@(ii) find(frSm(:, ii) > 2, 1), 1:numel(ch));    % Find time points where the firing rate is 2sd above base
+
 [recIndsSorted, so] = sort(recruitmentInd);                                % Get the order in which channels were recruited to seizure
 position = get_position(mea, ch(so));                                      % Transform the position into coordinates
 
