@@ -31,7 +31,7 @@ end
 %% Local functions
 
 function [] = plot_wave_fit(position, data, beta, p)
-
+	if numel(beta) < 2, return, end
 	X = position(:, 1);
 	Y = position(:, 2);
 	beta = beta(:);
