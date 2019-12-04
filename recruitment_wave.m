@@ -89,6 +89,7 @@ function [position] = get_position(mea, ch)
 P = mea.Position;
 P(mea.BadChannels, :) = [];
 Ps = P(ch, :);  % Limit to only coordinates of interest
+if size(Ps, 1) == 1, position = (Ps - min(Ps)) + 1; return; end
 position = (Ps - min(Ps)) ./ min(diff(unique(Ps))) + 1;  % Reassign coordinates
 end
 
