@@ -16,6 +16,7 @@ plot_data_v_location(position, data);
 
 subplot(222);                                                              % Fit a wave to the recruitment times
 [beta, ~, ~, ~, ~, p] = estimate_wave(data, position);
+if numel(beta) < 2, return, end
 beta = circshift(beta, -1);
 plot_wave_fit(position, data, beta, p);
 
@@ -31,7 +32,6 @@ end
 %% Local functions
 
 function [] = plot_wave_fit(position, data, beta, p)
-	if numel(beta) < 2, return, end
 	X = position(:, 1);
 	Y = position(:, 2);
 	beta = beta(:);
