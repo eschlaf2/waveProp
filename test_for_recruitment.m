@@ -89,7 +89,6 @@ if any(strcmpi(method, 'wpli'))
 	output.wpliFreq = freq;
 
 	if PLOT
-		figure(); clf; fullwidth()
 		plot(Time(1:winstep:ti), wpli_mean);
 		title([strrep(mea.Name, '_', ' '), ' Coherence'])
 		ylabel('Mean square WPLI')
@@ -101,6 +100,6 @@ end
 
 %% Compute Fano factor
 if any(strcmpi(method, 'fano'))
-	output = mua_fano_factor(mea);
+	output.ff = mua_fano_factor(mea);
 end
 
