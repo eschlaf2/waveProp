@@ -8,7 +8,7 @@
 % end
 % fclose(fid);
 
-if ~exist('seizure', 'var'); seizure = '*'; else, seizure = num2str(seizure); end
+if ~exist('seizure', 'var'); seizure = '*'; elseif isnumeric(seizure), seizure = num2str(seizure); end
 if ~exist('files', 'var'); files = dir([pat '_Seizure' seizure '_Neuroport_10_10_wave_prop.mat']); end
 if ~exist('metrics', 'var')
 	metrics = {...
@@ -313,16 +313,17 @@ end
     case 4
     figure(4); fullwidth();
 
-    seizure = 1;
-    thresh = 5e-10;
+    s = 1;
 
     whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
-    p = res(seizure).p(:, whichfields);
-    p(p > thresh) = nan;
-    stem(res(seizure).time, -log(p), 'filled', 'linewidth', 2)
+    p = res(s).p(:, whichfields);
+    p(p > sig) = nan;
+    plot(res(s).time, -log(p), '.', 'markersize', 20)
 
     legend(metrics)
     title('p-values')
+	ylabel('-log(p)')
+	xlabel('Time (s)')
 
 %%
     case 5
