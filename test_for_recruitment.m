@@ -37,12 +37,12 @@ if any(strcmpi(method, 'wpli'))
 	
 	%% Downsample lfp
 	DOWNSAMPLED_FREQ = 1e3;  % Hz
-	ds_step = floor(mea.SamplingRate / DOWNSAMPLED_FREQ);
-	DOWNSAMPLED_FREQ = mea.SamplingRate / ds_step;
+	ds_step = floor(mea.SamplingRate / mea.skipfactor / DOWNSAMPLED_FREQ);
+	DOWNSAMPLED_FREQ = mea.SamplingRate / mea.skipfactor / ds_step;
 	lfp = mea.lfp;
 	lfp = lfp(1:ds_step:end, :);
 	Time = mea.Time();
-	Time = Time(1:ds_step:end);
+	Time = Time(1:mea.skipfactor*ds_step:end);
 
 	%% Set parameters for coherence calculations
 	W = 5;  % bandwidth (Hz)
@@ -89,7 +89,7 @@ if any(strcmpi(method, 'wpli'))
 	output.wpliFreq = freq;
 
 	if PLOT
-		figure(4); clf; fullwidth()
+		figure(); clf; fullwidth()
 		plot(Time(1:winstep:ti), wpli_mean);
 		title([strrep(mea.Name, '_', ' '), ' Coherence'])
 		ylabel('Mean square WPLI')
