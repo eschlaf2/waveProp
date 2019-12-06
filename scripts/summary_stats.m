@@ -79,11 +79,7 @@ ax = gobjects(nP, 1);
 cdata = lines(7);
 
 % Rename metrics
-metricpairs = strrep(metricpairs, 'maxdescent', 'M');
-metricpairs = strrep(metricpairs, 'events', 'E');
-metricpairs = strrep(metricpairs, 'delays_T01_fband1_50', 'D');
-metricpairs = strrep(metricpairs, 'delays_T0p2_fband0_50', 'Ds');
-metricpairs = strrep(metricpairs, 'delays_T10_fband1_13', 'D10');
+metricpairs = rename_metrics(metricpairs);
 
 for ii = 1:nP
 	ax(ii) = subplot(nP, 1, ii);
