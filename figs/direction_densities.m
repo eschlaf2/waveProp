@@ -33,8 +33,9 @@ hist_fits.m = fits.maxdescent.Z(time_inds & (fits.maxdescent.p(:) < .05));
 
 figure(1) 
 for f = fieldnames(hist_fits)'
-	temp = [hist_fits.(f{:}), hist_fits.(f{:}) + 2*pi, hist_fits.(f{:}) - 2*pi]; 
-    [d, xi] = ksdensity(temp, 'bandwidth', 1.06);  % This bw came from running the function with [-pi pi] support
+% 	temp = [hist_fits.(f{:}), hist_fits.(f{:}) + 2*pi, hist_fits.(f{:}) - 2*pi]; 
+	temp = hist_fits.(f{:});
+    [d, xi, bw] = ksdensity(temp, 'support', [-pi pi]);  % This bw came from running the function with [-pi pi] support
     plot(xi, d/max(d), 'DisplayName', f{:}); hold on;
 	xlim([-pi pi])
 end
