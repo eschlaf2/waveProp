@@ -13,7 +13,7 @@ if ischar(metrics)
 		metrics = map{strcmp(metrics, map(:, 1)), 2};
 	end
 else
-	for ii = 1:length(metrics)
+	for ii = 1:numel(metrics)
 		if ismember(metrics{ii}, map)
 			metrics{ii} = map{strcmp(metrics{ii}, map(:, 1)), 2};
 		end
