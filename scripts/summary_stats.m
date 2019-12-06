@@ -87,7 +87,7 @@ metricpairs = strrep(metricpairs, 'delays_T10_fband1_13', 'D10');
 
 for ii = 1:nP
 	ax(ii) = subplot(nP, 1, ii);
-	mask = whichpair==ii | whichpair == 0;
+	mask = whichpair==pairs(ii) | whichpair == 0;
 	N = sum(mask);
 	
 % 	'XAxisLocation', 'origin', ...
