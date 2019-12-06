@@ -14,7 +14,7 @@ if ischar(metrics)
 	end
 else
 	for ii = 1:numel(metrics)
-		if ismember(metrics{ii}, map)
+		if ismember(metrics{ii}, map(:, 1))
 			metrics{ii} = map{strcmp(metrics{ii}, map(:, 1)), 2};
 		end
 	end
