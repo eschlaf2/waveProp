@@ -107,7 +107,7 @@ end
 set(ax(ii), 'XTickLabel', seizure(mask));
 
 for ii = 1:nP
-	mask = whichpair==ii | whichpair == 0;
+	mask = whichpair==pairs(ii) | whichpair == 0;
 	N = sum(mask);
 	
 	x = [1;1] * (1:sum(mask));
