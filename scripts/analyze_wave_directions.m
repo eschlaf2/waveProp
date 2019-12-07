@@ -79,6 +79,30 @@ delays.params = mea.params;
 fieldname = checkname(sprintf('delays_T%02g_fband%d_%d', T, band));
 outfile.(fieldname) = delays;
 
+disp('Computing wave directions from delays (again) ...')
+T = 1;
+band = [1 13];
+mea.params.T = T;
+mea.params.delay_band = band;
+[delays, mea] = wave_prop(mea, 'delays');
+plot_wave_directions(mea, delays);
+print(gcf, delays.Name, '-dpng')
+delays.params = mea.params;
+fieldname = checkname(sprintf('delays_T%02g_fband%d_%d', T, band));
+outfile.(fieldname) = delays;
+
+disp('Computing wave directions from delays (again) ...')
+T = 10;
+band = [1 50];
+mea.params.T = T;
+mea.params.delay_band = band;
+[delays, mea] = wave_prop(mea, 'delays');
+plot_wave_directions(mea, delays);
+print(gcf, delays.Name, '-dpng')
+delays.params = mea.params;
+fieldname = checkname(sprintf('delays_T%02g_fband%d_%d', T, band));
+outfile.(fieldname) = delays;
+
 disp('Computing wave directions from delays (T=10) ...')
 T = 10;
 band = [1 13];
