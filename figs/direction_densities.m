@@ -27,7 +27,9 @@ compute_times = fits.events.computeTimes;
 time_inds = compute_times > 0;
 
 for ii = 1:numel(f)
-    hist_fits.(rename_metrics(f{ii})) = fits.(f{ii}).Z(time_inds & isfinite(fits.(f{ii}).p(:)) & (fits.(f{ii}).p(:) < .05));
+    mask = time_inds & isfinite(fits.(f{ii}).p(:)) & (fits.(f{ii}).p(:) < .05);
+    ct.(rename_metrics(f{ii})) = compute_times(mask);
+    hist_fits.(rename_metrics(f{ii})) = fits.(f{ii}).Z(mask);
 end
  
 % hist_fits.d10 = fits.delays_T10_fband1_13.Z(time_inds & (fits.delays_T10_fband1_13.p(:) < .05));
@@ -35,11 +37,19 @@ end
 % hist_fits.e = fits.events.Z(time_inds & (fits.events.p(:) < .05));
 % hist_fits.m = fits.maxdescent.Z(time_inds & (fits.maxdescent.p(:) < .05));
 % 
+rotateby = angle(nansum(exp(hist_fits.E * 1j)));
+gridx1 = min(compute_times(time_inds))/1e3:.1:max(compute_times(time_inds))/1e3;
+gridx2 = linspace(-3*pi, 3*pi, 301);
+[x1, x2] = meshgrid(gridx1, gridx2);
+x1 = x1(:); x2 = x2(:);
 figure(1) 
 for f = fieldnames(hist_fits)'
 % 	temp = [hist_fits.(f{:}), hist_fits.(f{:}) + 2*pi, hist_fits.(f{:}) - 2*pi]; 
-	temp = hist_fits.(f{:});
-    [d, xi, bw] = ksdensity(temp, 'support', [-pi pi]);  % This bw came from running the function with [-pi pi] support
+	temp = angle(exp(1j * (hist_fits.(f{:}) - rotateby)));
+	temp = [temp(:) - 2*pi; temp(:); temp(:) + 2*pi];
+        ksdensity([repmat(ct.(f{:}), 3, 1) temp], [x1 x2], 'bandwidth', [5 .15*pi/3]);
+	
+%    [d, xi, bw] = ksdensity([repmat(ct.(f{:}), 3, 1) temp], 'bandwidth', .15*pi/3, 'numpoints', 500);
     plot(xi, d/max(d), 'DisplayName', f{:}); hold on;
 	xlim([-pi pi])
 end
