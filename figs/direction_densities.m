@@ -16,21 +16,25 @@ time = mea.Time();
 
 if ~isfield(mea, 'firingRate'), [~, mea] = mua_firing_rate(mea); end
 
-f = {'delays_T10_fband1_13', 'events', 'maxdescent'};
+f = {'delays_T10_fband1_13', 'events', 'maxdescent', 'delays_T01_fband1_13'};
+% f = {'delays_T01_fband1_13', 'delays_T10_fband1_50', 'delays_T01_fband1_50'};
 figure(2);
-for ii = 1:3; subplot(3,1,ii); plot_dir_simple(mea, fits.(f{ii})); title(rename_metrics(f{ii})); end
+for ii = 1:numel(f); subplot(numel(f),1,ii); plot_dir_simple(mea, fits.(f{ii})); title(rename_metrics(f{ii})); end
 
 %%
 compute_times = fits.events.computeTimes;
-time_inds = compute_times >= (time(end) - mea.Padding(2) - 30) * 1e3;
-% time_inds = compute_times > 0;
+% time_inds = compute_times >= (time(end) - mea.Padding(2) - 30) * 1e3;
+time_inds = compute_times > 0;
 
+for ii = 1:numel(f)
+    hist_fits.(rename_metrics(f{ii})) = fits.(f{ii}).Z(time_inds & isfinite(fits.(f{ii}).p(:)) & (fits.(f{ii}).p(:) < .05));
+end
  
-hist_fits.d10 = fits.delays_T10_fband1_13.Z(time_inds & (fits.delays_T10_fband1_13.p(:) < .05));
-% hist_fits.d = fits.delays_T01_fband1_50.Z(time_inds & (fits.delays_T01_fband1_50.p(:) < .05));
-hist_fits.e = fits.events.Z(time_inds & (fits.events.p(:) < .05));
-hist_fits.m = fits.maxdescent.Z(time_inds & (fits.maxdescent.p(:) < .05));
-
+% hist_fits.d10 = fits.delays_T10_fband1_13.Z(time_inds & (fits.delays_T10_fband1_13.p(:) < .05));
+% % hist_fits.d = fits.delays_T01_fband1_50.Z(time_inds & (fits.delays_T01_fband1_50.p(:) < .05));
+% hist_fits.e = fits.events.Z(time_inds & (fits.events.p(:) < .05));
+% hist_fits.m = fits.maxdescent.Z(time_inds & (fits.maxdescent.p(:) < .05));
+% 
 figure(1) 
 for f = fieldnames(hist_fits)'
 % 	temp = [hist_fits.(f{:}), hist_fits.(f{:}) + 2*pi, hist_fits.(f{:}) - 2*pi]; 
