@@ -104,7 +104,7 @@ end
 set(ax(ii), 'XTickLabel', seizure(mask));
 
 include_zero = lowCI <= 0 & hiCI >=0 & ~nanconf;
-theta_small = abs(theta) < pi/4;
+theta_small = abs(theta) < pi/4 & ~nanconf;
 
 for ii = 1:nP
 	mask = whichpair==pairs(ii) | whichpair == 0;
