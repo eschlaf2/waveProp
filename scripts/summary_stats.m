@@ -9,27 +9,11 @@
 theta = stats.theta;
 m1 = stats.m1;
 cconf = stats.conf;
-% cconf = real(cellfun(@(Z) circ_confmean(angle(Z(isfinite(Z)))), stats.dZ));
 nanconf = isnan(cconf);
 whichpair = stats.whichpair;
-[S, C, sigS, sigC, cvar] = deal(nan(size(stats, 1)));
-for ii = 1:size(stats, 1)
-	S(ii) = mean(imag(stats.dZ{ii}), 'omitnan');
-	C(ii) = mean(real(stats.dZ{ii}), 'omitnan');
-	sigS(ii) = std(imag(stats.dZ{ii}), 'omitnan') / sqrt(stats.N(ii));
-	sigC(ii) = std(real(stats.dZ{ii}), 'omitnan') / sqrt(stats.N(ii));
-% 	r = sqrt(sigS(ii)^2 + sigC(ii)^2);
-% 	r = max(sigS(ii), sigC(ii));
-	Y = S(ii) + 2*sigS(ii) * [1 -1];
-	X = C(ii) + 2*sigC(ii) * [1 -1];
-% 	cvar(ii) = atan(2*r/stats.R(ii));
-	[XX, YY] = meshgrid(linspace(X(1), X(2), 100), linspace(Y(1), Y(2), 100));	
-	cvar(ii) = range(unwrap(sort(angle(complex(XX(:), YY(:)))))) / 2;
-end
+
 %%
-% cconf(nanconf) = 2*stats.sigma(nanconf);
-cconf(nanconf) = cvar(nanconf);
-% cconf(nanconf) = pi;
+cconf(nanconf) = pi;
 % ... including variables for patient and seizure
 [patient, seizure] = deal(cell(size(stats, 1), 1));
 for ii = 1:size(stats, 1)
