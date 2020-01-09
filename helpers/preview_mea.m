@@ -14,6 +14,7 @@ im = nan(max(mea.Position));
 inds = sub2ind(size(im), mea.Position(:, 1), mea.Position(:, 2));
 im(inds) = mea.Data(1, :);
 ih = imagesc(im);
+colormap bone;
 th = title('');
 t = mea.Time();
 
