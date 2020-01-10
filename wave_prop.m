@@ -1,7 +1,7 @@
 function [wave_fit, mea] = wave_prop(mea, metric, varargin)
 % Inputs: 
 %	mea:		Matfile or struct with seizure epoch
-%	dataToFit:  which type of data to fit the plane to (delays, maxdescent, events) 
+%	metric:  which type of data to fit the plane to (delays, maxdescent, events) 
 % 
 % Name-value parameter pairs:
 %	fitMethod:  use 'bos' or 'nyc' method of fitting a plane to the data
@@ -10,7 +10,7 @@ function [wave_fit, mea] = wave_prop(mea, metric, varargin)
 %   T:          Time window to use for computing coherence in 'delays'
 %					data. 
 %					(default: 10) [s]
-%   halfWin:	Time window surrounding firing discharges for computing
+%   half_win:	Time window surrounding firing discharges for computing
 %					'maxdescent' and 'events'. 
 %					(default: 50) [ms]
 
