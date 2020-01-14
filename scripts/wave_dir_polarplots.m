@@ -1,12 +1,12 @@
 % pat = 'c7';
 % Requires Circular Statistics Toolbox (plotnum case 6)
-% fid = fopen('seizures2.txt');
-% A = textscan(fid, '%s %d'); 
-% pats = A{1}; seizures = A{2};
-% for ii = numel(pats):-1:1
-% 	files(ii) = dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pats{ii}, seizures(ii)));
-% end
-% fclose(fid);
+fid = fopen('seizures2.txt');
+A = textscan(fid, '%s %d'); 
+pats = A{1}; seizures = A{2};
+for ii = numel(pats):-1:1
+	files(ii) = dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pats{ii}, seizures(ii)));
+end
+fclose(fid);
 
 if ~exist('seizure', 'var'); seizure = '*'; elseif isnumeric(seizure), seizure = num2str(seizure); end
 if ~exist('files', 'var'); files = dir([pat '_Seizure' seizure '_Neuroport_10_10_wave_prop.mat']); end
@@ -368,10 +368,11 @@ end
     whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
     p = res(s).p(:, whichfields);
     p(p > sig) = nan;
-    plot(res(s).time, -log(p), '.', 'markersize', 20)
+%     plot(res(s).time, -log(p), '.', 'markersize', 20)
+	bar(res(s).time, -log(p), 'stacked')
 
-    legend(metrics)
-    title('p-values')
+    legend(rename_metrics(metrics))
+    title([pat ' p-values'])
 	ylabel('-log(p)')
 	xlabel('Time (s)')
 
