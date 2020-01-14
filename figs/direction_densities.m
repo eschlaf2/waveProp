@@ -17,6 +17,7 @@ time = mea.Time();
 if ~isfield(mea, 'firingRate'), [~, mea] = mua_firing_rate(mea); end
 
 f = {'delays_T10_fband1_13', 'events', 'maxdescent', 'delays_T01_fband1_13'};
+
 % f = {'delays_T01_fband1_13', 'delays_T10_fband1_50', 'delays_T01_fband1_50'};
 figure(2);
 for ii = 1:numel(f); subplot(numel(f),1,ii); plot_dir_simple(mea, fits.(f{ii})); title(rename_metrics(f{ii})); end
@@ -42,14 +43,15 @@ gridx1 = min(compute_times(time_inds))/1e3:.1:max(compute_times(time_inds))/1e3;
 gridx2 = linspace(-3*pi, 3*pi, 301);
 [x1, x2] = meshgrid(gridx1, gridx2);
 x1 = x1(:); x2 = x2(:);
+
 figure(1) 
 for f = fieldnames(hist_fits)'
 % 	temp = [hist_fits.(f{:}), hist_fits.(f{:}) + 2*pi, hist_fits.(f{:}) - 2*pi]; 
 	temp = angle(exp(1j * (hist_fits.(f{:}) - rotateby)));
 	temp = [temp(:) - 2*pi; temp(:); temp(:) + 2*pi];
-        ksdensity([repmat(ct.(f{:}), 3, 1) temp], [x1 x2], 'bandwidth', [5 .15*pi/3]);
+% 	ksdensity([repmat(ct.(f{:}), 3, 1) temp], [x1 x2], 'bandwidth', [5 .15*pi/3]);
 	
-%    [d, xi, bw] = ksdensity([repmat(ct.(f{:}), 3, 1) temp], 'bandwidth', .15*pi/3, 'numpoints', 500);
+   [d, xi, bw] = ksdensity(temp, gridx2, 'bandwidth', .15*pi/3);
     plot(xi, d/max(d), 'DisplayName', f{:}); hold on;
 	xlim([-pi pi])
 end
