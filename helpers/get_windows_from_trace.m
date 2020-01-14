@@ -21,6 +21,6 @@ if numel(sample_points) == 1  % if sample_points is a skipfactor, convert to sam
 	sample_points = 0:sample_points:length(data) - samples(end); 
 end
 
-[tt, ww] = ndgrid(samples, 1:sample_points:length(data) - samples(end));
+[tt, ww] = ndgrid(samples, sample_points);
 inds = tt + ww;
 windows = reshape(data(inds), size(tt));
