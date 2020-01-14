@@ -14,7 +14,7 @@ data = [data(:) position];
 
 T = clusterdata(data, ...
 	'distance', 'seuclidean', ... % standardized euclidean distance
-	'cutoff', .5, 'criterion', 'distance');  % Separate large gaps (this distance is somewhat arbitrary right now...)
+	'cutoff', .7, 'criterion', 'distance');  % Separate large gaps (this distance is somewhat arbitrary right now...)
 
 %%% For copy-paste on SCC
 % T = clusterdata(data, 'distance', 'seuclidean','cutoff', .5, 'criterion', 'distance'); 

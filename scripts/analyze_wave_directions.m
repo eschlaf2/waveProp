@@ -56,8 +56,8 @@ outfile.maxdescent = maxdescent;
 % outfile.falling = falling;
 % 
 disp('Computing wave directions from delays ...')
-T = .2;
-band = [0 50];
+T = .1;
+band = [300 3000];
 mea.params.T = T;
 mea.params.delay_band = band;
 [delays, mea] = wave_prop(mea, 'delays');
