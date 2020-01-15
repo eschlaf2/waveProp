@@ -10,4 +10,4 @@ function [coeff, score, explained] = pca_on_windows(windows)
 %   score: (w x t array) windows in PC space
 %   explained: (t x 1 vector) variance explained by each PC
 
-[coeff, score, ~, ~, explained] = pca(windows');
+[coeff, score, ~, ~, explained] = pca(windows', 'variableweights', 'variance');

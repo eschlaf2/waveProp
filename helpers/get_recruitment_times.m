@@ -8,7 +8,7 @@ function recruitment = get_recruitment_times(mea, varargin)
 %		e.g. get_recruitment_times(mea, 'mea');
 
 
-time = mea.Time();
+time = mea.Time; time = time();
 if ~isfield(mea, 'params'), mea.params = init_mea_params(); end
 [~, ~, mea] = mua_events(mea);
 
