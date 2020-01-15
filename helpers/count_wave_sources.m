@@ -31,7 +31,7 @@ MZ = MZ / sum(MZ);
 sources.max_density = MZ;
 sources.edges = edges;
 sources.peaks = pks;
-sources.locs = locs;
+sources.locs = edges(locs);
 sources.width = w;
 sources.prominence = p;
 
