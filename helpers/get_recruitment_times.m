@@ -21,12 +21,14 @@ fr = zscore(smoothdata(fr, 'gaussian', mea.SamplingRate / 2));  % smooth with 50
 peaks = smoothdata(fr > 2, 'movmean', mea.SamplingRate) >= 1;  % Highlight sustained periods of elevated firing
 recruitment_time = arrayfun(@(ii) time(find([diff(peaks(:, ii)); 1], 1)), 1:nCh);  % Get time of first peak
 recruitment_time(recruitment_time == time(end)) = nan;  % Exclude peaks at the last index
+recruitment_time(isoutlier(recruitement_time)) = nan;
 
 EOS_mask = time >= time(end) - mea.Padding(2) - 10;  % Isolate the end of the seizure
 tE = time(EOS_mask);
 troughs = smoothdata(fr(EOS_mask, :) < quantile(fr, .5), 'movmean', 5*mea.SamplingRate) >= 1;  % highlight sustained silence
 termination_time = arrayfun(@(ii) tE(find([diff(troughs(:, ii)); 1], 1)), 1:nCh);  % Get time of first peak
 termination_time(termination_time == time(end)) = nan;  % Exclude peaks at the last index
+termination_time(isoutlier(termination_time)) = nan;
 
 % Return results
 P = mea.Position;                   
