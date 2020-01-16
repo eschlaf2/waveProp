@@ -17,11 +17,20 @@ if nargin > 1, assignin('caller', varargin{1}, mea); end
 fr = zeros(size(mea.mua));
 [~, nCh] = size(fr);
 fr(mea.event_inds) = 1;  % Store firing times
-fr = zscore(smoothdata(fr, 'gaussian', mea.SamplingRate / 2));  % smooth with 500 ms gaussian kernel (merricks, 2016)
-peaks = smoothdata(fr > 2, 'movmean', mea.SamplingRate) >= 1;  % Highlight sustained periods of elevated firing
-recruitment_time = arrayfun(@(ii) time(find([diff(peaks(:, ii)); 1], 1)), 1:nCh);  % Get time of first peak
-recruitment_time(recruitment_time == time(end)) = nan;  % Exclude peaks at the last index
-recruitment_time(isoutlier(recruitment_time)) = nan;
+fr = smoothdata(fr, 'gaussian', mea.SamplingRate / 2) * mea.SamplingRate;  % smooth with 500 ms gaussian kernel (merricks, 2016)
+[pks, locs, w, p] = deal(cell(nCh, 1));
+for ii = 1:nCh, [pks{ii}, locs{ii}, w{ii}, p{ii}] = findpeaks(fr(:, ii), time, 'MinPeakWidth', 1); end
+
+
+recruitment_time = get_first(locs);  % get time of first peak
+width = get_first(w);
+height = get_first(pks);
+
+mask = isoutlier(recruitment_time);
+recruitment_time(mask) = nan;  % exclude outliers
+width(mask) = nan;
+height(mask) = nan;
+
 
 EOS_mask = time >= time(end) - mea.Padding(2) - 10;  % Isolate the end of the seizure
 tE = time(EOS_mask);
@@ -39,6 +48,16 @@ recruitment.pos = P;
 recruitment.addy = addy;
 recruitment.N_rec = sum(isfinite(recruitment_time));
 if recruitment.N_rec > 1, recruitment.rate = recruitment.N_rec / range(recruitment.time); else, recruitment.rate = nan; end
+recruitment.width = width;
+recruitment.heigth = height;
 
 recruitment.term_time = termination_time;
 recruitment.term_rate = sum(isfinite(termination_time)) / range(termination_time);
+
+end
+
+function X = get_first(C)
+	 idx = ~cellfun(@isempty, C);
+	 X = nan(size(C));
+	 X(idx) = cellfun(@(c) c(1), C(idx));
+end
