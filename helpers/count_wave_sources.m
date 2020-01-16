@@ -14,7 +14,7 @@ N = nan(numel(time), N_edges - 1);
 
 for tidx = numel(time):-1:1
 	mask = (tt >= (time(tidx) - halfwin)) & (tt <= (time(tidx) + halfwin));
-	N(tidx, :) = histcounts(Z(mask), edges, 'normalization', 'probability');
+	N(tidx, :) = histcounts(Z(mask), edges);
 end
 
 % win = gausswin(round(2*halfwin / diff(time(1:2)))) * ...
