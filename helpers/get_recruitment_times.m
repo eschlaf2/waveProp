@@ -49,7 +49,7 @@ recruitment.addy = addy;
 recruitment.N_rec = sum(isfinite(recruitment_time));
 if recruitment.N_rec > 1, recruitment.rate = recruitment.N_rec / range(recruitment.time); else, recruitment.rate = nan; end
 recruitment.width = width;
-recruitment.heigth = height;
+recruitment.height = height;
 
 recruitment.term_time = termination_time;
 recruitment.term_rate = sum(isfinite(termination_time)) / range(termination_time);
