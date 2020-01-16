@@ -23,7 +23,6 @@ win = gausswin(round(pi / 2 / diff(edges(1:2))))';
 Zdens = conv2(repmat(N(:, :), 1, 3), win, 'same');  % Circular padding and convolution
 Zdens = Zdens(:, N_edges-1:2*(N_edges-1));  % Take the middle of the result
 MZ = max(Zdens);
-MZ = MZ / sum(MZ);
 [pks, locs, w, p] = findpeaks(MZ);
 
 % peaks_mask = diff(circshift(MZ, 1)) > 0 & diff(MZ) <= 0 & zscore(MZ(1:end-1)) > 2;
