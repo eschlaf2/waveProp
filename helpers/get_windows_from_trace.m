@@ -2,7 +2,7 @@ function windows = get_windows_from_trace(data, samples, sample_points)
 % Extract windows surrounding points in time or sampled at a given
 % interval. 
 % Inputs:
-%	data: txk vector of the data
+%	data: t-by-k array
 %	samples: (vector) indices surrounding sample sample_points to return OR
 %			 (scalar) number of points to collect starting at sample_points
 %					  E.g. the following are the same:
