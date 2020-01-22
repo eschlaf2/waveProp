@@ -17,9 +17,9 @@ if nargin > 1, assignin('caller', varargin{1}, mea); end
 fr = zeros(size(mea.mua));
 [~, nCh] = size(fr);
 fr(mea.event_inds) = 1;  % Store firing times
-fr = smoothdata(fr, 'gaussian', mea.SamplingRate / 2) * mea.SamplingRate;  % smooth with 500 ms gaussian kernel (merricks, 2016)
+fr = smoothdata(fr, 'gaussian', mea.SamplingRate) * mea.SamplingRate;  % smooth with 1 second gaussian kernel
 [pks, locs, w, p] = deal(cell(nCh, 1));
-for ii = 1:nCh, [pks{ii}, locs{ii}, w{ii}, p{ii}] = findpeaks(fr(:, ii), time, 'MinPeakWidth', 1); end
+for ii = 1:nCh, [pks{ii}, locs{ii}, w{ii}, p{ii}] = findpeaks(fr(:, ii), time, 'MinPeakWidth', 1, 'MinPeakHeight', 2*nanstd(fr(:, ii))); end
 
 
 recruitment_time = get_first(locs);  % get time of first peak
@@ -31,13 +31,14 @@ recruitment_time(mask) = nan;  % exclude outliers
 width(mask) = nan;
 height(mask) = nan;
 
-
-EOS_mask = time >= time(end) - mea.Padding(2) - 10;  % Isolate the end of the seizure
+% Time when each recruited electrode stops firing for 5 seconds
+EOS_mask = time >= max(time(end) - mea.Padding(2) - 30, 10);  % Isolate the end of the seizure
 tE = time(EOS_mask);
 troughs = smoothdata(fr(EOS_mask, :) < quantile(fr, .5), 'movmean', 5*mea.SamplingRate) >= 1;  % highlight sustained silence
 termination_time = arrayfun(@(ii) tE(find([diff(troughs(:, ii)); 1], 1)), 1:nCh);  % Get time of first peak
 termination_time(termination_time == time(end)) = nan;  % Exclude peaks at the last index
-termination_time(isoutlier(termination_time)) = nan;
+termination_time(isnan(recruitment_time)) = nan;  % Only include recruited electrodes
+termination_time(isoutlier(termination_time)) = nan;  % Exclude outliers
 
 % Return results
 P = mea.Position;                   
