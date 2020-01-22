@@ -10,7 +10,7 @@ function recruitment = get_recruitment_times(mea, varargin)
 
 time = mea.Time; time = time();
 if ~isfield(mea, 'params'), mea.params = init_mea_params(); end
-[~, ~, mea] = mua_events(mea);
+if ~isfield(mea, 'event_inds'), [~, ~, mea] = mua_events(mea); end
 
 if nargin > 1, assignin('caller', varargin{1}, mea); end
 
