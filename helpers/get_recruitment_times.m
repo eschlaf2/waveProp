@@ -48,12 +48,12 @@ recruitment.time = recruitment_time;
 recruitment.pos = P;
 recruitment.addy = addy;
 recruitment.N_rec = sum(isfinite(recruitment_time));
-if recruitment.N_rec > 1, recruitment.rate = recruitment.N_rec / range(recruitment.time); else, recruitment.rate = nan; end
+recruitment.rate = get_rate(P, recruitment_time);
 recruitment.width = width;
 recruitment.height = height;
 
 recruitment.term_time = termination_time;
-recruitment.term_rate = sum(isfinite(termination_time)) / range(termination_time);
+recruitment.term_rate = get_rate(P, termination_time);
 
 end
 
@@ -61,4 +61,10 @@ function X = get_first(C)
 	 idx = ~cellfun(@isempty, C);
 	 X = nan(size(C));
 	 X(idx) = cellfun(@(c) c(1), C(idx));
+end
+
+function rate = get_rate(P, t)
+	[~, idx] = max(pdist([P t(:)]));
+	p = nchoosek(1:numel(t), 2);
+	rate = pdist(P(p(idx, :), :)) ./ diff(t(p(idx, :)));
 end
