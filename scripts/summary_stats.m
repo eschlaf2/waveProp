@@ -63,15 +63,11 @@ ax = gobjects(nP, 1);
 cdata = lines(7);
 
 % Rename metrics
-metricpairs = strrep(metricpairs, 'maxdescent', 'M');
-metricpairs = strrep(metricpairs, 'events', 'E');
-metricpairs = strrep(metricpairs, 'delays_T01_fband1_50', 'D');
-metricpairs = strrep(metricpairs, 'delays_T0p2_fband0_50', 'Ds');
-metricpairs = strrep(metricpairs, 'delays_T10_fband1_13', 'D10');
+metricpairs = rename_metrics(metricpairs);
 
 for ii = 1:nP
 	ax(ii) = subplot(nP, 1, ii);
-	mask = whichpair==ii | whichpair == 0;
+	mask = whichpair==pairs(ii) | whichpair == 0;
 	N = sum(mask);
 	
 % 	'XAxisLocation', 'origin', ...
@@ -80,7 +76,8 @@ for ii = 1:nP
 	set(ax(ii),'TickLength',[0 0], ...
 		'XTick', (1:N), ...
 		'XTickLabel', [], ...
-		'YGrid','on', ...  % 'YTick', (-pi:pi:pi), ...
+		'YGrid','on', ...  
+		'YTick', (-pi:pi/4:pi), ...
 		'YTickLabel', [], ...
 		'box', 'off', ...
 		'nextplot', 'replacechildren', ...
@@ -90,8 +87,11 @@ for ii = 1:nP
 end
 set(ax(ii), 'XTickLabel', seizure(mask));
 
+include_zero = lowCI <= 0 & hiCI >=0 & ~nanconf;
+theta_small = abs(theta) < pi/4 & ~nanconf;
+
 for ii = 1:nP
-	mask = whichpair==ii | whichpair == 0;
+	mask = whichpair==pairs(ii) | whichpair == 0;
 	N = sum(mask);
 	
 	x = [1;1] * (1:sum(mask));
@@ -113,9 +113,14 @@ for ii = 1:nP
 	scatter(ax(ii), ...
 		x(nanconf(mask)), y(nanconf(mask)), 90, .4*[1 1 1], ...
 		'd', 'filled');
+	scatter(ax(ii), ...
+		x(include_zero(mask)), y(include_zero(mask)), 90, [1 0 0]);
+	plot(ax(ii), ...
+		x(theta_small(mask)), y(theta_small(mask)), 'r*');
 	ylabel(ax(ii), sprintf('%s - %s \\color{white}...', ...
 		metricpairs{pairs(ii), 2}, metricpairs{pairs(ii), 1} ...
 		));
 	hold(ax(ii), 'off');
+	yline(ax(ii), 0);
 
 end

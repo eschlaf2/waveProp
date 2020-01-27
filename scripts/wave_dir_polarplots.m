@@ -1,22 +1,23 @@
 % pat = 'c7';
 % Requires Circular Statistics Toolbox (plotnum case 6)
-% fid = fopen('seizures2.txt');
-% A = textscan(fid, '%s %d'); 
-% pats = A{1}; seizures = A{2};
-% for ii = numel(pats):-1:1
-% 	files(ii) = dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pats{ii}, seizures(ii)));
-% end
-% fclose(fid);
+fid = fopen('seizures2.txt');
+A = textscan(fid, '%s %d'); 
+pats = A{1}; seizures = A{2};
+for ii = numel(pats):-1:1
+	files(ii) = dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pats{ii}, seizures(ii)));
+end
+fclose(fid);
 
-if ~exist('seizure', 'var'); seizure = '*'; else, seizure = num2str(seizure); end
+if ~exist('seizure', 'var'); seizure = '*'; elseif isnumeric(seizure), seizure = num2str(seizure); end
 if ~exist('files', 'var'); files = dir([pat '_Seizure' seizure '_Neuroport_10_10_wave_prop.mat']); end
 if ~exist('metrics', 'var')
 	metrics = {...
-		'delays_T0p2_fband0_50', ...
 		'maxdescent', ...
 		'events', ...
-		'delays_T01_fband1_50', ...
-		'delays_T10_fband1_13'}; 
+		'delays_T10_fband1_13', ...
+		'delays_T01_fband1_13'}; %, ...
+% 		'delays_T10_fband1_50', ...
+% 		'delays_T01_fband1_50'}; 
 end
 if ~exist('plotnum', 'var'); plotnum = 0; end
 if ~exist('sig', 'var'); sig = 5e-2; end
@@ -114,36 +115,80 @@ switch plotnum
 	case 7
 		% Plots histogram (normalized to percentage) of directions within 5 seconds
 		% of each time point at .1 second intervals. Each seizure and metric
+		
+		outer = 'metrics';  % 'metrics' or 'files'
+		
+		if strcmpi(outer, 'files')
+			outer = cellfun(@(f) f(strfind(f, ' ')+1:end), {res.name}, 'uni', 0);
+			inner = rename_metrics(metrics);
+		else
+			outer = rename_metrics(metrics);
+			inner = cellfun(@(f) f(strfind(f, ' ')+1:end), {res.name}, 'uni', 0);
+		end
 
 		edges = linspace(-pi, pi, 65);
 		halfwin = 5;  % (s)
-		N = cell(nF, 1);
-		for ii = 1:nF
-			tt = res(ii).time;
-			time = tt(1):.1:tt(end);
+		[N, time, Z] = deal(cell(nF, 1));
+		
+		for iF = 1:nF
+			tt = res(iF).time;
+			time{iF} = tt(1):.1:tt(end);
 			% Rotate Z so that the distributions are centered and it is easy to see
 			% deviations
-% 			rotateby = angle(sum(exp(1j*res(ii).Z), 'omitnan'));
+% 			rotateby = angle(sum(exp(1j*res(iF).Z), 'omitnan'));
 			rotateby = 0;
-			Z = angle(exp(1j * res(ii).Z) .* exp(-1j * rotateby));
-			[~, nM] = size(Z);
-			N{ii} = nan(numel(time), numel(edges) - 1, nM);
-			figure('Units', 'normalized', 'Position', [0 0 .5 1])
-			win = gausswin(round(2*halfwin / diff(time(1:2)))) * ...
-				gausswin(round(pi / 2 / diff(edges(1:2))))';
-			for m = 1:nM
-				for tidx = 1:numel(time)
-					mask = (tt >= (time(tidx) - halfwin)) & (tt <= (time(tidx) + halfwin));
-					N{ii}(tidx, :, m) = histcounts(Z(mask, m), edges);
+			Z{iF} = angle(exp(1j * (res(iF).Z - rotateby)));
+			[~, nM] = size(Z{iF});
+			N{iF} = nan(numel(time{iF}), numel(edges) - 1, nM);
+			
+			for iM = 1:nM
+				for tidx = 1:numel(time{iF})
+					mask = (tt >= (time{iF}(tidx) - halfwin)) & (tt <= (time{iF}(tidx) + halfwin));
+					N{iF}(tidx, :, iM) = histcounts(Z{iF}(mask, iM), edges);
 				end
-				subplot(nM, 1, m), 
-				Zdens = conv2(N{ii}(:, :, m), win, 'same');
+				
+			end
+		end
+		
+		nO = numel(outer);
+		nI = numel(inner);
+		h = gobjects(nO, 1);
+		
+		for iO = 1:nO
+			h(iO) = figure('Units', 'normalized', 'Position', [0 0 .5 1]);
+		end
+		
+		
+		for iO = 1:nO
+			
+			patname = strsplit(res(iF).name);
+			
+			figure(h(iO));
+			annotation('textbox', ...
+				'String', [patname{1} ' ' strrep(outer{iO}, '_', ' ')], ...
+				'Position', [0 0 1 1], ...
+				'FitBoxToText', true, ...
+				'LineStyle', 'none');
+			
+			for ii = 1:nI
+				h(iO); subplot(nI, 4, ii * 4 - (3:-1:1)), 
+				if all(strcmpi(outer, files))
+					iF = iO; 
+					iM = ii;
+				else
+					iF = ii; 
+					iM = iO;
+				end
+				win = gausswin(round(2*halfwin / diff(time{iF}(1:2)))) * ...
+					gausswin(round(pi / 2 / diff(edges(1:2))))';
+				Zdens = conv2(repmat(N{iF}(:, :, iM), 1, 3), win, 'same');
+				Zdens = Zdens(:, size(N{iF}, 2):2*size(N{iF}, 2));
 				Zdens = Zdens ./ max(sum(Zdens, 2), mean(sum(Zdens, 2))) * 100;
-				emilys_pcolor(time, edges(2:end), Zdens, 'clims', [0 5]); %, ...
+				emilys_pcolor(time{iF}, edges, Zdens, 'clims', [0 5]); %, ...
 		% 			'clims', [0 20]); 
 				hold on;
 				try
-				plot(tt, (angle((exp(1j * Z(:, m))))), 'c.');
+					plot(res(iF).time, (angle((exp(1j * Z{iF}(:, iM))))), 'c.');
 				catch ME
 					if ~strcmp(ME.identifier, 'MATLAB:griddedInterpolant:DegenerateGridErrId')
 						rethrow(ME)
@@ -158,15 +203,20 @@ switch plotnum
 
 				yticks(ytks);
 				yticklabels(ytklbl);
-				title(rename_metrics(metrics{m}))
+				xlim([min(cat(2, time{:})), max(cat(2, time{:}))]);
+				title(strrep(inner{ii}, '_', ' '))
+				
+				subplot(nI, 4, ii * 4);
+				plot(max(Zdens), edges, 'linewidth', 2); axis tight;
+				yticks(ytks);
+				yticklabels([]);
+				xlim([0 inf]);
+				grid on;
 			end
-			annotation('textbox', ...
-				'String', res(ii).name, ...
-				'Position', [0 0 1 1], ...
-				'FitBoxToText', true, ...
-				'LineStyle', 'none');
+			
+			
 			drawnow;
-			print(sprintf('figs/dens_%s', checkname(res(ii).name)), '-dpng');
+			print(sprintf('figs/dens_%s_%s', patname{1}, checkname(outer{iO})), '-dpng');
 		end
 
 
@@ -313,16 +363,18 @@ end
     case 4
     figure(4); fullwidth();
 
-    seizure = 1;
-    thresh = 5e-10;
+    s = 1;
 
     whichfields = find(sum(cell2mat(cellfun(@(f) strcmpi(f, fields), metrics, 'uni', 0)), 2));
-    p = res(seizure).p(:, whichfields);
-    p(p > thresh) = nan;
-    stem(res(seizure).time, -log(p), 'filled', 'linewidth', 2)
+    p = res(s).p(:, whichfields);
+    p(p > sig) = nan;
+%     plot(res(s).time, -log(p), '.', 'markersize', 20)
+	bar(res(s).time, -log(p), 'stacked')
 
-    legend(metrics)
-    title('p-values')
+    legend(rename_metrics(metrics))
+    title([pat ' p-values'])
+	ylabel('-log(p)')
+	xlabel('Time (s)')
 
 %%
     case 5
