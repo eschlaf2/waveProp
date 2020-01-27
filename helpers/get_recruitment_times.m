@@ -51,6 +51,7 @@ recruitment.N_rec = sum(isfinite(recruitment_time));
 recruitment.rate = get_rate(P, recruitment_time);
 recruitment.width = width;
 recruitment.height = height;
+recruitment.sd = nanstd(fr);
 
 recruitment.term_time = termination_time;
 recruitment.term_rate = get_rate(P, termination_time);
@@ -66,5 +67,5 @@ end
 function rate = get_rate(P, t)
 	[~, idx] = max(pdist([P t(:)]));
 	p = nchoosek(1:numel(t), 2);
-	rate = pdist(P(p(idx, :), :)) ./ diff(t(p(idx, :)));
+	rate = pdist(P(p(idx, :), :)) ./ abs(diff(t(p(idx, :))));
 end
