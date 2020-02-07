@@ -33,6 +33,7 @@
 % Get parameters and display them (for remote run tracking)
 if ~exist('params', 'var'); params = init_scm_params(); end
 disp(params.meta)
+rng(params.meta.seed);
 
 create_directory(params);
 run_simulation(params);

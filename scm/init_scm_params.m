@@ -114,9 +114,11 @@ p('subsample', Inf);  % Allow subsampling when making mea
 p('return_fields', {'Qe', 'Ve'});  % Qe required to make mea
 p('out_vars', {'Qe', 'Ve'});  % Define which variables you would like to visualize (can be any in IC)
 p('source', []); % Define fixed, rotating sources of excitation
+p('seed', rng(0));  % Set seed for repeatability
 
 if isstruct(options), G.parse(options); else, parse(G, options{:}); end
 meta = G.Results;
+meta.seed = rng(meta.seed);  % convert option to seed struct
 
 s = 0;
 while isempty(meta.sim_num)
