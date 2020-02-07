@@ -51,6 +51,7 @@ recruitment.N_rec = sum(isfinite(recruitment_time));
 recruitment.rate = get_rate(P, recruitment_time);
 recruitment.width = width;
 recruitment.height = height;
+recruitment.sd = nanstd(fr);
 
 recruitment.term_time = termination_time;
 recruitment.term_rate = get_rate(P, termination_time);

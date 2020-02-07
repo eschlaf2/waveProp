@@ -5,14 +5,12 @@ function T = cluster_wave_data(data, position)
 %	data: nx1 time of occurrence
 %   position: nx2 electrode locations
  
-data = [data(:) position];
-
 %%% Underlying algorithm
 % Y = pdist(data, 'seuclidean');  
 % Z = linkage(Y, 'single');
 % T = cluster(Z, 'cutoff', .5, 'criterion', 'distance');
 
-T = clusterdata(data, ...
+T = clusterdata([data(:) position], ...
 	'distance', 'seuclidean', ... % standardized euclidean distance
 	'cutoff', .7, 'criterion', 'distance');  % Separate large gaps (this distance is somewhat arbitrary right now...)
 
