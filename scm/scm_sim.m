@@ -39,8 +39,8 @@ create_directory(params);
 run_simulation(params);
 convert_to_mea(params.meta);
 
-fname = sprintf('%s/SCM/SCM_Seizure%d_Neuroport_%d_%d.mat', ...
-			pwd, params.meta.sim_num, params.meta.padding);
+fname = sprintf('%s/%s/%s_Seizure%d_Neuroport_%d_%d.mat', ...
+			pwd, params.meta.label, params.meta.label, params.meta.sim_num, params.meta.padding);
 paramfile = '';
 analyze_wave_directions;
 
