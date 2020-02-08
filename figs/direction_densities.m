@@ -24,8 +24,8 @@ for ii = 1:numel(f); subplot(numel(f),1,ii); plot_dir_simple(mea, fits.(f{ii}));
 
 %%
 compute_times = fits.events.computeTimes;
-% time_inds = compute_times >= (time(end) - mea.Padding(2) - 30) * 1e3;
-time_inds = compute_times > 0;
+time_inds = compute_times >= (time(end) - mea.Padding(2) - 30) * 1e3;  % use only last 30 seconds
+% time_inds = compute_times > 0;
 
 for ii = 1:numel(f)
     mask = time_inds & isfinite(fits.(f{ii}).p(:)) & (fits.(f{ii}).p(:) < .05);
