@@ -8,7 +8,7 @@ function res = compile_wave_prop(varargin)
 %     res = compile_wave_prop('pats', '*', 'seizures', '*');
 %       % this will pull pat/seizure pairs from seizures2.txt
 
-args = parse_inputs(p, varargin);
+args = parse_inputs(varargin);
 
 files = args.files;
 metrics = args.metrics;
@@ -41,7 +41,7 @@ for ii = 1:nF
 		for F = 'Zpxy'  % and each property
 			
 			[data, f] = ...  % match results to unique times
-				interpolate_data(F, res(ii).data.(fields{jj}));
+				interpolate_data(F, res(ii).data.(fields{jj}), time);
 			res(ii).(f)(:, jj) = data;  
 			mask = ...  % Remove values where fit is not significant
 				res(ii).data.(fields{jj}).p >= sig;
@@ -58,7 +58,7 @@ end
 
 %% HELPERS
 
-function [dataI, f] = interpolate_data(f, data)
+function [dataI, f] = interpolate_data(f, data, time)
 % Match wave properties to nearest wave time and rename f. Originally this
 % was to control for delay metric which only computed wave properties once
 % per second. Now, wave properties are computed at each discharge so this
@@ -95,7 +95,7 @@ end
 function args = parse_inputs(args)
 
 P = inputParser;
-p =@(argin) addParameter(P, argin{:});
+p =@(varargin) addParameter(P, varargin{:});
 
 % Defaults
 metrics = {...
