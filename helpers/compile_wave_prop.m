@@ -111,7 +111,7 @@ allMetrics = {...
 	'delays_T10_fband1_50', ...
 	'delays_T01_fband1_50'}; 
 
-p('pats', '*');
+p('pat', '*');
 p('seizure', '*');
 p('files', []);
 p('metrics', metrics, @(c) all(contains(c, allMetrics)));
@@ -122,10 +122,9 @@ parse(P, args{:});
 args = P.Results;
 
 % Cleaning
-if isnumeric(args.seizure), args.seizure = num2str(args.seizure); end
 if isempty(args.files)
-	if ischar(args.pats) && ischar(args.seizures)
-		if strcmpi([args.pats args.seizures], '**')
+	if ischar(args.pat) && ischar(args.seizure)
+		if strcmpi([args.pat args.seizure], '**')
 			fid = fopen('seizures2.txt');
 			A = textscan(fid, '%s %d'); 
 			pats = A{1}; seizures = A{2};
@@ -134,16 +133,16 @@ if isempty(args.files)
 			end
 			fclose(fid);
 		else
-			args.files = dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pats, seizures));
+			args.files = dir(sprintf('%s_Seizure%s_Neuroport_10_10_wave_prop.mat', args.pat, args.seizure));
 		end
 	else
 		
 		ii = 1;
-		for p = 1:numel(args.pats)
-			for s = 1:numel(args.seizures)
+		for p = 1:numel(args.pat)
+			for s = 1:numel(args.seizure)
 				try 
 					args.files(ii) = ...
-						dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', args.pats{p}, args.seizures(s)));
+						dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', args.pat{p}, args.seizure(s)));
 					ii = ii + 1;
 				catch ME
 					if ~strcmpi(ME.identifier, 'MATLAB:matrix:singleSubscriptNumelMismatch')
