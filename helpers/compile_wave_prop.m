@@ -1,4 +1,12 @@
 function res = compile_wave_prop(varargin)
+% Create <res>. Compiles computed wave properties from the files produced
+% after analyzing wave directions.
+% Inputs are in the form of name-value pairs
+%     res = compile_wave_prop('files', files);  % files is a struct
+%     res = compile_wave_prop('pats', pats);  % pats is a char array or
+%		cell of strings
+%     res = compile_wave_prop('pats', '*', 'seizures', '*');
+%       % this will pull pat/seizure pairs from seizures2.txt
 
 args = parse_inputs(p, varargin);
 
@@ -112,6 +120,8 @@ p('sig', 5e-2);
 parse(P, args{:});
 
 args = P.Results;
+
+% Cleaning
 if isnumeric(args.seizure), args.seizure = num2str(args.seizure); end
 if isempty(args.files)
 	if ischar(args.pats) && ischar(args.seizures)
@@ -141,10 +151,9 @@ if isempty(args.files)
 					end
 				end
 			end
-		end
-			
-			
-end
+		end	
+	end
 
 end
 
+end
