@@ -34,9 +34,9 @@ for ii = 1:nF
 	res(ii).time = get_unique_wavetimes(res(ii).data);  % Get the times of waves detected for each method (these should be identical, but prior analyses ran delays only every 1 second)
 
 	time = res(ii).time;
+	fields = fieldnames(res(ii).data);
 	[res(ii).Z, res(ii).Vx, res(ii).Vy] = ...
 		deal(zeros(length(time), length(fields)));
-	fields = fieldnames(res(ii).data);
 	for jj = 1:numel(fields)  % for each metric
 		for F = 'Zpxy'  % and each property
 			
