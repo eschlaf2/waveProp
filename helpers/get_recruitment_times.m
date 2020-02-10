@@ -17,7 +17,7 @@ if nargin > 1, assignin('caller', varargin{1}, mea); end
 fr = zeros(size(mea.mua));
 [~, nCh] = size(fr);
 fr(mea.event_inds) = 1;  % Store firing times
-fr = smoothdata(fr, 'gaussian', mea.SamplingRate / 2) * mea.SamplingRate;  % smooth with 1 second gaussian kernel
+fr = smoothdata(fr, 'gaussian', mea.SamplingRate / 2) * mea.SamplingRate;  % smooth with 500 ms gaussian kernel
 [pks, locs, w, p] = deal(cell(nCh, 1));
 for ii = 1:nCh, [pks{ii}, locs{ii}, w{ii}, p{ii}] = findpeaks(fr(:, ii), time, 'MinPeakWidth', 1, 'MinPeakHeight', 2*nanstd(fr(:, ii))); end
 
@@ -67,5 +67,5 @@ end
 function rate = get_rate(P, t)
 	[~, idx] = max(pdist([P t(:)]));
 	p = nchoosek(1:numel(t), 2);
-	rate = pdist(P(p(idx, :), :)) ./ abs(diff(t(p(idx, :))));
+	rate = abs(pdist(P(p(idx, :), :)) ./ diff(t(p(idx, :))));
 end

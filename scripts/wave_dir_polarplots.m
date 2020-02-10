@@ -1,12 +1,12 @@
 % pat = 'c7';
 % Requires Circular Statistics Toolbox (plotnum case 6)
-fid = fopen('seizures2.txt');
-A = textscan(fid, '%s %d'); 
-pats = A{1}; seizures = A{2};
-for ii = numel(pats):-1:1
-	files(ii) = dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pats{ii}, seizures(ii)));
-end
-fclose(fid);
+% fid = fopen('seizures2.txt');
+% A = textscan(fid, '%s %d'); 
+% pats = A{1}; seizures = A{2};
+% for ii = numel(pats):-1:1
+% 	files(ii) = dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pats{ii}, seizures(ii)));
+% end
+% fclose(fid);
 
 if ~exist('seizure', 'var'); seizure = '*'; elseif isnumeric(seizure), seizure = num2str(seizure); end
 if ~exist('files', 'var'); files = dir([pat '_Seizure' seizure '_Neuroport_10_10_wave_prop.mat']); end
@@ -29,88 +29,14 @@ nF = numel(files);
 switch plotnum
 	case 0
 	% Make res
-		clear res;
-        res(nF) = struct(...
-            'name', [], ...
-            'data', [], ...
-            'Z', [], ...
-            'time', [], ...
-            'p', [], ...
-            'Vx', [], ...
-            'Vy', []);
-
-        for ii = 1:nF
-			finfo = strsplit(files(ii).name, {'_', '.'});
-            res(ii).name = sprintf('%s %s', finfo{1}, finfo{2}(8:end));
-			res(ii).data = load(fullfile(files(ii).folder, files(ii).name), metrics{:});
-            fields = fieldnames(res(ii).data);
-			alltimes = cellfun(@(f) ...
-				res(ii).data.(f).computeTimes(:), ...
-				fields, 'uni', 0);
-			alltimes = cat(1, alltimes{:});
-            res(ii).time = unique(alltimes / 1e3, 'stable');
-			
-			
-			time = res(ii).time;  % - min(res.time);
-			[res(ii).Z, res(ii).Vx, res(ii).Vy] = ...
-				deal(zeros(length(time), length(fields)));
-			for jj = 1:numel(fields)
-				for f = 'Zpxy'
-
-					switch f
-						case {'Z', 'p'}
-							data = interp1(...
-								res(ii).data.(fields{jj}).computeTimes / 1e3, ...
-								res(ii).data.(fields{jj}).(f), time, 'nearest');
-						case 'x'
-							data = interp1(...
-								res(ii).data.(fields{jj}).computeTimes / 1e3, ...
-								res(ii).data.(fields{jj}).V(1, :), time, 'nearest');
-							f = 'Vx';
-						case 'y'
-							data = interp1(...
-								res(ii).data.(fields{jj}).computeTimes / 1e3, ...
-								res(ii).data.(fields{jj}).V(2, :), time, 'nearest');
-							f = 'Vy';
-					end
-					res(ii).(f)(:, jj) = data;
-					% Remove values where fit is not significant
-					mask = res(ii).data.(fields{jj}).p < sig;
-					res(ii).(f)(~mask, jj) = nan;
-					% Remove values where slope is zero in both directions
-					res(ii).(f)(all(abs(res(ii).data.(fields{jj}).beta(1:2, :)) < eps), jj) = nan;
-				end
-			end
-        end
-        
+		res = compile_wave_prop('files', files);
 		
     case 1
 
         figure(1); clf; fullwidth(true);
-        ax = gobjects(2*nF, 1);
-        for ii = 1:nF
-            fields = fieldnames(res(ii).data);
-            ax(ii) = subplot(2, nF, ii, polaraxes());
-            ax(ii + nF) = subplot(2, nF, ii + nF, polaraxes());
-            [ax(ii), ax(ii + nF)] = ...
-				plot_wave_polar(res(ii), ax(ii), ax(ii + nF));
-
-        end
-        legend(rename_metrics(fields), 'position', [.9 .55 0 0])
-        rlim = arrayfun(@(a) a.RLim(2), ax(1:nF));
-        for kk = 1:numel(ax)
-            if kk <= nF, ax(kk).RLim = [0 max(rlim)]; end
-            ax(kk).ThetaTickLabel = [];
-            ax(kk).RTickLabel = [];
-        end
-        ttl = @(s) annotation('textbox', ...
-            'string', s, ...
-            'Position', [.5 .05 0 0], ...
-            'FontSize', 18, 'FontWeight', 'bold', 'HorizontalAlignment', 'center', ...
-            'FitBoxToText', 'on', ...
-            'LineStyle', 'none');
-        ttl(pat)
+		plot_circular_trajectories(res);
 		
+
 %% Density plots
 	case 7
 		% Plots histogram (normalized to percentage) of directions within 5 seconds
@@ -118,107 +44,9 @@ switch plotnum
 		
 		outer = 'metrics';  % 'metrics' or 'files'
 		
-		if strcmpi(outer, 'files')
-			outer = cellfun(@(f) f(strfind(f, ' ')+1:end), {res.name}, 'uni', 0);
-			inner = rename_metrics(metrics);
-		else
-			outer = rename_metrics(metrics);
-			inner = cellfun(@(f) f(strfind(f, ' ')+1:end), {res.name}, 'uni', 0);
+		plot_direction_densities(res, outer)
+		
 		end
-
-		edges = linspace(-pi, pi, 65);
-		halfwin = 5;  % (s)
-		[N, time, Z] = deal(cell(nF, 1));
-		
-		for iF = 1:nF
-			tt = res(iF).time;
-			time{iF} = tt(1):.1:tt(end);
-			% Rotate Z so that the distributions are centered and it is easy to see
-			% deviations
-% 			rotateby = angle(sum(exp(1j*res(iF).Z), 'omitnan'));
-			rotateby = 0;
-			Z{iF} = angle(exp(1j * (res(iF).Z - rotateby)));
-			[~, nM] = size(Z{iF});
-			N{iF} = nan(numel(time{iF}), numel(edges) - 1, nM);
-			
-			for iM = 1:nM
-				for tidx = 1:numel(time{iF})
-					mask = (tt >= (time{iF}(tidx) - halfwin)) & (tt <= (time{iF}(tidx) + halfwin));
-					N{iF}(tidx, :, iM) = histcounts(Z{iF}(mask, iM), edges);
-				end
-				
-			end
-		end
-		
-		nO = numel(outer);
-		nI = numel(inner);
-		h = gobjects(nO, 1);
-		
-		for iO = 1:nO
-			h(iO) = figure('Units', 'normalized', 'Position', [0 0 .5 1]);
-		end
-		
-		
-		for iO = 1:nO
-			
-			patname = strsplit(res(iF).name);
-			
-			figure(h(iO));
-			annotation('textbox', ...
-				'String', [patname{1} ' ' strrep(outer{iO}, '_', ' ')], ...
-				'Position', [0 0 1 1], ...
-				'FitBoxToText', true, ...
-				'LineStyle', 'none');
-			
-			for ii = 1:nI
-				h(iO); subplot(nI, 4, ii * 4 - (3:-1:1)), 
-				if all(strcmpi(outer, files))
-					iF = iO; 
-					iM = ii;
-				else
-					iF = ii; 
-					iM = iO;
-				end
-				win = gausswin(round(2*halfwin / diff(time{iF}(1:2)))) * ...
-					gausswin(round(pi / 2 / diff(edges(1:2))))';
-				Zdens = conv2(repmat(N{iF}(:, :, iM), 1, 3), win, 'same');
-				Zdens = Zdens(:, size(N{iF}, 2):2*size(N{iF}, 2));
-				Zdens = Zdens ./ max(sum(Zdens, 2), mean(sum(Zdens, 2))) * 100;
-				emilys_pcolor(time{iF}, edges, Zdens, 'clims', [0 5]); %, ...
-		% 			'clims', [0 20]); 
-				hold on;
-				try
-					plot(res(iF).time, (angle((exp(1j * Z{iF}(:, iM))))), 'c.');
-				catch ME
-					if ~strcmp(ME.identifier, 'MATLAB:griddedInterpolant:DegenerateGridErrId')
-						rethrow(ME)
-					end
-					disp(ME)
-				end
-				hold off;
-				ytks = -pi:pi/2:pi;
-				ytklbl = cell(size(ytks));
-				ytklbl{2} = '-\pi/2'; ytklbl{4} = '\pi/2';
-				for y=ytks, yline(y); end  % grid doesn't show over pcolor
-
-				yticks(ytks);
-				yticklabels(ytklbl);
-				xlim([min(cat(2, time{:})), max(cat(2, time{:}))]);
-				title(strrep(inner{ii}, '_', ' '))
-				
-				subplot(nI, 4, ii * 4);
-				plot(max(Zdens), edges, 'linewidth', 2); axis tight;
-				yticks(ytks);
-				yticklabels([]);
-				xlim([0 inf]);
-				grid on;
-			end
-			
-			
-			drawnow;
-			print(sprintf('figs/dens_%s_%s', patname{1}, checkname(outer{iO})), '-dpng');
-		end
-
 
 %% quantify distributions		
 	case 6 

@@ -100,7 +100,7 @@ function meta = parse_meta(options)
 % Save and visualize
 [G, p] = get_parser();
 
-p('basename', 'SCM/SCM/SCM');
+p('basename', []);
 p('sim_num', []);
 p('save', true);  % Save output
 p('visualization_rate', 0);  % Show this many frames per second
@@ -114,9 +114,13 @@ p('subsample', Inf);  % Allow subsampling when making mea
 p('return_fields', {'Qe', 'Ve'});  % Qe required to make mea
 p('out_vars', {'Qe', 'Ve'});  % Define which variables you would like to visualize (can be any in IC)
 p('source', []); % Define fixed, rotating sources of excitation
+p('seed', rng);  % Set seed for repeatability
+p('label', 'SCM');
 
 if isstruct(options), G.parse(options); else, parse(G, options{:}); end
 meta = G.Results;
+if isempty(meta.basename), meta.basename = sprintf('%s/%s/%s', meta.label, meta.label, meta.label); end
+meta.seed = rng(meta.seed);  % convert option to seed struct
 
 s = 0;
 while isempty(meta.sim_num)
