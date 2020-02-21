@@ -1,6 +1,6 @@
 function [fx, fy] = phase_gradient(X)
 
-X = padarray(exp(1j*temp), [1 1], 'replicate');
+X = padarray(exp(1j*X), [1 1], 'replicate');
 A = X(:, 1:end-2);
 B = X(:, 2:end - 1);
 C = X(:, 3:end);
