@@ -3,9 +3,9 @@ function res = compile_wave_prop(varargin)
 % after analyzing wave directions.
 % Inputs are in the form of name-value pairs
 %     res = compile_wave_prop('files', files);  % files is a struct
-%     res = compile_wave_prop('pats', pats);  % pats is a char array or
+%     res = compile_wave_prop('pat', pats);  % pats is a char array or
 %		cell of strings
-%     res = compile_wave_prop('pats', '*', 'seizures', '*');
+%     res = compile_wave_prop('pat', '*', 'seizure', '*');
 %       % this will pull pat/seizure pairs from seizures2.txt
 
 args = parse_inputs(varargin);
@@ -129,9 +129,10 @@ if isempty(args.files)
 			A = textscan(fid, '%s %d'); 
 			pats = A{1}; seizures = A{2};
 			for ii = numel(pats):-1:1
-				args.files(ii) = dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pats{ii}, seizures(ii)));
+				files(ii) = dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', pats{ii}, seizures(ii)));
 			end
 			fclose(fid);
+			args.files = files;
 		else
 			args.files = dir(sprintf('%s_Seizure%s_Neuroport_10_10_wave_prop.mat', args.pat, args.seizure));
 		end
@@ -141,7 +142,7 @@ if isempty(args.files)
 		for p = 1:numel(args.pat)
 			for s = 1:numel(args.seizure)
 				try 
-					args.files(ii) = ...
+					args.files{ii} = ...
 						dir(sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', args.pat{p}, args.seizure(s)));
 					ii = ii + 1;
 				catch ME
