@@ -1,4 +1,4 @@
-function res = compile_wave_prop(varargin)
+function [res, metrics, sig] = compile_wave_prop(varargin)
 % Create <res>. Compiles computed wave properties from the files produced
 % after analyzing wave directions.
 % Inputs are in the form of name-value pairs
