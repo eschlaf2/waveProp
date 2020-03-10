@@ -46,7 +46,7 @@ switch plotnum
 		
 		plot_direction_densities(res, outer)
 		
-		end
+		
 
 %% quantify distributions		
 	case 6 
