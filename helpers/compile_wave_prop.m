@@ -122,6 +122,7 @@ parse(P, args{:});
 args = P.Results;
 
 % Cleaning
+if isnumeric(args.seizure), args.seizure = num2str(args.seizure); end
 if isempty(args.files)
 	if ischar(args.pat) && ischar(args.seizure)
 		if strcmpi([args.pat args.seizure], '**')
