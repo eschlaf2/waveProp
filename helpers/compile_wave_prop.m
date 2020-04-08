@@ -1,4 +1,4 @@
-function [res, metrics, sig] = compile_wave_prop(varargin)
+function res = compile_wave_prop(varargin)
 % Create <res>. Compiles computed wave properties from the files produced
 % after analyzing wave directions.
 % Inputs are in the form of name-value pairs
@@ -122,7 +122,6 @@ parse(P, args{:});
 args = P.Results;
 
 % Cleaning
-if isnumeric(args.seizure), args.seizure = num2str(args.seizure); end
 if isempty(args.files)
 	if ischar(args.pat) && ischar(args.seizure)
 		if strcmpi([args.pat args.seizure], '**')

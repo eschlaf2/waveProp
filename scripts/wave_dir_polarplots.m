@@ -46,16 +46,12 @@ switch plotnum
 		
 		plot_direction_densities(res, outer)
 		
-<<<<<<< HEAD
-=======
-		
->>>>>>> 93134f83f6cd8cbbca3067037c6a56491c9134d1
 
 %% quantify distributions		
 	case 6 
 
 		if ~exist('res', 'var'); res = compile_wave_prop; end
-		if ~exist('metrics', 'var'), metrics = fieldnames(res.data); end
+		if ~exist('metrics', 'var'), metrics = fieldnames(res(1).data); end
 		if ~exist('sig', 'var'), sig = 5e-2; end
 		nF = length(res);
 		metricpairs = nchoosek(metrics, 2);

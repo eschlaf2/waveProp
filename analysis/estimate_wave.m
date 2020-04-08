@@ -42,9 +42,9 @@ if finite > max(MIN_RATIO_FINITE * size(position,1), 3)  % check enough delay da
     end
 end
 
-if isnan(src_dir)
+if isnan(src_dir) && any(ismember({'v', 'verbose'}, lower(varargin)))
     fprintf('Unable to fit a plane to the delays in space\n');
-elseif nargin ==3 && strcmp(varargin{1}, 'plot')                        % Visualize the fit, if last function input is set.
+elseif nargin > 2 && ismember('plot', lower(varargin))                        % Visualize the fit, if last function input is set.
 %     figure
     scatter3(position(:,1), position(:,2), 1000 * delay, 200, 1000 * delay, 'filled');
     hold on    
