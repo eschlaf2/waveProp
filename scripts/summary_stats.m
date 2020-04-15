@@ -4,7 +4,17 @@
 % Load the table with comparison data
 % load('direction_stats.mat');  % This should have the stats and a variable with the metrics
 % pairs = [2 3];  % Ignore very short delay windows for now
-if ~exist('pairs', 'var'); pairs = 1:size(metricpairs, 1); end
+
+function fig = summary_stats(stats, metricpairs, varargin)
+if any(isa(varargin, 'Figure'))
+	which = isa(varargin, 'Figure');
+	fig = varargin{which}; clf(fig)
+	varargin(which) = [];
+else
+	fig = gcf; clf(fig)
+end
+
+pairs = 1:size(metricpairs, 1);
 
 % Extract variables from table
 theta = stats.theta;
@@ -55,8 +65,6 @@ toolow = lowCI < -pi;
 toohi = hiCI > pi;
 
 %% Make the figure
-% Clear the figure
-fig = figure(1); clf
 nP = length(pairs);
 ax = gobjects(nP, 1);
 
@@ -126,6 +134,9 @@ for ii = 1:nP
 
 end
 
-str = annotation('textbox', ...
+annotation('textbox', ...
 	'string', {'\circ := CI includes zero'; '* := \theta < \pi/4'}, ...
 	'Position', [.01 .9 .05 .04], 'FitBoxToText', true);
+fig.Tag = 'figs/compare_all.fig';
+
+end
