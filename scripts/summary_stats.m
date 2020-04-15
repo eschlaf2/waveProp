@@ -18,12 +18,13 @@ cconf(nanconf) = pi;
 % ... including variables for patient and seizure
 [patient, seizure] = deal(cell(size(stats, 1), 1));
 for ii = 1:size(stats, 1)
-	patient{ii} = stats.name{ii}{1};
-	seizure{ii} = stats.name{ii}{2};
+	info = strsplit(stats.filename{ii}, {'_', ' '});
+	patient{ii} = info{1};
+	seizure{ii} = [' ' info{2}(8:end)];
 end
 
 % Move SIM to the end
-mask = strcmpi(patient, 'sim');
+mask = strcmpi(patient, 'scm');
 reorder = @(X) [X(~mask); X(mask)];
 patient = reorder(patient);
 seizure = reorder(seizure);

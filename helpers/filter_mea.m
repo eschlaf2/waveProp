@@ -5,7 +5,7 @@ function [output, mea] = filter_mea(mea, bands, custom_band)
 %	mea: mea structure containing fields Data, Position, SamplingRate
 %	bands: cell or character string indicating which frequency band to
 %	       isolate. Default limits for each band are
-%				lfp: 2-50 Hz (these data are downsampled to 1 kHz)
+%				lfp: 1-50 Hz (these data are downsampled to 1 kHz)
 %				highg: 50-300 Hz
 %               mua: 300-3000 Hz
 %	custom_band: 1x2 array indicating custom frequency band. To use a
@@ -55,7 +55,7 @@ if any(strcmpi(bands, 'lfp'))
 	% Filter to 2-50 Hz using 150 order bp filter; downsample to 1000 Hz
 	disp('Filtering lfp band...')
 	bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
-		'CutoffFrequency1',2,'CutoffFrequency2',50, ...
+		'CutoffFrequency1',1,'CutoffFrequency2',50, ...
 		'SampleRate', SamplingRate);
 	skipfactor = max(round(SamplingRate / 1e3), 1);
 	temp = single(filtfilt(bpFilt, double(data)));
