@@ -3,10 +3,12 @@
 
 % Load the table with comparison data
 % load('direction_stats.mat');  % This should have the stats and a variable with the metrics
+%    OR
+% run WaveProp.summary_stats(fits)
 % pairs = [2 3];  % Ignore very short delay windows for now
 
 function fig = summary_stats(stats, metricpairs, varargin)
-if any(isa(varargin, 'Figure'))
+if any(isa(varargin, 'matlab.ui.Figure'))
 	which = isa(varargin, 'Figure');
 	fig = varargin{which}; clf(fig)
 	varargin(which) = [];
@@ -69,7 +71,7 @@ nP = length(pairs);
 ax = gobjects(nP, 1);
 
 % Plot the means first so it's easy to label
-cdata = lines(7);
+cdata = lines(nP);
 
 % Rename metrics
 metricpairs = rename_metrics(metricpairs);
@@ -137,6 +139,6 @@ end
 annotation('textbox', ...
 	'string', {'\circ := CI includes zero'; '* := \theta < \pi/4'}, ...
 	'Position', [.01 .9 .05 .04], 'FitBoxToText', true);
-fig.Tag = 'figs/compare_all.fig';
+fig.Tag = 'figs/summary_stats';
 
 end

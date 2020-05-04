@@ -3,7 +3,7 @@
 %
 % Peter Lakatos, modified by Julien Besle 02/12/2008
 
-function [tf, frq, coi] = compute_wavelet(data,low_frq,high_frq,adrate, omega)
+function [tf, frq, coi, W] = compute_wavelet(data,low_frq,high_frq,adrate, omega)
 
 if ~ismember(nargin,[4 5]) 
     fprintf (1, 'Usage: [tf, frq, coi] = compute_wavelet(data, low_frq, high_frq, samp_rate,[omega]))\n');
@@ -24,17 +24,17 @@ if size(data,1) == 1
 end
 
 
-for trial=1:size(data,2)
+for trial=num_tr:-1:1
 	if WB  % EDS2 3/27/2020 (waitbar not necessary for small sets)
-		a2=['trial ' num2str(trial)];
-		waitbar(trial/size(data,2), waitb,a2);
+		a2=['trial ' num2str(num_tr-trial+1)];
+		waitbar((num_tr-trial)/num_tr, waitb,a2);
 	end
     [wave,period,scale,coi] = basewave4(data(:,trial),adrate,low_frq,high_frq,omega,0);            
-    
+    if nargout > 3, W(:, :, trial) = wave; end
     po=abs(wave);
     % the phase of the different frequency wavelets would be:
     % ph=angle(wave);
-    if trial==1
+    if ~exist('tf', 'var')
         tf=zeros(size(po));
     end
     tf=tf+po;

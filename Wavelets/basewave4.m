@@ -99,7 +99,7 @@ for a1 = 1:fscale
     daughter = norm*exp(expnt);
     daughter = daughter.*(k > 0.);                          % Heaviside step function
 	wave(a1,:) = ifft(f.*daughter);                         % wavelet transform[Eqn(4)]
-    clear expnt,daughter;
+    clear expnt daughter;
 end
 
 period = fourier_factor*scale1;                                 % az �jfajta, fourier frekvenci�knak megfelelo period
