@@ -31,18 +31,18 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Get parameters and display them (for remote run tracking)
-if ~exist('params', 'var'); params = init_scm_params(); end
+if ~exist('params', 'var'); params = SCMParams; end
 disp(params.meta)
 try rng(params.meta.seed); catch ME; end
 
 create_directory(params);
 run_simulation(params);
-convert_to_mea(params.meta);
+convert_to_mea(params);
 
 fname = sprintf('%s/%s/%s_Seizure%d_Neuroport_%d_%d.mat', ...
-			pwd, params.meta.label, params.meta.label, params.meta.sim_num, params.meta.padding);
+			pwd, params.label, params.label, params.sim_num, params.padding);
 paramfile = '';
-analyze_wave_directions;
+% analyze_wave_directions;
 
 %% Subroutines
 function create_directory(params)
@@ -154,12 +154,14 @@ function convert_to_mea(PM)
 		'Path', sprintf('%s/%s/%s_Seizure%d_Neuroport_%d_%d.mat', ...
 			pwd, PM.label, PM.label, PM.sim_num, PM.padding) ...	 
 		);
-	qe_mat = rescale(single(qe_mat), 0, 500);  % range is based on MG49_43
+	
+% 	mea = add_noise(mea, 2);  % Add 3D brownian noise with snr=2; the spectra after this transformation looked similar to recorded seizures - could also use (much) higher snr pink noise
+	qe_mat = rescale(single(qe_mat), 0, 25);  % range is based on experimentation
 	mea.firingRate = reshape(qe_mat, size(mea.Data));
 	mea.event_inds = rate2events(mea);
 	mea.event_mat_size = size(mea.Data);
 	mea.params = init_mea_params();
-	mea.firingRate = mua_firing_rate(mea);
+% 	mea.firingRate = mua_firing_rate(mea);
 	fprintf('Saving %s ... ', mea.Path);
 	save(mea.Path, '-struct', 'mea');
 	m = matfile(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'Writable', true);
@@ -173,11 +175,27 @@ function convert_to_mea(PM)
 end
 
 %% Helpers
+
+function mea = add_noise(mea, snr_dB)
+	signal = mea.Data;
+	brown_noise = randnd(-2, [length(signal), max(mea.Position)]);  % brownian noise: -2; pink noise: -1
+	noise = brown_noise(:, mea.locs);
+	signal_power = rms(signal);
+	noise_power = rms(noise);
+	scale_factor = signal_power ./ (10^(log10(snr_dB)/2) .* noise_power);
+	noisy_sig = signal + scale_factor .* noise;
+	mea.Data = noisy_sig;
+
+end
 function event_inds = rate2events(mea)
-	lambda = mea.firingRate;
-	X = rand(size(lambda));
-	events = X > exp(-lambda / mea.SamplingRate);
-	event_inds = find(events);
+% 	lambda = mea.firingRate;
+% 	X = rand(size(lambda));
+% 	events = X > exp(-lambda / mea.SamplingRate);
+% 	event_inds = find(events);
+	
+	FR = double(-mea.Data);
+	FR = (FR - min(FR)) ./ std(FR);
+	[~, event_inds, ~, ~] = findpeaks(FR(:), 'MinPeakHeight', 2);  
 end
 
 function [source_drive] = set_source_drive(t, params)

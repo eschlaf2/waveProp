@@ -11,6 +11,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		Position
 		Time
 		SamplingRate = 1000
+		event_inds
 	end
 	
 	properties (Hidden = true)
@@ -36,10 +37,10 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		wave_fits
 		event_times
 		metrics
-		event_inds
 % 		flow
 % 		metrics
 		
+		Spectrum
 		BSI
 		WaveTimes
 		ExcludedChannels
@@ -54,10 +55,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		Active
 	end
 	
-% 	properties (SetObservable)
-% 		flow
-% 	end
-	
+
 	methods % init, setters and getters
 		
 		function mea = MEA(path, SR)
@@ -103,12 +101,15 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			mea.PeakRatio = pr;
 		end
 		function out = compute_cohgram(mea, varargin)
-			% out = mea.compute_cohgram(::'morlet'::)
+			% out = mea.compute_cohgram(::'morlet'::, ::'delays'::)
 			MW = false;
+			NODELAYS = true;
 			chars = cellfun(@ischar, varargin);
 			if ismember('morlet', lower(varargin(chars))), MW = true; end
+			if ismember('delays', lower(varargin(chars))), NODELAYS = false; end
+			
 			T = 1;
-			movingwin = [T .1];
+			movingwin = [T .01];
 			thresh = 5e-2; 
 			MIN_RATIO_FINITE = 0.2;
 	
@@ -147,6 +148,14 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			else
 				[C,phi,~,~,~,t,f,confC,~]=cohgramc(data1,data2,movingwin,params);
 				 t = t - mea.Padding(1);
+			end
+			if NODELAYS
+				out.C = C; 
+				out.phi = phi;
+				out.t = t;
+				out.f = f;
+				out.confC = confC;
+				return
 			end
 			[nt, nf, np] = size(C);
 % 			df = mean(diff(f)); 
@@ -195,6 +204,16 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			out.t = t;
 			out.f = f;
 			
+		end
+		
+		function S = get.Spectrum(mea)
+			S = mea.Spectrum;
+			if isempty(S)
+				[ss, frq] = mea.morlet_wavelet;
+				S.power = ss';
+				S.frq = frq;
+				mea.Spectrum = S;
+			end
 		end
 		function out = exclude_by_coh(mea, electrode)
 			% Excludes channels that have coh<.8 relative to electrode
@@ -270,12 +289,12 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			mea.Path = fullfile(file.folder, file.name);
 		end
 		
-		function mov = preview(mea, times, ax)
-			% mov = preview(times, ax=axes(figure) )
-			if nargin < 3, ax = axes(figure); end
+		function mov = preview(mea, times, ax, varargin)
+			% mov = preview(times, ax=axes(figure), ::imagesc directives:: )
+			if nargin < 3 || isempty(ax), ax = axes(figure); end
 			t_inds = mea.time2inds(times);
 			N = length(t_inds);
-			im = imagesc(ax, nan(max(mea.Position)));
+			im = imagesc(ax, nan(max(mea.Position)), varargin{:});
 			ttl = title(ax, '0');
 			mov(N) = getframe(ax);
 			for ii = 1:N
@@ -341,42 +360,8 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		end
 		function EI = get.event_inds(mea)
 			EI = mea.event_inds;
-			if ~isempty(EI) && ~iscell(EI)
-				EI = {EI, size(mea.Raw)};
-			end
-		end
-		function ET = get.event_times(mea)
-			ET = mea.event_times;
-			if isempty(ET)
-				if ~isempty(mea.event_inds)  % these are saved for SCM sims
-					[EI, N] = mea.event_inds{:};
-					[r, c] = ind2sub(N, EI);
-					ET = cell(N(2), 1);
-					for cc = unique(c)'
-						ET{cc} = mea.AllTime(r(c == cc));
-					end
-				else
-					data = mea.baseline_zscore(mea.mua, mea.AllTime);
-					Nch = size(data, 2);
-					ET = cell(Nch, 1);
-					for ch = 1:Nch
-						temp = mea.interp_nan(data(:, ch));
-						if ~any(abs(zscore(temp)) > mea.params.event_thresh)
-							continue
-						end
-						[~, inds] = findpeaks(-temp, mea.AllTime, ...
-							'minpeakdistance', mea.params.min_dist/1e3, ...
-							'minpeakheight', mea.params.event_thresh);  
-						ET{ch} = inds;
-					end
-				end
-				mea.event_times = ET;
-			end
-		end
-		
-		function events = get.mua_events(mea)
 			
-			if isempty(mea.event_inds)
+			if isempty(EI)
 				data = mea.baseline_zscore(mea.mua, mea.AllTime);
 				intervalM = mea.SRO / 1e3 * mea.params.min_dist;  % samples per MIN_DIST
 
@@ -392,11 +377,31 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 						'minpeakheight', mea.params.event_thresh);  
 					events(inds, ch) = true;
 				end
-				mea.event_inds = {find(events), size(events)};
-			else
-				events = false(mea.event_inds{2});
-				events(mea.event_inds{1}) = true;
+				EI = sparse(events);
+				mea.event_inds = EI;
+			elseif ~issparse(EI)
+				sz = size(mea.Raw);
+				[i, j] = ind2sub(sz, EI);
+				EI = sparse(i, j, true, sz(1), sz(2));
 			end
+			
+% 			if ~isempty(EI) && ~iscell(EI)
+% 				EI = {EI, size(mea.Raw)};
+% 			end
+		end
+		function ET = get.event_times(mea)
+			ET = mea.event_times;
+			if isempty(ET)
+				EI = mea.event_inds;
+				[r, ch] = find(EI);
+				times = mea.AllTime(r);
+				ET = {ch(:), times(:)};
+				mea.event_times = ET;
+			end
+		end
+		
+		function events = get.mua_events(mea)
+			events = mea.event_inds;
 		end
 		
 		function lfp_lo = get.lfp_lo(mea)
@@ -432,14 +437,6 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			if isempty(m)
 				m = s.all_metrics;
 				s.metrics = m;
-			end
-		end
-		function fits = get.Fits(s)
-			if isempty(s.Fits)
-				fits = WaveFits(s);
-				s.Fits = fits;
-			else
-				fits = s.Fits;
 			end
 		end
 		
@@ -538,18 +535,40 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		end
 		function D = delays(mea, times, varargin)
 			N = numel(times);
-			D(N) = Delays;
-			tic
-			for ii = 1:N
-				if ~mod(ii, 10)
-					fprintf('Computed delay %d/%d (%0.2f seconds)\n', ii-1, N, toc); 
-					tic; 
+			wng = warning;
+			warning('off');
+			D(N) = Delays(mea, times(N), varargin{:});
+			num_workers = getenv('NSLOTS');
+			if 1  %isempty(num_workers)
+				
+				tic
+				for ii = 1:N-1
+					if ~mod(ii, 10)
+						fprintf('Computed delay %d/%d (%0.2f seconds)\n', ii-1, N, toc); 
+						tic; 
+					end
+					t0 = times(ii);
+					D(ii) = Delays(mea, t0, varargin{:});		
 				end
-				t0 = times(ii);
-				D(ii) = Delays(mea, t0, varargin{:});		
+			else
+% 				clust = parcluster;
+% 				parpool(clust);				
+				delay_fun = @(t0) Delays(mea, t0, varargin{:});
+				parfor(ii = 1:N, str2double(num_workers))
+					warning('off');
+					t0 = times(ii);
+% 					D(ii) = Delays(mea, t0, varargin{:});
+					D(ii) = delay_fun(t0);
+					if ~mod(ii, 10)
+						fprintf('Computed delay %d/%d (parfor)\n', ii-1, N); 
+					end
+				end
+% 				delete(gcp('nocreate'));
 			end
 			D = WaveProp.resize_obj(D);
 			D.Name = mea.Name;
+			warning(wng);
+			
 		end
 	
 		function [wt, peaks] = get_wave_times(s, method, min_peak_height)
@@ -599,7 +618,128 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			fs = fs(fs > range(1) & fs < range(2));
 			S = pow2db(S.*fs.^2);
 		end
-		
+		function noisy_sig = add_noise(mea, snr_dB)
+			signal = mea.Data;
+			brown_noise = randnd(-2, [length(signal), max(mea.Position)]);  % brownian noise: -2; pink noise: -1
+			noise = brown_noise(:, mea.locs);
+			signal_power = rms(signal);
+			noise_power = rms(noise);
+			scale_factor = signal_power ./ (10^(log10(snr_dB)/2) .* noise_power);
+			noisy_sig = signal + scale_factor .* noise;
+			
+		end
+		function out = change_points(mea, data, thresh, min_dist)
+			% out = mea.change_points(data='fr',
+			% thresh=30*mea.SamplingRate, min_dist=mea.SamplingRate)
+			if nargin < 4 || isempty(min_dist), min_dist = 1; end
+			if nargin < 3 || isempty(thresh), thresh = 30; end
+			if nargin < 2 || isempty(data) 
+				data = 'fr';
+			end
+			if ischar(data)
+				data = validatestring(data, ...
+					{'fr', 'firing', 'spectrum', 'coherence', 'direction', ...
+					'mean_fr' 'isi', 'peak_height', 'lfp'});
+				switch data
+					case {'fr', 'firing'}
+						data = mea.firing_rate; 
+						data = zscore(data);
+						out.t = mea.Time;
+						thresh = thresh*mea.SamplingRate;
+						min_dist = min_dist * mea.SamplingRate;
+						stat = 'linear';
+					case 'spectrum'
+						S = mea.Spectrum;
+						data = zscore(pow2db(S.power));
+						out.frq = S.frq;
+						out.t = mea.Time;
+						thresh = thresh*mea.SamplingRate;
+						min_dist = min_dist * mea.SamplingRate;
+						stat = 'mean';
+					case 'coherence'
+						coh = mea.compute_cohgram;
+						coh.C(coh.C < coh.confC(1)) = nan;
+						data = squeeze(nanmean(coh.C, 3));
+						data(~isfinite(data)) = 0;
+						out.t = coh.t;
+						out.frq = coh.f;
+						data = zscore(data);
+						SR = 1 / diff(coh.t(1:2));
+						thresh = thresh * SR;
+						min_dist = min_dist * SR;
+						stat = 'mean';
+					case 'direction'
+						F = WaveProp.load(mea, 'metrics', {'D1xwh'});
+						F = F.D1xwh;
+						out.t = F.t0;
+						data = [0; diff_phase(F.Direction) ./ diff(F.t0)];
+						mask = isfinite(data);
+						data = data(mask);
+						out.t = out.t(mask);
+% 						thresh = nanstd(data);
+						thresh = 150;
+						min_dist = 2 / median(diff(F.t0));
+						stat = 'std';
+					case 'mean_fr'
+						data = mean(mea.firing_rate, 2);
+						out.t = mea.Time;
+						thresh = thresh/2 * mea.SamplingRate;
+						min_dist = min_dist * mea.SamplingRate;
+						stat = 'rms';
+					case {'isi', 'peak_height'}
+						lfp = -zscore(mea.lfp);
+						N = size(lfp, 2);
+						clear isi pks
+						for pp = N:-1:1
+							[pks{pp}, tpts{pp}] = ...
+								findpeaks(lfp(:, pp), mea.Time, ...
+								'MinPeakProminence', 2);
+							isi{pp} = diff(tpts{pp});
+							t{pp} = tpts{pp}(2:end);
+						end
+						if strcmpi(data, 'isi')
+							[t, so] = sort(cat(2, t{:}), 'ascend');
+							data = cat(2, isi{:});
+							data = data(so);
+							out.t = t;
+						else
+							[t, so] = sort(cat(2, tpts{:}), 'ascend');
+							data = cat(1, pks{:});
+							data = data(so);
+							out.t = t;
+						end
+						stat = 'linear';
+						min_dist = 10;
+					case 'lfp'
+						data = -zscore(mea.lfp);
+						out.t = mea.Time;
+						stat = 'linear';
+						thresh = mea.SamplingRate;
+						min_dist = min_dist * mea.SamplingRate;
+				end
+			end
+			out.data = data;
+			[q, r] = findchangepts(data', ...
+				'Statistic', stat, ...
+				'MinThreshold', thresh, ...
+				'MinDistance', round(min_dist));
+% 			[q, r] = findchangepts(data', ...
+% 				'Statistic', stat, ...
+% 				'MaxNumChanges', 5, ...
+% 				'MinDistance', min_dist);
+			out.CP1 = q(:)';
+			out.r1 = r;
+			mask = false(size(data, 1), 1);
+			mask(q) = true;
+			groups = cumsum(mask) + 1;
+			out.group = uint16(groups);
+			[q, r] = findchangepts(data', ...
+				'Statistic', 'mean', ...
+				'MinThreshold', thresh/10, ...
+				'MinDistance', round(min_dist));
+			out.CP2 = q(:)';
+			out.r2 = r;
+		end
 		function [S, frq, coi, W] = morlet_wavelet(mea, data, fs, range, varargin)
 			% [S, frq, coi, W] = mea.morlet_wavelet(data=Data, fs=SamplingRate, range=[1 50], ::'mean'::)
 			if nargin < 4 || isempty(range), range = [1 50]; end
@@ -669,23 +809,36 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			seizure = data{2}(8:end);
 		end
 		
+		
 		function data = filter(data, sampling_rate, band)
-			if band(2) > sampling_rate / 2
-				band(2) = sampling_rate / 2 - 1;
+        % data = filter(data, sampling_rate, band);  % (static)
+			if band(2) > sampling_rate / 2 / 1.1
+				band(2) = (sampling_rate / 2 - 1) / 1.1;
 				fprintf('Setting CutoffFrequency2 to %.1f\n', band(2)); 
 			end
 % 			bpFilt = designfilt('bandpassiir','FilterOrder',150, ...
 % 				'HalfPowerFrequency1',band(1),'HalfPowerFrequency2',band(2), ...
 % 				'SampleRate', sampling_rate);
 			if band(1) == 0
-				bpFilt = designfilt('lowpassfir', 'filterorder', 25, ...
+				bpFilt = designfilt('lowpassfir', 'filterorder', 150, ...
 					'passbandfrequency', band(2), ...
 					'stopbandfrequency', 1.1*band(2), ...
 					'samplerate', sampling_rate);
+% 				bpFilt = designfilt('lowpassiir', ...
+% 					'PassbandFrequency', band(2), ...
+% 					'StopbandFrequency', 1.1*band(2), ...
+% 					'PassbandRipple', .5, 'StopbandAttenuation', 65, ...
+% 					'SampleRate', sampling_rate);
 			else
 				bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
-					'CutoffFrequency1',band(1),'CutoffFrequency2',band(2), ...
+					'CutoffFrequency1',band(1),'Cutofffrequency2',band(2), ...
 					'SampleRate', sampling_rate);
+% 				bpFilt = designfilt('bandpassiir', ...
+% 					'StopbandFrequency1', .1 * band(1), 'PassbandFrequency1', band(1), ...
+% 					'PassbandFrequency2', band(2), 'StopbandFrequency2', 1.1*band(2), ...
+% 					'StopbandAttenuation1', 65, 'PassbandRipple', .5, ...
+% 					'StopbandAttenuation2', 65, 'SampleRate', sampling_rate, ...
+% 					'MatchExactly', 'passband');
 			end
 			data = single(filtfilt(bpFilt, double(data)));
 		end
@@ -767,7 +920,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 				'linewidth', 2, ...
 				'displayname', 'lfp');
 			mn_fr = nanmean(s.firing_rate, 2);
-			frline(3) = plot(ax, s.Time, mn_fr ./ nanstd(mn_fr), ...
+			frline(3) = plot(ax, s.Time, mn_fr ./ nanstd(mn_fr) - pi, ...
 				'color', (cmap(2, :) + .8)/2, ...
 				'linewidth', 2, ...
 				'displayname', 'FR');
@@ -775,7 +928,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			for ii = 1:numel(s.metrics)
 				m = s.metrics{ii};
 				if strcmp(m, 'F'), sz = 3; else, sz = 8; end
-				dir(ii) = scatter(ax, s.Fits.(m).t0, s.Fits.(m).Direction, ...
+				dir(ii) = scatter(ax, s.Fits.(m).time, s.Fits.(m).Direction, ...
 					sz, 'filled', 'MarkerFaceAlpha', .8, ...
 					'DisplayName', m);
 			end
@@ -785,6 +938,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 				'', '\pi/2', '', '\pi'});
 			ylabel(ax, {'Direction', 'Normalized Signal'})
 			xlabel(ax, 'Time (s)');
+			title(ax, [s.patient s.seizure]);
 			ax.NextPlot = NP;
 			fr.ax = ax;
 			fr.frline = frline;

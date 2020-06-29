@@ -9,6 +9,8 @@ function res = init_scm_params(varargin)
 % 		'IC', {'dVe', 1} ...
 % 		);
 
+res.argin = varargin;
+
 %%%% Adjust values as name-value pairs %%%%
 	res.meta = parse_meta(varargin); 
 		% basename             save                 sim_num

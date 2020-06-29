@@ -4,17 +4,16 @@ classdef WaveProp
 		Name
 		Vx = nan
 		Vy = nan
-		Magnitude = nan
-		Direction = nan
 		p = nan
 		Beta = nan(1, 6)
 		Curvature = nan
 		Data
-		t0
+		time
 		sig = 0.05
 		NClust
 		ClustSize
 		Quadratic = false
+		RotateBy = 0
 % 		HalfWin
 % 		FBand
 	end
@@ -23,28 +22,168 @@ classdef WaveProp
 % 		t_inds
 % 		res
 		
+		Magnitude
+		Direction
 		Time
 		Position
 		scale_quiver = 1
 		complexZ
-		
+		Inds = []
+		Early = [-Inf 25]
+		Late = [30 Inf]
+		MinDetections = 100
 	end
 	
 	properties (Hidden = true)
 		WPParamNames = "Quadratic"
+		t0
 	end
 	
 	properties (Dependent = true, Hidden = true)
-		time
+
 		Z
 		mask
 		logp
 		NormedMagnitude
+		Phi_mean_early
+		Phi_mean_late
+		Phi_std_early
+		Phi_std_late
+		First_detection
+		N_detections_early
+		N_detections_late
+	end
+	
+	methods  % Getters and Setters
+		function inds = get.Inds(s)
+			inds = s.Inds;
+			if isempty(inds)
+				inds = (1:numel(s.t0))';
+			end
+		end
+		function obj = set.Beta(obj, val)
+			assert(isempty(val) || any(size(val) == 6));
+			if isempty(val) || size(val, 2) == 6
+				obj.Beta = val;
+			else
+				obj.Beta = val';
+			end
+		end
+		function beta = get.Beta(obj)
+			beta = obj.Beta(obj.Inds, :);
+		end
+		function mgn = get.NormedMagnitude(obj)
+			mgn = obj.Magnitude;
+			mgn(isoutlier(mgn)) = nan;
+			mgn = (mgn - nanmean(mgn)) / nanstd(mgn);
+			mgn = mgn(obj.Inds);
+		end
+		function logp = get.logp(s)
+			logp = -log(s.p)/log(5);
+			logp = logp(s.Inds);
+		end
+		function Z = get.complexZ(s)
+			Z = complex(s.Vx, s.Vy);
+			Z = Z(s.Inds);
+		end
+		function mask = get.mask(s)
+			M = sqrt(s.Vx.^2 + s.Vy.^2);
+			M(M > 1e6) = nan;
+			M(isoutlier(M)) = nan;
+			M = M(s.Inds);
+			mask = s.p > s.sig | isnan(M);
+		end
+		function D = get.Data(s)
+			if size(s.Data, 1) ~= numel(s.t0)
+				time_dim = find(size(s.Data) == numel(s.t0));
+				if isempty(time_dim)
+					D = reshape(s.Data, [numel(s.t0) size(s.Data)]);
+				else
+					D = shiftdim(s.Data, time_dim-1);
+				end
+			else
+				D = s.Data;
+			end
+			D = D(s.Inds, :, :);
+		end
+		function time = get.time(s)
+			time = s.t0;
+			time = time(s.Inds);
+		end
+		function Z = get.Z(s)
+			Z = s.Direction;
+			Z = Z(s.Inds);
+		end
+		function Curvature = get.Curvature(s)
+			Curvature = s.Curvature;
+			Curvature(s.mask) = nan;
+			Curvature = Curvature(s.Inds);
+		end
+		function RB = get.RotateBy(s)
+			RB = s.RotateBy .* ones(size(s.Vx));
+			RB = RB(s.Inds);
+		end
+		function D = get.Direction(s)
+			D = atan2(s.Vy, s.Vx);
+			D = D(s.Inds);
+			D(s.mask) = nan;
+			D = D - s.RotateBy;
+			D = angle(exp(1j * D));  % Keep in range [-pi pi]
+		end
+		function M = get.Magnitude(s)
+			M = sqrt(s.Vx.^2 +  s.Vy.^2) / 400;  % Fits return electrodes/second
+			M(s.mask) = nan;
+			M = M(s.Inds);
+		end
+		function psig = get.p(s)
+			psig = s.p(s.Inds);
+		end
+		
+		%% Summary stats
+		function e = early(s)
+			e = s.time > s.Early(1) & s.time < s.Early(2);
+		end
+		function l = late(s)
+			l = s.time > s.Late(1) & s.time < s.Late(2);
+		end
+		function phimn = get.Phi_mean_early(s)
+			phimn = circ_mean(s.Direction(s.early), [], [], 'omitnan');
+			phimn(s.N_detections_early < s.MinDetections) = nan;
+			phimn = angle(exp(1j*phimn));  % keep in range [-pi pi]
+		end
+		
+		function phimn = get.Phi_mean_late(s)
+			phimn = circ_mean(s.Direction(s.late), [], [], 'omitnan');
+			phimn(s.N_detections_late < s.MinDetections) = nan;
+			phimn = angle(exp(1j*phimn));  % keep in range [-pi pi]
+		end
+		function phisd = get.Phi_std_early(s)
+			phisd = circ_std(s.Direction(s.early), [], [], 'omitnan');
+			phisd(s.N_detections_early < s.MinDetections) = nan;
+		end
+		function phisd = get.Phi_std_late(s)
+			phisd = circ_std(s.Direction(s.late), [], [], 'omitnan');
+			phisd(s.N_detections_late < s.MinDetections) = nan;
+		end
+		function t1 = get.First_detection(s)
+			times = [s.time; nan];
+			% t1 = times(find(isfinite(s.Direction), 1));
+			t1 = quantile(times(isfinite(s.Direction)), .025);
+		end
+		function nd_early = get.N_detections_early(s)
+			nd_early = numfinite(s.Direction(s.early));
+		end
+		function nd_late = get.N_detections_late(s)
+			nd_late = numfinite(s.Direction(s.late));
+		end
+		
 	end
 	
 	methods 
+		
+		%% Plotting
 		function ax = plot(obj, varargin)
-			% ax = plot(type='2D', t0, ax); % if object has only one time point, t0=obj.t0
+			% ax = plot(obj, type='2D', t0, ax); % if object has only one time point, t0=obj.time
 			directive = '';
 			chars = cellfun(@ischar, varargin);
 			if any(chars), directive = varargin{chars}; varargin(chars) = []; end
@@ -56,55 +195,38 @@ classdef WaveProp
 			end
 		end
 		function ax = plot3D(obj, varargin)
-			% ax = plot(t0, ax); % if object has only one time point, t0=obj.t0
+			% ax = plot(obj, t0, ax); % if object has only one time point, t0=obj.time
 			[ax, tt] = WaveProp.parse_plot_inputs(varargin{:});
-			if numel(obj.t0) == 1
+			if numel(obj.time) == 1
 				F = obj;
 				units = '';
 			else				
-				[~, ind] = min((obj.t0 - tt).^2);
+				[~, ind] = min((obj.time - tt).^2);
 				F = obj.sub(ind);
 				F.Magnitude = obj.NormedMagnitude(ind);
 				units = 'std';
 			end
-			
-			N = size(F.Data);
-			[p1, p2] = ind2sub(N, find(isfinite(F.Data)));
-			scatter3(ax, p1, p2, F.Data(isfinite(F.Data)), [], F.Data(isfinite(F.Data)), 'filled'); 
+			data = squeeze(F.Data);
+			N = size(data);
+			[p1, p2] = ind2sub(N, find(isfinite(data)));
+			scatter3(ax, p1, p2, F.Data(isfinite(data)), [], F.Data(isfinite(data)), 'filled'); 
 			hold(ax, 'on');
 			[xx, yy] = ndgrid(1:N(1), 1:N(2));
 			zfit = F.Beta(1) + F.Beta(2) * xx + F.Beta(3) * yy;
-			im = surf(ax, xx, yy, min(F.Data(:)) * ones(N), F.Data, 'linestyle', 'none'); 
+			im = surf(ax, xx, yy, min(F.Data(:)) * ones(N), data, 'linestyle', 'none'); 
 			im.Tag = 'Data';
 			surfax = surf(ax, xx, yy, zfit, 'linestyle', 'none', 'facealpha', .5);
 			surfax.Tag = 'Fit';
-			title(ax, sprintf('T=%.2f\np=%.4g\nspeed=+%.2f%s', F.t0, F.p, F.Magnitude, units)); 
+			title(ax, sprintf('T=%.2f\np=%.4g\nspeed=+%.2f%s', F.time, F.p, F.Magnitude, units)); 
 			hold(ax, 'off');
-			ax.Tag = checkname(['figs' filesep obj.Name '_' class(obj) '_' num2str(F.t0) '_plot3D']);
+			ax.Tag = checkname(['figs' filesep obj.Name '_' class(obj) '_' num2str(F.time) '_plot3D']);
 			
 		end
-		function mgn = get.NormedMagnitude(obj)
-			mgn = obj.Magnitude;
-			mgn(isoutlier(mgn)) = nan;
-			mgn = (mgn - nanmean(mgn)) / nanstd(mgn);
-		end
-		function t0 = get.t0(obj)
-			t0 = obj.t0(:);
-		end
-		function obj = set.Beta(obj, val)
-			assert(isempty(val) || any(size(val) == 6));
-			if isempty(val) || size(val, 2) == 6
-				obj.Beta = val;
-			else
-				obj.Beta = val';
-			end
-		end
-		
 		function ax = plot2D(s, varargin)
-			% ax = plot2D(tt, ax)
+			% ax = plot2D(obj, tt, ax)
 			[ax, tt] = WaveProp.parse_plot_inputs(varargin{:});
 			if ndims(s.Data) == 3
-				[~, which_t] = min(abs(tt - s.t0));
+				[~, which_t] = min(abs(tt - s.time));
 				data = s.Data(:, :, which_t);
 				vx = s.Vx(which_t);
 				vy = s.Vy(which_t);
@@ -122,9 +244,89 @@ classdef WaveProp
 				'LineWidth', 2, ...
 				'MaxHeadSize', 1)
 			hold(ax, 'off')
-			ax.Tag = checkname(['figs' filesep obj.Name '_' class(obj) '_' num2str(F.t0) '_plot2D']);
+			ax.Tag = checkname(['figs' filesep s.Name '_' class(s) '_' num2str(tt) '_plot2D']);
+		end
+		function [H, centers, T] = hist(obj, window, mean_center, show_directions, h)
+			% [H, edges, T] = hist(window=1, mean_center=true, show_directions=true, h=gcf)
+			
+			if nargin < 5, h = gcf; end
+			if nargin < 4 || isempty(show_directions), show_directions = true; end
+			if nargin < 3 || isempty(mean_center), mean_center = true; end
+			if nargin < 2 || isempty(window), window = 1; end
+			t = obj.time;
+			if mean_center
+				obj.Direction = angle(exp(1j*(obj.Direction - obj.mean)));
+			end
+% 			dir = exp(obj.Vx + 1j*obj.Vy);
+			T = t(1):.01:t(end)+.01;
+			edges = linspace(-pi, pi, 65);
+			H = nan(length(edges)-1, length(T));
+			for ii = 1:length(T)
+				t_inds = abs(t - T(ii)) <= window/2;
+				dir = obj.Direction(t_inds);
+				H(:, ii) = histcounts(dir, edges) ./ window;
+			end
+            TL = tiledlayout(h, 1, 9);
+            ax_summ = nexttile(TL, [1, 2]);
+            ax_main = nexttile(TL, [1, 7]);
+            
+
+			win = gausswin(round(pi/4 / diff(edges(1:2)))) .* gausswin(round(window ./ diff(T(1:2))))';
+			win = win / sum(win, 'all');
+			H = [H; H; H];
+			centers = unwrap(repmat(edges(1:end-1)' + diff(edges(1:2)/2), 3, 1)) - 2*pi;
+			H = conv2(H, win, 'same');
+			angle_mask = abs(centers) <= pi;
+			centers = centers(angle_mask);
+			H = H(angle_mask, :);
+			contourf(ax_main, T, centers, H, quantile(H(:), .1:.05:.9), 'linestyle', 'none'); %conv2(H, ones(4, window/2*1e3)/(2*window*1e3), 'same'));
+			if show_directions
+				NP = ax_main.NextPlot;
+				ax_main.NextPlot = 'add';
+				plot(ax_main, obj.time, obj.Direction, '.', 'markersize', 10);
+				ax_main.NextPlot = NP;
+			end
+			colorbar(ax_main);
+            
+            
+			
+% 			axis(ax, 'xy');
+			plot(ax_summ, smoothdata(max(H, [], 2)), centers, 'linewidth', 2);
+			axis(ax_summ, 'tight');
+			xticks(ax_summ, []); yticks(ax_summ, []);
+			xlabel(ax_main, 'Time (s)')
+			ylabel(ax_main, 'Direction')
+            
+            ax_main.Tag = 'Main';
+            ax_summ.Tag = 'Summ';
+% 			SR = 1/min(diff(t));
+% 			W = ones(floor(SR * window), 1);
+% 			T = min(t):1/SR:max(t)+1/SR;
+% 			D = zeros(size(T));
+% 			t_inds = interp1(T, 1:length(T), t, 'nearest');
+% 			D(t_inds) = dir;
+		end
+		function [d, xi, bw] = ksdensity(obj, ax, rotateby, xres, bw, varargin)
+			% [d, xi, bw] = ksdensity(ax=gca, rotateby=0, xres=pi/500, bw=.15*pi/3, ::plot directives::)
+			if nargin < 5 || isempty(bw), bw = .15*pi/3; end
+			if nargin < 4 || isempty(xres), xres = 500; end
+			if nargin < 3 || isempty(rotateby), rotateby = 0; end
+			if nargin < 2 || isempty(ax), ax = gca; end
+			if rotateby ~= 0
+				temp = angle(exp(1j * (obj.Direction - rotateby)));
+			else
+				temp = obj.Direction;
+			end
+			temp = [temp(:) - 2*pi; temp(:); temp(:) + 2*pi];
+		% 	ksdensity([repmat(ct.(f{:}), 3, 1) temp], [x1 x2], 'bandwidth', [5 .15*pi/3]);
+			gridx2 = linspace(-3*pi, 3*pi, 6*xres + 1);
+			[d, xi, bw] = ksdensity(temp, gridx2, 'bandwidth', bw);
+% 			plot(ax, xi, d/max(d), varargin{:});
+			plot(ax, xi, d, varargin{:});
+			xlim(ax, [-pi pi])
 		end
 		
+		%% Main
 		function obj = compile_results(obj, varargin)
 			% obj = compile_results(::'nocluster'::)
 			CLUSTER = true;
@@ -154,53 +356,18 @@ classdef WaveProp
 			temp(locs) = data;
 			obj.Data = single(temp);
 		end
-		
-		function sref = subsref_nightmare(obj, s)
-			
-			switch s(1).type
-				case '.'
-% 					mtd = methods(obj, '-full');
-% 					staticM = contains(mtd, 'Static') & contains(mtd, s(1).subs);
-% 					if any(staticM)
-% 						s(2).subs = [obj, s(2).subs];
-% 					end
-					sref = builtin('subsref', obj, s);
-				case '()'
-					if numel(obj) > 1
-						sref = builtin('subsref', obj, s);
-						return
-					end
-					sref = obj;
-					N = numel(obj.t0);
-					for f = string(fieldnames(obj)')
-						temp = obj.(f);
-						sz = size(temp);
-						if strcmpi(f, 'data'), dim = 3; else, dim = 1; end
-						
-						if ~any(sz == N)
-							sref.(f) = temp;
-						elseif isvector(temp)
-							sref.(f) = builtin('subsref', temp, s);
-						else
-							temp = reshape(shiftdim(temp, dim - 1), N, []);
-							sz = circshift(sz, 1 - dim);
-							data = temp(s.subs{1}, :);
-							if numel(sz) < 3, sz = [sz 1]; end %#ok<AGROW>
-							sref.(f) = shiftdim(reshape(data, sz(2:end)), numel(sz) - (dim - 1));
-						end
-					
-					end
-				case '{}'
-					error('WaveProp:subsref',...
-						'Not a supported subscripted reference')
-				end
+		function obj = parse_inputs(obj, varargin)
+			for ii = 1:2:numel(varargin)
+				ff = validatestring(varargin{ii}, [obj.ParamNames(:); obj.WPParamNames(:)]);
+				obj.(ff) = varargin{ii+1};
+			end
 		end
-% 		function pos = get.Position(obj)
-% 			if isempty(obj.Position)
-% 		end
+		
+		%% Updates
 		function sN = refit_data(s)
 			W = warning;
 			warning('off', 'stats:statrobustfit:IterationLimit');
+			s.Inds = [];  % Remove time resampling
 			data = s.Data;
 			eval(sprintf('sN = %s();', class(s)));
 			sN = s;
@@ -215,15 +382,17 @@ classdef WaveProp
 		function s = compute_curvature(s)
 			S = warning;
 			warning('off', 'stats:statrobustfit:IterationLimit');
-			N = numel(s.t0);
+			INDS = s.Inds; s.Inds = [];  % temporarily remove time filter
+			
+			N = numel(s.time);
 			s.Beta = nan(N, 6);
 			s.Curvature = nan(N, 1);
 			
 			dims = size(s.Data);
-			[xx, yy] = ndgrid(1:dims(1), 1:dims(2));
+			[xx, yy] = ndgrid(1:dims(2), 1:dims(3));
 			position = [xx(:) yy(:)];
 			for ii = 1:N
-				data = s.Data(:, :, ii);
+				data = squeeze(s.Data(ii, :, :));
 				finite = isfinite(data(:));
 				[V, p0, beta] = WaveProp.fit_data(data(finite), position(finite, :)); 
 				s.Vx(ii) = V(1); 
@@ -236,109 +405,18 @@ classdef WaveProp
 				s.Curvature(ii) = WaveProp.curvature_from_beta(beta);
 			end
 			warning(S);
+			s.Inds = INDS;  % re-apply time filter
 		end
-		function [H, centers, T] = hist(obj, window, mean_center, show_directions, h)
-			% [H, edges, T] = hist(window=1, mean_center=true, show_directions=true, h=gcf)
-			
-			if nargin < 5, h = gcf; end
-			if nargin < 4 || isempty(show_directions), show_directions = true; end
-			if nargin < 3 || isempty(mean_center), mean_center = true; end
-			if nargin < 2 || isempty(window), window = 1; end
-			t = obj.t0;
-			if mean_center
-				obj.Direction = angle(exp(1j*(obj.Direction - obj.mean)));
-			end
-% 			dir = exp(obj.Vx + 1j*obj.Vy);
-			T = t(1):.01:t(end)+.01;
-			edges = linspace(-pi, pi, 65);
-			H = nan(length(edges)-1, length(T));
-			for ii = 1:length(T)
-				t_inds = abs(t - T(ii)) <= window/2;
-				dir = obj.Direction(t_inds);
-				H(:, ii) = histcounts(dir, edges) ./ window;
-			end
-			set(0, 'currentfigure', h);
-			ax = subplot(1, 9, 1:6);
-			s = subplot(1, 9, 7:8);
-			win = gausswin(round(pi/4 / diff(edges(1:2)))) .* gausswin(round(window ./ diff(T(1:2))))';
-			win = win / sum(win, 'all');
-			H = [H; H; H];
-			centers = unwrap(repmat(edges(1:end-1)' + diff(edges(1:2)/2), 3, 1)) - 2*pi;
-			H = conv2(H, win, 'same');
-			angle_mask = abs(centers) <= pi;
-			centers = centers(angle_mask);
-			H = H(angle_mask, :);
-			contourf(ax, T, centers, H, quantile(H(:), .1:.05:.9), 'linestyle', 'none'); %conv2(H, ones(4, window/2*1e3)/(2*window*1e3), 'same'));
-			if show_directions
-				NP = ax.NextPlot;
-				ax.NextPlot = 'add';
-				plot(ax, obj.t0, obj.Direction, '.', 'markersize', 10);
-				ax.NextPlot = NP;
-			end
-			C = colorbar(ax);
-			temp = subplot(1, 9, 9); 
-			temp.Visible = 'off';
-			C.Position(1:2) = temp.Position(1:2);
-% 			axis(ax, 'xy');
-			plot(s, smoothdata(max(H, [], 2)), centers, 'linewidth', 2);
-			axis(s, 'tight');
-			xticks(s, []); yticks(s, []);
-			xlabel(ax, 'Time (s)')
-			ylabel(ax, 'Direction')
-% 			SR = 1/min(diff(t));
-% 			W = ones(floor(SR * window), 1);
-% 			T = min(t):1/SR:max(t)+1/SR;
-% 			D = zeros(size(T));
-% 			t_inds = interp1(T, 1:length(T), t, 'nearest');
-% 			D(t_inds) = dir;
-		end
-		function logp = get.logp(s)
-			logp = -log(s.p)/log(5);
-		end
-		function Z = get.complexZ(s)
-			Z = complex(s.Vx, s.Vy);
-		end
-		function mask = get.mask(s)
-			mask = s.p > s.sig | isnan(s.Magnitude);
-		end
-		function time = get.time(s)
-			time = s.t0;
-		end
-		function Z = get.Z(s)
-			Z = s.Direction;
-		end
-		function Vx = get.Vx(s)
-			Vx = s.Vx;
-			Vx(s.mask) = nan;
-		end
-		function Vy = get.Vy(s)
-			Vy = s.Vy;
-			Vy(s.mask) = nan;
-		end
-		function Curvature = get.Curvature(s)
-			Curvature = s.Curvature;
-			Curvature(s.mask) = nan;
-		end
-		function D = get.Direction(s)
-			D = s.Direction;
-			D(s.mask) = nan;
-		end
-		function M = get.Magnitude(s)
-			M = s.Magnitude / 400;  % Fits return electrodes/second
-			M(M > 1e6) = nan;
-			M(isoutlier(M)) = nan;
-% 			M(M./nanstd(M) > 4) = nan;
-		end
-		
 		function [mn, ci] = mean(s, data)
 			if nargin < 2, data = s.Direction; end
 			[mn, ul] = circ_mean(data, [], [], 'omitnan');
 			ci = ul - mn;
 		end
-		
 		function F = sub(obj, ind)
-			N = min(numel(obj.t0), numel(obj.Vx));
+			obj.Inds = [];
+			N = min(numel(obj.time), numel(obj.Vx));
 			eval(sprintf('F = %s;', class(obj)));
+			F.t0 = obj.t0(ind);
 			for f = string(fieldnames(obj)')
 				temp = obj.(f);
 				sz = size(temp);
@@ -350,61 +428,50 @@ classdef WaveProp
 				elseif ismatrix(temp)
 					F.(f) = temp(ind, :);
 				else
-					assert(size(temp, 3) >= N);
-					dim = 3;
-					temp = shiftdim(temp, dim-1);
+					assert(size(temp, 1) >= N);
+% 					dim = 3;
+% 					temp = shiftdim(temp, dim-1);
 					sz = size(temp);
 					temp = reshape(temp, N, []);
-					data = reshape(temp(ind, :), sz(2:3));
+					data = reshape(temp(ind, :), [1 sz(2:end)]);
 					F.(f) = data;
 				end
 
 			end
 		end
-		
 		function F = split(obj)
-			N = min(numel(obj.t0), numel(obj.Vx));
+			N = min(numel(obj.time), numel(obj.Vx));
 			F(N) = obj.sub(N);
 			for ii = 1:N
 				F(ii) = obj.sub(ii);
 			end
 		end
-		
 		function d = diff(s, other)
-			t_inds = interp1(other.t0, 1:length(other.t0), s.t0, 'nearest', 'extrap');
-			d = angle(exp(1j*(s.Direction - other.Direction(t_inds))));
+			other = other.resample_t0(s.time);
+% 			t_inds = interp1(other.time, 1:length(other.time), s.time, 'nearest', 'extrap');
+			d = angle(exp(1j*(s.Direction - other.Direction)));
 		end
 		
-		function [d, xi, bw] = ksdensity(obj, ax, rotateby, xres, bw, varargin)
-			% [d, xi, bw] = ksdensity(ax=gca, rotateby=0, xres=pi/500, bw=.15*pi/3, ::plot directives::)
-			if nargin < 5 || isempty(bw), bw = .15*pi/3; end
-			if nargin < 4 || isempty(xres), xres = 500; end
-			if nargin < 3 || isempty(rotateby), rotateby = 0; end
-			if nargin < 2 || isempty(ax), ax = gca; end
-			temp = angle(exp(1j * (obj.Direction - rotateby)));
-			temp = [temp(:) - 2*pi; temp(:); temp(:) + 2*pi];
-		% 	ksdensity([repmat(ct.(f{:}), 3, 1) temp], [x1 x2], 'bandwidth', [5 .15*pi/3]);
-			gridx2 = linspace(-3*pi, 3*pi, 6*xres + 1);
-			[d, xi, bw] = ksdensity(temp, gridx2, 'bandwidth', bw);
-			plot(ax, xi, d/max(d), varargin{:});
-			xlim(ax, [-pi pi])
-		end
-	
-		
+		%% Reshaping
+		function [obj, iq] = resample_t0(obj, t_new)
+			iq = interp1(obj.t0, 1:numel(obj.t0), t_new, 'nearest', 'extrap');
+			obj.Inds = iq(:);
+		end	
 		function S = compile(obj, t_fun)
 			% Compile an array of WaveProp objects into one
 			% S = obj.compile(t_fun=@(t) t0 < Inf)
 			if nargin < 2, t_fun =@(t0) t0 < Inf; end
 			S = obj(1);
 			for ii = 1:numel(obj)
-				t_mask = t_fun(obj(ii).t0);
-				obj(ii).p(t_mask) = Inf;
+				t_mask = t_fun(obj(ii).time);
+				obj(ii).p(~t_mask) = Inf;
 			end
 % 			S.p = cat(1, obj.p);
 % 			S.Magnitude = cat(1, obj.Magnitude);
 			for ff = string(fieldnames(obj)')
 				
 % 				if ismember(lower(ff), {'name'}), continue, end
+% 				if strcmpi(ff, 'data'), S.(ff) = cat(3, obj.(ff)); continue; end
 				try
 					S.(ff) = cat(1, obj.(ff));
 				catch ME
@@ -414,21 +481,15 @@ classdef WaveProp
 					end
 				end
 			end
-% 			t_mask = t_fun(S.t0);
+% 			t_mask = t_fun(S.time);
 % 			S.p(t_mask) = Inf;
-			t0d = [0; diff(S.t0)];
+			t0d = [0; diff(S.time)];
 			t0d(t0d <= 0) = 1;
-			S.t0 = cumsum(t0d);
+			S.time = cumsum(t0d);
 			S.sig = min(S.sig);
 			
 		end
 		
-		function obj = parse_inputs(obj, varargin)
-			for ii = 1:2:numel(varargin)
-				ff = validatestring(varargin{ii}, [obj.ParamNames(:); obj.WPParamNames(:)]);
-				obj.(ff) = varargin{ii+1};
-			end
-		end
 	end
 	
 %% Static methods
@@ -449,21 +510,23 @@ classdef WaveProp
 			end
 		end
 		
-		function [mat, tt] = WP2mat(S, field)
-			N = numel(fieldnames(S));
-			tt = [];
-			for ff = string(fieldnames(S)')
-				tt = [tt; S.(ff).t0(:)]; %#ok<AGROW>
-			end
-			tq = unique(tt, 'stable');
+		function [mat, times] = WP2mat(obj, field, times)
+			% [mat, tt] = WP2mat(S, field, times=[])
+			% If no times are given, the time points from the first metric
+			% in obj are used
+			if nargin < 3, times = []; end
 			X = {};
-			for ff = string(fieldnames(S)')
-				[tt, ii] = unique(S.(ff).t0);
-				iq = interp1(tt, ii, tq, 'nearest', 'extrap');
-				X = [X {S.(ff).(field)(iq)}]; %#ok<AGROW>
+			for ff = string(fieldnames(obj)')
+				if isempty(times)
+					times = obj.(ff).time; 
+				else
+					obj.(ff) = obj.(ff).resample_t0(times);
+				end
+% 				[times, ii] = unique(S.(ff).time);
+% 				iq = interp1(times, ii, tq, 'nearest', 'extrap');
+				X = [X {obj.(ff).(field)}]; %#ok<AGROW>
 			end
 			mat = cat(2, X{:});
-			
 		end
 		function fits = file2fit(res)
 			
@@ -514,7 +577,7 @@ classdef WaveProp
 			%   Optional: if the last input is 'plot', a representation of the delays
 			%   at each electrode position with the fitted plane will be shown.
 
-			MIN_RATIO_FINITE = 0.25;                                                 % we require 50% of electrodes to have a defined delay
+			MIN_RATIO_FINITE = 0.05;   % we require 50% of electrodes to have a defined delay
 
 			P0 = nan;
 			b = nan;
@@ -531,7 +594,7 @@ classdef WaveProp
 				[b,stats] = robustfit(X, data, 'fair');                     % fit the delay vs two-dimensional positions
 % 				H = [0 1 0; 0 0 1];  % These are default values
 % 				c = [0 ; 0];
-				P0 = linhyptest(b, stats.covb, [], [], stats.dfe);                    % perform F test that last two coefs are both 0.
+				P0 = linhyptest(b, stats.covb, [], [], stats.dfe);  % perform F test that last two coefs are both 0.
 			end
 		end
 		function [V, p, beta] = fit_data(data, position, quadratic)
@@ -600,16 +663,32 @@ classdef WaveProp
 				end
 			end
 			S.p = cat(1, s.p);
-			S.Magnitude = cat(1, s.Magnitude);
+			S.t0 = cat(1, s.t0);
+			S.Vx = cat(1, s.Vx);
+			S.Vy = cat(1, s.Vy);
+			S.Inds = [];
+% 			S.Magnitude = cat(1, s.Magnitude);
 			for f = string(fieldnames(s)')
-				if ismember(lower(f), {'quadratic', 'sig', 'halfwin', 'fband', 'name', 'minfreq', 'p', 'magnitude'}), continue, end
-				if isempty(S.(f)), continue,
-				elseif ismember(lower(f), {'data', 'freq'})
-					S.(f) = cat(3, s.(f));
+				if ismember(lower(f), ...
+						{'quadratic', 'sig', 'halfwin', 'fband', ...
+						'name', 'minfreq', 'p', 'magnitude', 'Vx', 'Vy', ...
+                        'samplingrate'})
+					continue
+				end
+				if isempty(s(1).(f)), continue,
+% 				elseif ismember(lower(f), {'data', 'freq'})
+% 					S.(f) = cat(3, s.(f));
 				else
-					S.(f) = cat(1, s.(f));					
+                    try
+					    S.(f) = cat(1, s.(f));					
+                    catch ME
+                        if ~strcmp(ME.identifier, 'MATLAB:catenate:dimensionMismatch'), rethrow(ME);
+                        end
+                        S.(f) = {s.(f)};
+                    end
 				end
 			end
+			
 		end
 		function obj = struct2obj(fstruct)
 			% Usage: obj = struct2obj(res)
@@ -617,7 +696,7 @@ classdef WaveProp
 			obj = WaveProp;
 			assert(nargin == 1);
 			obj.Name = fstruct.Name;
-			obj.t0 = fstruct.computeTimes/1e3;
+			obj.time = fstruct.computeTimes/1e3;
 
 			data = fstruct.data;
 			position = fstruct.position;
@@ -679,12 +758,14 @@ classdef WaveProp
 			parse(P, varargin{:});
 
 			args = P.Results;
+			if isnumeric(args.seizure), args.seizure = num2str(args.seizure); end
+			if ischar(args.metrics), args.metrics = {args.metrics}; end
 			
 			% Cleaning
 			if args.original
 				fname =@(p, s) sprintf('%s_Seizure%s_Neuroport_10_10_wave_prop.mat', p, s);
 			else
-				fname =@(p, s) strrep(sprintf('%s*Seizure*%s*fits.mat', p, s), '***', '*');
+				fname =@(p, s) sprintf('%s_Seizure%s_fits.mat', p, s);
 			end
 			if isempty(args.files)
 				if ischar(args.pat) && ischar(args.seizure)
@@ -775,6 +856,7 @@ classdef WaveProp
 		end
 		function [out, S, dir_stats] = summary_stats(F, varargin)
 			% [out, S, dir_stats] = WP.summary_stats(F, ::'noplot'::, ::'mea'::)
+			% Generates stats for each patient
 			PLT = true;
 			USE_MEA = false;
 			if ismember('noplot', varargin), PLT = false; end
@@ -805,13 +887,19 @@ classdef WaveProp
 				D = WaveProp.compute_dir_stats(Z, T);
 				out.Direction_persistence(pp, :) = D.persistence;
 				out.Direction_variability(pp, :) = D.dphi_mean;
+				for ff = ["phi_mean_early" "phi_mean_late" "phi_std_early" "phi_std_late" "first_detection"]
+					out.(ff)(pp, :) = D.(ff);
+				end
 				dir_stats{pp} = D;
+				
 				
 				for mm = 1:numel(metrics)
 					if numfinite(magnitude(:, mm)) < 10, continue; end
 					pd = fitdist(magnitude(:, mm), 'Weibull');
 					out.Weibull_A(pp, mm) = pd.A;
 					out.Weibull_B(pp, mm) = pd.B;
+					
+					
 				end
 				
 				if USE_MEA
@@ -827,8 +915,6 @@ classdef WaveProp
 					pd = fitdist(ISI(:), 'InverseGaussian');
 					out.IGmu(pp) = pd.mu;
 					out.IGlbda(pp) = pd.lambda;
-					
-					
 				end
 			end
 			
@@ -846,23 +932,24 @@ classdef WaveProp
 			end
 			
 		end
-		function out = compute_dir_stats(phi, t0, thresh)
+		function out = compute_dir_stats(phi, times, thresh)
 			if nargin < 3, thresh = pi/64; end
 			[dphi, phi_uw, phi_std] = deal(nan(size(phi)));
-			for jj = size(phi, 2):-1:1
+			num_metrics = size(phi, 2);
+			for jj = num_metrics:-1:1
 				phi_temp = phi(:, jj);  % get Z for given patient and metric
 
 				mask = isfinite(phi_temp);  % isolate non-nan
 				phi_uw_temp = unwrap(phi_temp(mask));  % unwrap (isolate and then unwrap is questionable ...)
 				phi_temp(mask) = phi_uw_temp;
 				phi_uw(:, jj) = phi_temp;
-				for tt = 1:numel(t0)
-					mask_tt = (t0 >= t0(tt) - .5) & (t0 <= t0(tt) + .5);
+				for tt = 1:numel(times)
+					mask_tt = (times >= times(tt) - .5) & (times <= times(tt) + .5);
 					phi_std(tt, jj) = nanstd(phi_temp(mask_tt));
 				end
 		% 		phi_temp_sm = smoothdata(phi_temp, 1, 'gaussian', 1, 'SamplePoints', t_temp);  % smooth with a 1 second (gaussian) kernel
 		% 		dphi{ii}(:, jj) = [nan; smoothdata(diff(phi_temp_sm))];
-				dphi_temp = [nan; smoothdata(diff(phi_temp), 1, 'movmean', 1, 'samplepoints', t0(2:end))];
+				dphi_temp = [nan; smoothdata(diff(phi_temp), 1, 'movmean', 1, 'samplepoints', times(2:end))];
 				dphi(:, jj) = dphi_temp;
 
 				low_dphi = [false; abs(dphi_temp) < thresh; false];
@@ -871,7 +958,7 @@ classdef WaveProp
 				if sum(starts)==0
 					interval = nan; 
 				else
-					interval = max(t0(stops) - t0(starts));
+					interval = max(times(stops) - times(starts));
 				end
 				perst(jj) = interval;
 				dphi_mean(jj) = nanmean(abs(dphi_temp));
@@ -882,9 +969,11 @@ classdef WaveProp
 			out.dphi = dphi;
 			out.phi_std = phi_std;
 			out.phi_uw = phi_uw;
+			
 		end
 		function out = summary_comparison(F, varargin)
-			% out = summary_stats(F, ::fig=gcf::, ::'save'::)
+			% out = summary_comparison(F, ::fig=gcf::, ::'save'::)
+			% Generates stats comparing pairs of metrics
 			SAVE = false;
 			fig = gcf;
 			for arg = varargin
@@ -949,3 +1038,4 @@ classdef WaveProp
 	end
 	
 end
+

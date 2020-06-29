@@ -25,19 +25,24 @@ classdef Events < WaveProp
 			obj.Data = data;
 			obj = obj.compile_results; 			
 		end
-		function [window, T] = get_window(obj, mea)
+		function [window, T] = get_window(obj, mea)  % Not used
 			t_inds = abs(mea.AllTime - obj.t0) <= obj.HalfWin;
 			events = mea.mua_events(t_inds, :);
 			window = events;
 			T = mea.AllTime(t_inds);
 		end
 		function data = get_data(obj, event_times, t0)
-			N = numel(event_times);
-			data = nan(size(event_times));
+			
+			[ch, ET] = event_times{:};
+			mask = abs(ET - t0) <= obj.HalfWin;
+			ch(~mask) = [];
+			ET(~mask) = [];
+			N = size(obj.Position, 1);
+			data = nan(N, 1);
 			for ii = 1:N
-				ET = event_times{ii};
-				ET(abs(ET - t0) > obj.HalfWin) = [];
-				data(ii) = nanmean(ET);
+% 				ET = event_times{ii};
+% 				ET(abs(ET - t0) > obj.HalfWin) = [];
+				data(ii) = nanmean(ET(ch == ii));
 			end
 			
 		end
