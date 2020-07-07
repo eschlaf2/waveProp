@@ -331,6 +331,18 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 % 			data = single(downsample(mea.Raw, mea.skipfactor));
 			data = single(resample(double(mea.Raw), 1, mea.skipfactor));
 		end
+
+        function D = make_3d(mea, data)
+        % D = mea.make_3d(data=mea.Data)
+            if nargin < 2, data = mea.Data; end
+            nT = size(data, 2);
+            D = nan([max(mea.Position), nT]);
+            temp = nan(max(mea.Position));
+            for ii = 1:nT, 
+                temp(mea.locs) = data(ii, :); 
+                D(:, :, ii) = temp; 
+            end
+        end
 		
 		function lfp = get.lfp(mea)
 			lfp = mea.lfp;
@@ -431,13 +443,6 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		end
 		function m = all_metrics(s)
 			m = fieldnames(s.Fits);
-		end
-		function m = get.metrics(s)
-			m = s.metrics;
-			if isempty(m)
-				m = s.all_metrics;
-				s.metrics = m;
-			end
 		end
 		
 		function bsi = get.BSI(s)
@@ -858,6 +863,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 	
 	methods  % Plotting
 		function plot_panels(mea, times, layout, h)
+        % mea.plot_panels(times, layout=[], h=gcf)
 			if nargin < 4, h = gcf; end
 			if nargin < 3, layout = []; end
 			if isempty(layout)
