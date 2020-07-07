@@ -409,6 +409,7 @@ classdef WaveProp
 		end
 		function [mn, ci] = mean(s, data)
 			if nargin < 2, data = s.Direction; end
+            if all(isnan(data)), mn = nan; ci = nan; return; end
 			[mn, ul] = circ_mean(data, [], [], 'omitnan');
 			ci = ul - mn;
 		end

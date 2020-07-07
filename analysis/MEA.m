@@ -903,7 +903,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			ax.Tag = ['figs/' mea.patient '_' mea.seizure '_std'];
 		end
 		function fr = plot(s, ax)
-			if nargin < 2, ax = gca; end
+			if nargin < 2, ax = axes(figure('units', 'normalized', 'position', [0 .5 1 .5])); end
 			cmap = ax.ColorOrder;
 			set(ax, 'nextplot', 'replaceChildren', 'xlim', [s.Time(1), s.Time(end)]);
 			frline = gobjects(3, 1);
