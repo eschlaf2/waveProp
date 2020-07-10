@@ -285,7 +285,11 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			p = fullfile(file(1).folder, file(1).name);
 		end
 		function set.Path(mea, value)
-			file = dir(value);
+            if isstruct(value)  % allow entry of string or dir struct
+                file = value;
+            else
+                file = dir(value);
+            end
 			mea.Path = fullfile(file.folder, file.name);
 		end
 		
@@ -335,7 +339,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
         function D = make_3d(mea, data)
         % D = mea.make_3d(data=mea.Data)
             if nargin < 2, data = mea.Data; end
-            nT = size(data, 2);
+            nT = size(data, 1);
             D = nan([max(mea.Position), nT]);
             temp = nan(max(mea.Position));
             for ii = 1:nT, 
