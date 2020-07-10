@@ -8,20 +8,20 @@
 % end
 % fclose(fid);
 
-if ~exist('seizure', 'var'); seizure = '*'; elseif isnumeric(seizure), seizure = num2str(seizure); end
-if ~exist('files', 'var'); files = dir([pat '_Seizure' seizure '_Neuroport_10_10_wave_prop.mat']); end
-if ~exist('metrics', 'var')
-	metrics = {...
-		'maxdescent', ...
-		'events', ...
-		'delays_T10_fband1_13', ...
-		'delays_T01_fband1_13'}; %, ...
-% 		'delays_T10_fband1_50', ...
-% 		'delays_T01_fband1_50'}; 
-end
-if ~exist('plotnum', 'var'); plotnum = 0; end
-if ~exist('sig', 'var'); sig = 5e-2; end
-nF = numel(files);
+% if ~exist('seizure', 'var'); seizure = '*'; elseif isnumeric(seizure), seizure = num2str(seizure); end
+% % if ~exist('files', 'var'); files = dir([pat '_Seizure' seizure '_Neuroport_10_10_wave_prop.mat']); end
+% if ~exist('metrics', 'var')
+% 	metrics = {...
+% 		'maxdescent', ...
+% 		'events', ...
+% 		'delays_T10_fband1_13', ...
+% 		'delays_T01_fband1_13'}; %, ...
+% % 		'delays_T10_fband1_50', ...
+% % 		'delays_T01_fband1_50'}; 
+% end
+% if ~exist('plotnum', 'var'); plotnum = 0; end
+% if ~exist('sig', 'var'); sig = 5e-2; end
+% nF = numel(files);
 
 %% Make res
 
@@ -29,7 +29,7 @@ nF = numel(files);
 switch plotnum
 	case 0
 	% Make res
-		res = compile_wave_prop('files', files);
+		res = compile_wave_prop();
 		
     case 1
 
@@ -46,16 +46,19 @@ switch plotnum
 		
 		plot_direction_densities(res, outer)
 		
-		
 
 %% quantify distributions		
 	case 6 
 
+		if ~exist('res', 'var'); res = compile_wave_prop; end
+		if ~exist('metrics', 'var'), metrics = fieldnames(res(1).data); end
+		if ~exist('sig', 'var'), sig = 5e-2; end
+		nF = length(res);
 		metricpairs = nchoosek(metrics, 2);
 		nM = size(metricpairs, 1);
 		
 		nrows = nM * nF;
-		filename = cell(nrows, 1);
+		name = cell(nrows, 1);
 		whichpair = zeros(nrows, 1, 'uint16');
 		dZ = cell(nrows, 1);
 		[m1, R, theta, kappa, conf, sigma, N] = ...
@@ -64,15 +67,12 @@ switch plotnum
 		idx = 0;
 		for f = 1:nF % for each file
 			
-			
-			[~, name, ~] = fileparts(files(f).name);
-			data = load(name);
-			
+			data = res(f).data;
 			for m = metricpairs'  % and each pair of metrics
 				idx = idx + 1;
 				
 				whichpair(idx) = mod(idx-1, nM) + 1;
-				filename{idx} = name;
+				name{idx} = strsplit(res(f).name);
 				
 				tt = data.(m{1}).computeTimes;
 				d1 = data.(m{1}).Z(:);
@@ -97,7 +97,7 @@ switch plotnum
 			end
 			
 		end
-        stats = table(filename, whichpair, R, theta, kappa, conf, sigma, N, ...
+        stats = table(name, whichpair, R, theta, kappa, conf, sigma, N, ...
             m1, dZ);
 		save('direction_stats', 'stats', 'metricpairs');
 		
@@ -129,7 +129,7 @@ switch plotnum
         nP = size(metricpairs, 1);
         r = ceil(sqrt(nP)); c = ceil(nP / r);  % Create an appropriate number of subplots
         figure(2); clf; fullwidth(r > 1);
-        for dd = 1:nP  % For each pair
+		for dd = 1:nP  % For each pair
             ax2 = polaraxes();  % Create a polar axis,
             subplot(r, c, dd, ax2)  % ... place it,
             d1 = metricpairs(dd, 1); d2 = metricpairs(dd, 2);  % ... assign convenience vars,

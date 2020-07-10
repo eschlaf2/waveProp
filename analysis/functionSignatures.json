@@ -1,0 +1,28 @@
+{
+"MEA":
+{               
+                "inputs":
+        [       
+                {"name":"filename", "kind":"required", "type":[["file", "@(x) exist(x,'file')==2||exist([x '.mat'],'file')==2"], ["matlabpathfile=*.mat"]]},
+                {"name":"'-mat'", "kind":"ordered", "type":[["char", "choices={'-mat'}"]]},     
+                {"name":"variables", "kind":"ordered", "type":[["char", "choices=matlab.internal.language.introspective.tabcompletion.load_vvariables(filename)"]], "repeating":true}
+        ],
+        "outputs":
+        [
+                {"name":"S", "type":["struct"]}
+        ]
+},
+"SummStats":
+{               
+                "inputs":
+        [       
+                {"name":"filename", "kind":"required", "type":[["file", "@(x) exist(x,'file')==2||exist([x '.mat'],'file')==2"], ["matlabpathfile=*.mat"]]},
+                {"name":"'-mat'", "kind":"ordered", "type":[["char", "choices={'-mat'}"]]},     
+                {"name":"variables", "kind":"ordered", "type":[["char", "choices=matlab.internal.language.introspective.tabcompletion.load_vvariables(filename)"]], "repeating":true}
+        ],
+        "outputs":
+        [
+                {"name":"S", "type":["struct"]}
+        ]
+}
+}

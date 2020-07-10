@@ -39,10 +39,10 @@
 function [NP, EC, time, last, fig] = seizing_cortical_field(~, time_end, IC, fig, params)
 
 %% Preferences and parameters
-if ~exist('params', 'var') || isempty(params), params = init_scm_params(); end
+if ~exist('params', 'var') || isempty(params), params = SCMParams; end
 
 PM = params.meta;
-PK = params.K;
+try PK = params.potassium; catch, PK = params.K; end
 M = params.model;
 PE = params.electrodes;
 PT = params.time_constants;
@@ -234,7 +234,7 @@ EC = rmfield(EC, no_return);
 				) ...
 			) ...     %The E voltage must be big enough,
 			- SS.Qe_max * ( ...
-				1 ./ ( 1 + ...
+				SS.depo_block ./ ( 1 + ...
 					exp(-pi / ( sqrt(3) * SS.sigma_e ) .* ( last.Ve - ( SS.theta_e + 30 ) )) ...
 				) ...
 			);   %... but not too big.
@@ -246,7 +246,7 @@ EC = rmfield(EC, no_return);
 				) ...
 			) ...     %The I voltage must be big enough,
 			- SS.Qi_max * ( ...
-				1 ./ ( 1 + ...
+				SS.depo_block ./ ( 1 + ...
 					exp(-pi / ( sqrt(3) * SS.sigma_i ) .* ( last.Vi - ( SS.theta_i + 30 ) )) ...
 				) ...
 			);   %... but not too big.
@@ -288,14 +288,13 @@ EC = rmfield(EC, no_return);
 % Update source and expand wavefront
 	function update_source
 		if time(ii) > 0 
+			[new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx^2, M.excitability_map);
 			if time(ii) <= PM.duration
-				[new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx^2, M.excitability_map);
 				new.dVe(new.map) = PM.source_drive; 
 				if isempty(PM.source), return, end
 				which_source = mod(floor(time(ii) / 2), size(PM.source, 3)) + 1;
 				new.dVe(PM.source(:, :, which_source)) = PM.source_drive;
 			else
-				new.map = last.map; new.state = last.state;
 				if isnan(PM.post_ictal_source_drive), return; end			
 				new.dVe(new.map) = PM.post_ictal_source_drive;
 			end

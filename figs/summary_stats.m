@@ -3,7 +3,20 @@
 
 % Load the table with comparison data
 % load('direction_stats.mat');  % This should have the stats and a variable with the metrics
+%    OR
+% run WaveProp.summary_stats(fits)
 % pairs = [2 3];  % Ignore very short delay windows for now
+
+function fig = summary_stats(stats, metricpairs, varargin)
+if any(isa(varargin, 'matlab.ui.Figure'))
+	which = isa(varargin, 'Figure');
+	fig = varargin{which}; clf(fig)
+	varargin(which) = [];
+else
+	fig = gcf; clf(fig)
+end
+
+pairs = 1:size(metricpairs, 1);
 
 % Extract variables from table
 theta = stats.theta;
@@ -17,13 +30,13 @@ cconf(nanconf) = pi;
 % ... including variables for patient and seizure
 [patient, seizure] = deal(cell(size(stats, 1), 1));
 for ii = 1:size(stats, 1)
-	info = strsplit(stats.filename{ii}, '_');
+	info = strsplit(stats.filename{ii}, {'_', ' '});
 	patient{ii} = info{1};
 	seizure{ii} = [' ' info{2}(8:end)];
 end
 
 % Move SIM to the end
-mask = strcmpi(patient, 'sim');
+mask = strcmpi(patient, 'scm');
 reorder = @(X) [X(~mask); X(mask)];
 patient = reorder(patient);
 seizure = reorder(seizure);
@@ -31,7 +44,7 @@ m1 = reorder(m1);
 theta = reorder(theta);
 cconf = reorder(cconf);
 nanconf = reorder(nanconf);
-cvar = reorder(cvar);
+% cvar = reorder(cvar);
 whichpair = reorder(whichpair);
 
 % Add a nan row between patients
@@ -42,7 +55,7 @@ for uu = sort(u(u ~= 1), 'descend')'
 	theta = [theta(1:uu-1); nan; theta(uu:end)];
 	cconf = [cconf(1:uu-1); nan; cconf(uu:end)];
 	nanconf = [nanconf(1:uu-1); false; nanconf(uu:end)];
-	cvar = [cvar(1:uu-1); nan; cvar(uu:end)];
+% 	cvar = [cvar(1:uu-1); nan; cvar(uu:end)];
 	whichpair = [whichpair(1:uu-1); 0; whichpair(uu:end)];
 	m1 = [m1(1:uu-1); 0; m1(uu:end)];
 end
@@ -54,13 +67,11 @@ toolow = lowCI < -pi;
 toohi = hiCI > pi;
 
 %% Make the figure
-% Clear the figure
-fig = figure(1); clf
 nP = length(pairs);
 ax = gobjects(nP, 1);
 
 % Plot the means first so it's easy to label
-cdata = lines(7);
+cdata = lines(nP);
 
 % Rename metrics
 metricpairs = rename_metrics(metricpairs);
@@ -114,13 +125,20 @@ for ii = 1:nP
 		x(nanconf(mask)), y(nanconf(mask)), 90, .4*[1 1 1], ...
 		'd', 'filled');
 	scatter(ax(ii), ...
-		x(include_zero(mask)), y(include_zero(mask)), 90, [1 0 0]);
+		x(include_zero(mask)), y(include_zero(mask)), 90, [1 0 0]);  % indicate where difference includes zero with a circle
 	plot(ax(ii), ...
-		x(theta_small(mask)), y(theta_small(mask)), 'r*');
+		x(theta_small(mask)), y(theta_small(mask)), 'r*');  % indicate small differences with a *
 	ylabel(ax(ii), sprintf('%s - %s \\color{white}...', ...
 		metricpairs{pairs(ii), 2}, metricpairs{pairs(ii), 1} ...
 		));
 	hold(ax(ii), 'off');
 	yline(ax(ii), 0);
+
+end
+
+annotation('textbox', ...
+	'string', {'\circ := CI includes zero'; '* := \theta < \pi/4'}, ...
+	'Position', [.01 .9 .05 .04], 'FitBoxToText', true);
+fig.Tag = 'figs/summary_stats';
 
 end
