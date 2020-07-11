@@ -62,6 +62,7 @@ classdef SCM < handle
 			end
         end
 
+
         function rotate(self, theta), self.Rotate(theta); end  % legacy
         function Run(self)
             self.CreateDirectory;
@@ -83,6 +84,7 @@ classdef SCM < handle
     properties (Access = private)
         Qe_movie
         Ve_movie
+
     end
 	
 	properties  % meta
@@ -136,6 +138,7 @@ classdef SCM < handle
 		expansion_rate (1,1) double {mustBeNonnegative} = .625  % in mm^2/s; set to 0 for fixed source
 		excitability_map
 		IC SCMState 
+
 	end
 	methods  % model
 
@@ -156,6 +159,7 @@ classdef SCM < handle
 				P.excitability_map = P.DefaultExcitabilityMap; 
 			end
             map = P.excitability_map;
+
 			assert(all(size(map) == P.grid_size))
 		end
 	end
