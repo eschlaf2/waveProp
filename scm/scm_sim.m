@@ -35,9 +35,9 @@ if ~exist('params', 'var'); params = SCMParams; end
 disp(params.meta)
 try rng(params.meta.seed); catch ME; end
 
-create_directory(params);
-run_simulation(params);
-convert_to_mea(params);
+create_directory_(params);
+run_simulation_(params);
+convert_to_mea_(params);
 
 fname = sprintf('%s/%s/%s_Seizure%d_Neuroport_%d_%d.mat', ...
 			pwd, params.label, params.label, params.sim_num, params.padding);
@@ -45,7 +45,7 @@ paramfile = '';
 % analyze_wave_directions;
 
 %% Subroutines
-function create_directory(params)
+function create_directory_(params)
 
 	PM = params.meta;
 	if ~PM.save, return, end
@@ -55,7 +55,7 @@ function create_directory(params)
 	save(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'params');
 end
 
-function run_simulation(params)
+function run_simulation_(params)
 
 PM = params.meta;
 
@@ -69,30 +69,32 @@ T_STEP = PM.t_step;
 T0_START = PM.t0_start;
 
 % Create stimulus map
-if T0_START > 0
+if T0_START > -PADDING(1)
 	% If not starting a fresh sim, use previously saved <last>
-	load(sprintf('%s_%d_%03d', BASENAME, SIM_NUM, T0_START - 1), 'last')
+    try
+        load(sprintf('%s_%d_%03d', BASENAME, SIM_NUM, T0_START - 1), 'last')
+    catch ME
+        
+    end
 else
 	% ... otherwise, start a fresh sim
 	last = params.IC;  %Load the initial conditions to start.
 end
 
-K = sum(PADDING) + DURATION;
+K = PADDING(2) + DURATION;
 fig = [];
-for t0 = PM.t0_start:T_STEP:K-1  % For each step
+for t0 = PM.t0_start:T_STEP:K-T_STEP  % For each step
 	tic
 	% Update time offset
-	params.t0 = t0 - PADDING(1);
+	params.t0 = t0;
 	
 	% ... show progress, 
-	fprintf('Running %d / %d .. ', t0, floor(K-1));  
+	fprintf('Running %d / %d .. ', t0+1, floor(K));  
 		
-	% ... get appropriate source drive,
-	source_drive = set_source_drive(t0, PM);  
-	
 	% ... run simulation for duration T_STEP,
 	[NP, EC, time, last, fig] = ...  
-		seizing_cortical_field(source_drive, min(T_STEP, K - t0 - 1), last, fig, params);
+		seizing_cortical_field('legacy variable', ...
+            min(T_STEP, K - t0), last, fig, params);
 	
 	% ... save the results of this run,
 	if SAVE
@@ -107,7 +109,7 @@ end
 
 end
 
-function convert_to_mea(PM)
+function convert_to_mea_(PM)
 	if ~isfield(PM, 'label'), PM.label = 'SCM'; end
 	files = dir(sprintf('%s_%d_*mat', PM.basename, PM.sim_num));
 	addpath(files(1).folder);
@@ -155,13 +157,12 @@ function convert_to_mea(PM)
 			pwd, PM.label, PM.label, PM.sim_num, PM.padding) ...	 
 		);
 	
-% 	mea = add_noise(mea, 2);  % Add 3D brownian noise with snr=2; the spectra after this transformation looked similar to recorded seizures - could also use (much) higher snr pink noise
+%   mea = add_noise_(mea, 2);  % Add 3D brownian noise with snr=2; the spectra after this transformation looked similar to recorded seizures - could also use (much) higher snr pink noise
 	qe_mat = rescale(single(qe_mat), 0, 25);  % range is based on experimentation
 	mea.firingRate = reshape(qe_mat, size(mea.Data));
-	mea.event_inds = rate2events(mea);
+	mea.event_inds = rate2events_(mea);
 	mea.event_mat_size = size(mea.Data);
 	mea.params = init_mea_params();
-% 	mea.firingRate = mua_firing_rate(mea);
 	fprintf('Saving %s ... ', mea.Path);
 	save(mea.Path, '-struct', 'mea');
 	m = matfile(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'Writable', true);
@@ -176,7 +177,7 @@ end
 
 %% Helpers
 
-function mea = add_noise(mea, snr_dB)
+function mea = add_noise_(mea, snr_dB)
 	signal = mea.Data;
 	brown_noise = randnd(-2, [length(signal), max(mea.Position)]);  % brownian noise: -2; pink noise: -1
 	noise = brown_noise(:, mea.locs);
@@ -187,7 +188,7 @@ function mea = add_noise(mea, snr_dB)
 	mea.Data = noisy_sig;
 
 end
-function event_inds = rate2events(mea)
+function event_inds = rate2events_(mea)
 % 	lambda = mea.firingRate;
 % 	X = rand(size(lambda));
 % 	events = X > exp(-lambda / mea.SamplingRate);
@@ -198,15 +199,4 @@ function event_inds = rate2events(mea)
 	[~, event_inds, ~, ~] = findpeaks(FR(:), 'MinPeakHeight', 2);  
 end
 
-function [source_drive] = set_source_drive(t, params)
-
-	if t < params.padding(1)  % preseizure
-		source_drive = 0;
-	elseif t >= params.padding(1) && t < (params.padding(1) + params.duration)  % seizure
-		source_drive = params.source_drive; 
-	else  % postseizure
-		source_drive = params.post_ictal_source_drive;
-	end
-
-end
 
