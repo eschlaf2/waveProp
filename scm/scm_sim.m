@@ -110,6 +110,7 @@ end
 end
 
 function convert_to_mea_(PM)
+    if ~PM.save, return, end
 	if ~isfield(PM, 'label'), PM.label = 'SCM'; end
 	files = dir(sprintf('%s_%d_*mat', PM.basename, PM.sim_num));
 	addpath(files(1).folder);

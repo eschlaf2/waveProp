@@ -78,8 +78,8 @@ B_ei = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ei_sc / dt);
 out_vars = PM.out_vars;
 
 % Indices to capture from larger grid for NP and EC
-indsNP = get_inds(M.grid_size, PE.centerNP, PE.dimsNP, 1);
-indsEC = get_inds(M.grid_size, PE.centerEC, PE.dimsEC, PE.scaleEC);
+indsNP = get_inds_(M.grid_size, PE.centerNP, PE.dimsNP, 1);
+indsEC = get_inds_(M.grid_size, PE.centerEC, PE.dimsEC, PE.scaleEC);
 
 % Initialize electrode output variables (structs NP, EC)
 get_electrode_values;
@@ -307,12 +307,12 @@ EC = rmfield(EC, no_return);
 	function get_electrode_values
 		
 		if ~exist('NP', 'var')  % Initialize
-			for v = out_vars
+			for v = union(out_vars, {'Qe', 'Ve'})
 				NP.(v{:}) = zeros([Nsteps, PE.dimsNP], 'single');  % Microscale
 				EC.(v{:}) = zeros([Nsteps, PE.dimsEC], 'single');  % Macroscale
 			end
 		else  % ... or store
-			for v = out_vars 
+			for v = union(out_vars, {'Qe', 'Ve'})
 				NP.(v{:})(ii, :, :) = reshape(last.(v{:})(indsNP), [1, PE.dimsNP]); 
 				
 				% Take the local mean for ECOG electrodes
@@ -326,7 +326,7 @@ EC = rmfield(EC, no_return);
 	function visualize
 		if PM.visualization_rate > 0
 			if ~exist('fig', 'var') || isempty(fig)
-				fig = create_fig(out_vars, M.grid_size, indsNP, indsEC);
+				fig = create_fig_(out_vars, M.grid_size, indsNP, indsEC);
 			end
 			if diff(floor((time(ii) - [dt 0]) * PM.visualization_rate))
 				for sp = 1:numel(fig.ih)
@@ -395,7 +395,7 @@ L = [a b a; b -3 b; a b a];  % 9-point stencil Laplacian
 end
 
 %------------------------------------------------------------------------
-function fig = create_fig(out_vars, grid_size, addyNP, addyEC)
+function fig = create_fig_(out_vars, grid_size, addyNP, addyEC)
 	stop_at = 'seizing_cortical_field>update_gap_resting';
 	titles = out_vars;
 	N = numel(titles);
@@ -445,7 +445,7 @@ function fig = create_fig(out_vars, grid_size, addyNP, addyEC)
 end
 
 %------------------------------------------------------------------------
-function inds = get_inds(grid_size, center, dims, scale)
+function inds = get_inds_(grid_size, center, dims, scale)
 
 	x_offset = ( (1:dims(1)) - floor(dims(1)/2) ) * scale;
 	y_offset = ( (1:dims(2)) - floor(dims(2)/2) ) * scale;
