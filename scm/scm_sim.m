@@ -198,4 +198,15 @@ function mea = add_noise_(mea, snr_dB)
 
 end
 
+function event_inds = rate2events_(mea)
+% 	lambda = mea.firingRate;
+% 	X = rand(size(lambda));
+% 	events = X > exp(-lambda / mea.SamplingRate);
+% 	event_inds = find(events);
+	
+	FR = double(-mea.Data);
+	FR = (FR - min(FR)) ./ std(FR);
+	[~, event_inds, ~, ~] = findpeaks(FR(:), 'MinPeakHeight', 2);  
+end
+
 

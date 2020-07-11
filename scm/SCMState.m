@@ -1,5 +1,7 @@
+
 classdef SCMState
 % classdef SCMState
+
 % Initialize global constants that define the locations of the steady
 % states.  
 
@@ -71,7 +73,6 @@ classdef SCMState
 	methods
 		
 		function S = resize(S, grid_size)
-		% self.resize(grid_size)
 		% Converts scalar to matrix
 		
 			for ff = string(properties(S)')
