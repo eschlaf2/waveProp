@@ -1,5 +1,5 @@
-classdef SCM 
-% classdef SCM
+classdef SCMState
+% classdef SCMState
 % Initialize global constants that define the locations of the steady
 % states.  
 
@@ -19,7 +19,7 @@ classdef SCM
 %% Methods
 
 	methods
-		function S = SCM(obj, grid_size)
+		function S = SCMState(obj, grid_size)
 			if nargin < 1, return; end
 			if nargin < 2, grid_size = []; end
 			
@@ -71,7 +71,7 @@ classdef SCM
 	methods
 		
 		function S = resize(S, grid_size)
-		% resize(SCM, grid_size)
+		% self.resize(grid_size)
 		% Converts scalar to matrix
 		
 			for ff = string(properties(S)')

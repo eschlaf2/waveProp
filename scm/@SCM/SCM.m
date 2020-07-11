@@ -1,17 +1,17 @@
-classdef SCMParams < handle
+classdef SCM < handle
 	
 	methods  % constructor and other operators
-		function P = SCMParams(varargin)
+		function P = SCM(varargin)
 			if nargin == 0, P = P.init(); return; end
 			switch class(varargin{1})
-				case 'SCMParams'
+				case 'SCM'
 					P = varargin{1};
 				case 'struct'
 					
 					if isfield(varargin{1}, 'model')  % old params struct
 						params = varargin{1};
 					%	P.extract(params.meta);
-						P.IC = SCM(params.IC);
+						P.IC = SCMState(params.IC);
 						model = params.model;
 						
 						for ff = string(fieldnames(model)')
@@ -62,36 +62,27 @@ classdef SCMParams < handle
 			end
         end
 
-		function rotate(P, theta)
-			center = P.centerNP;
-			rot =@(xy) round( ...
-                    (xy - center) ...  % translate to center
-                    * [cos(theta), -sin(theta); sin(theta), cos(theta)] ...  % rotate
-                ) + center;  % translate back
-			
-			P.stim_center = rot(P.stim_center);
-			
-			for ii = 1:size(P.source, 3)
-				mat = P.source(:, :, ii);
-				rot_mat = false(size(mat));
-				[xx, yy] = ind2sub(size(mat), find(mat));
-				xnew = rot([xx, yy]);
-				inds = sub2ind(P.grid_size, xnew(:, 1), xnew(:, 2));
-				rot_mat(inds) = true;
-				P.source(:, :, ii) = rot_mat;
-			end
-			
+        function rotate(self, theta), self.Rotate(theta); end  % legacy
+        function Run(self)
+            self.CreateDirectory;
+            self.RunSimulation;
+            self.ConvertToMea;
+        end
 
-		end
+		Rotate(self, theta)
+        CreateDirectory(self)
+        RunSimulation(self)
+        ConvertToMea(self)
+        AnalyzeWaveDirections(self)
+        Preview(self)
 	end
     
-    methods (Access = private)  % define defaults
-        function map = default_excitability_map(P)
-            [ix, iy] = ind2sub(P.grid_size, 1:prod(P.grid_size));
-            R = min(P.grid_size) / 2 - 3;
-            map = zeros(P.grid_size);
-            map(sum(([ix' iy'] - P.grid_size/2).^2, 2) < R.^2) = .5;
-        end
+    methods (Access = private)
+        map = DefaultExcitabilityMap(P)
+    end
+    properties (Access = private)
+        Qe_movie
+        Ve_movie
     end
 	
 	properties  % meta
@@ -113,6 +104,7 @@ classdef SCMParams < handle
 		label (1,:) char = 'SCM'
 		t0  % used to keep track of progress in sims 
 	end
+
 	methods  % getters for meta
 		
         function t0s = get.t0_start(p)
@@ -143,7 +135,7 @@ classdef SCMParams < handle
 		dx = .4  % (mm) 
 		expansion_rate (1,1) double {mustBeNonnegative} = .625  % in mm^2/s; set to 0 for fixed source
 		excitability_map
-		IC SCM 
+		IC SCMState 
 	end
 	methods  % model
 
@@ -160,10 +152,10 @@ classdef SCMParams < handle
 			grid_size = p.grid_size;
 		end
 		function map = get.excitability_map(P)
-            map = P.excitability_map;
-			if isempty(map)
-				map = P.default_excitability_map; 
+			if isempty(P.excitability_map)
+				P.excitability_map = P.DefaultExcitabilityMap; 
 			end
+            map = P.excitability_map;
 			assert(all(size(map) == P.grid_size))
 		end
 	end

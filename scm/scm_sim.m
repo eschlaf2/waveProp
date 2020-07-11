@@ -39,10 +39,7 @@ create_directory_(params);
 run_simulation_(params);
 convert_to_mea_(params);
 
-fname = sprintf('%s/%s/%s_Seizure%d_Neuroport_%d_%d.mat', ...
-			pwd, params.label, params.label, params.sim_num, params.padding);
-paramfile = '';
-% analyze_wave_directions;
+% analyze_wave_directions_(params);
 
 %% Subroutines
 function create_directory_(params)
@@ -119,21 +116,25 @@ function convert_to_mea_(PM)
 	im = round(rescale(last.Ve) * (length(cmap) - 1)) + 1;
 	movQ(numel(files) - 1) = im2frame(im, cmap);
 	movV(numel(files) - 1) = im2frame(im, cmap);
-	[qe, ve, tt] = deal(cell(numel(files) - 1 , 1));
-	
-	for f = files'
+	[qe, ve, tt, file_inds] = deal(cell(numel(files) - 1 , 1));
+
+    file_inds = cellfun(@(f) strsplit(f, {'_', '.'}), {files.name}, 'uni', 0);
+    file_inds = cellfun(@(f) str2double(strrep(f{end - 1}, 'M', '-')), file_inds);
+    [~, file_order] = sort(file_inds, 'ascend');
+    
+	ii = 1;
+    for f = files(file_order)'
 		if strfind(f.name, 'info'), continue, end
 		load(f.name, 'last', 'NP', 'time');
 		disp(f.name)
-		ind = strsplit(f.name, {'_', '.'});
-		ind = str2double(ind{end - 1}) + 1;
-		disp(ind)
+		disp(ii)
 		im = round(rescale(last.Qe) * (length(cmap) - 1)) + 1;
-		movQ(ind) = im2frame(im, cmap);
-		movV(ind) = im2frame(round(rescale(last.Ve) * (length(cmap) - 1)) + 1, cmap);
-		qe{ind} = NP.Qe;
-		ve{ind} = NP.Ve;
-		tt{ind} = time;
+		movQ(ii) = im2frame(im, cmap);
+		movV(ii) = im2frame(round(rescale(last.Ve) * (length(cmap) - 1)) + 1, cmap);
+		qe{ii} = NP.Qe;
+		ve{ii} = NP.Ve;
+		tt{ii} = time;
+        ii = ii + 1;
 	end
 	
 % 	ve_mat = -cat(1, ve{:});
@@ -176,6 +177,13 @@ function convert_to_mea_(PM)
 	
 end
 
+function analyze_wave_directions_(params)
+fname = sprintf('%s/%s/%s_Seizure%d_Neuroport_%d_%d.mat', ...
+			pwd, params.label, params.label, params.sim_num, params.padding);
+paramfile = '';
+analyze_wave_directions;
+end
+
 %% Helpers
 
 function mea = add_noise_(mea, snr_dB)
@@ -188,16 +196,6 @@ function mea = add_noise_(mea, snr_dB)
 	noisy_sig = signal + scale_factor .* noise;
 	mea.Data = noisy_sig;
 
-end
-function event_inds = rate2events_(mea)
-% 	lambda = mea.firingRate;
-% 	X = rand(size(lambda));
-% 	events = X > exp(-lambda / mea.SamplingRate);
-% 	event_inds = find(events);
-	
-	FR = double(-mea.Data);
-	FR = (FR - min(FR)) ./ std(FR);
-	[~, event_inds, ~, ~] = findpeaks(FR(:), 'MinPeakHeight', 2);  
 end
 
 
