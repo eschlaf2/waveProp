@@ -26,8 +26,8 @@ if expansion_rate <= 0, map = logical(state); return; end
 boundary = conv2(state > 0, [0 1 0; 1 -4 1; 0 1 0], 'same') > 0;
 if ~exist('excitability_map', 'var'); excitability_map = ones(size(state)); end
 
-p_wavefront = 2^(.5*expansion_rate) - 1;  % 50% of area is recruited at this rate
-p_recruit = 2.^(.5*expansion_rate * excitability_map) - 1;  % wavefront dies off at rate indicated by excitability map
+p_wavefront = 2^(expansion_rate) - 1;  % 50% of area is recruited at this rate
+p_recruit = 2.^(expansion_rate * excitability_map) - 1;  % wavefront dies off at rate indicated by excitability map
 boundary = boundary .* excitability_map;
 
 dice = rand(size(state));

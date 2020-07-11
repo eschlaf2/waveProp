@@ -288,7 +288,7 @@ EC = rmfield(EC, no_return);
 % Update source and expand wavefront
 	function update_source
 		if time(ii) > 0 
-			[new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx^2, M.excitability_map);
+			[new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx, M.excitability_map);
 			if time(ii) <= PM.duration
 				new.dVe(new.map) = PM.source_drive; 
 				if isempty(PM.source), return, end
@@ -399,7 +399,6 @@ function fig = create_fig(out_vars, grid_size, addyNP, addyEC)
 	stop_at = 'seizing_cortical_field>update_gap_resting';
 	titles = out_vars;
 	N = numel(titles);
-% 	clims = {[0 30], [0 30], [0 1], [0 30]};
 	fig.fig = figure;
 	fig.quit_early = false;
 	% Create 'Quit' pushbutton in figure window
@@ -432,7 +431,7 @@ function fig = create_fig(out_vars, grid_size, addyNP, addyEC)
 	kN = convhull(xN(:), yN(:));
 	plot(h(1), xE(kE), yE(kE), '-', 'color', colorEC);
 	plot(h(1), xN(kN), yN(kN), '-', 'color', colorNP);
-	legend(h(1), {'EC', 'NP'}, 'location', 'southeast')
+	legend(h(1), {'EC', 'NP'}, 'location', 'southeast', 'textcolor', [1 1 1])
 	legend(h(1), 'boxoff')
 
 	hold(h(1), 'off')

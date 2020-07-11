@@ -171,10 +171,10 @@ classdef WaveProp
 			t1 = quantile(times(isfinite(s.Direction)), .025);
 		end
 		function nd_early = get.N_detections_early(s)
-			nd_early = numfinite(s.Direction(s.early));
+			nd_early = numfinite_(s.Direction(s.early));
 		end
 		function nd_late = get.N_detections_late(s)
-			nd_late = numfinite(s.Direction(s.late));
+			nd_late = numfinite_(s.Direction(s.late));
 		end
 		
 	end
@@ -583,7 +583,7 @@ classdef WaveProp
 			P0 = nan;
 			b = nan;
 			
-			finite = numfinite(data);
+			finite = numfinite_(data);
 			
 			
 			if finite > 3 && finite/numel(data) >= MIN_RATIO_FINITE  % check enough delay data is not NaN.
@@ -895,7 +895,7 @@ classdef WaveProp
 				
 				
 				for mm = 1:numel(metrics)
-					if numfinite(magnitude(:, mm)) < 10, continue; end
+					if numfinite_(magnitude(:, mm)) < 10, continue; end
 					pd = fitdist(magnitude(:, mm), 'Weibull');
 					out.Weibull_A(pp, mm) = pd.A;
 					out.Weibull_B(pp, mm) = pd.B;
@@ -1015,7 +1015,7 @@ classdef WaveProp
 					dd = data1.diff(data2);
 					dZ{idx} = dd;
 
-					N(idx) = numfinite(dZ{idx});
+					N(idx) = numfinite_(dZ{idx});
 					if N(idx) == 0, continue, end
 
 			% 		m1(idx) = mean(dZ{idx}, 'omitnan');
@@ -1040,3 +1040,8 @@ classdef WaveProp
 	
 end
 
+%% Local functions
+function n = numfinite_(X)
+% n = sum(isfinite(X), dim='all')
+n = sum(isfinite(X), 'all');
+end

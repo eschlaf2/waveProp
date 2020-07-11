@@ -2,7 +2,7 @@ classdef SCMParams < handle
 	
 	methods  % constructor and other operators
 		function P = SCMParams(varargin)
-			if nargin == 0, return; end
+			if nargin == 0, P = P.init(); return; end
 			switch class(varargin{1})
 				case 'SCMParams'
 					P = varargin{1};
@@ -29,11 +29,11 @@ classdef SCMParams < handle
 							end
 							
 						end
-						P.extract(params.meta);
+						P = P.extract(params.meta);
 						
 					else
 						for arg = varargin
-							P.extract(arg{:});
+							P = P.extract(arg{:});
 						end
 					end
 				case 'char'
@@ -42,17 +42,32 @@ classdef SCMParams < handle
 						P.(ff) = varargin{ii + 1};
 					end
 			end
-			P.IC.resize(P.grid_size);
+            P = P.init();
+			
+		end
+        function P = init(P)
+            if isempty(P.basename)  % set default basename
+				str = sprintf('%s/%s/%s', P.label, P.label, P.label); 
+				P.basename = str;
+            end
+            if ~isstruct(P.seed)  % set seed
+				P.seed = rng(P.seed);
+            end
+            if isempty(P.IC), P.IC = []; end  % set default IC
+			P.IC = P.IC.resize(P.grid_size);
 			if all(P.stim_center)
 				P.IC.map = false(P.grid_size);  % Source of ictal activity (on/off)
 				P.IC.map(P.stim_center(1), P.stim_center(2)) = 1;
 				P.IC.state = double(P.IC.map);  % Seizure state (ictal/non-ictal)
 			end
-			
-		end
+        end
+
 		function rotate(P, theta)
 			center = P.centerNP;
-			rot =@(xy) round((xy - center) * [cos(theta), -sin(theta); sin(theta), cos(theta)]) + center;
+			rot =@(xy) round( ...
+                    (xy - center) ...  % translate to center
+                    * [cos(theta), -sin(theta); sin(theta), cos(theta)] ...  % rotate
+                ) + center;  % translate back
 			
 			P.stim_center = rot(P.stim_center);
 			
@@ -69,18 +84,26 @@ classdef SCMParams < handle
 
 		end
 	end
-
+    
+    methods (Access = private)  % define defaults
+        function map = default_excitability_map(P)
+            [ix, iy] = ind2sub(P.grid_size, 1:prod(P.grid_size));
+            R = min(P.grid_size) / 2 - 3;
+            map = zeros(P.grid_size);
+            map(sum(([ix' iy'] - P.grid_size/2).^2, 2) < R.^2) = .5;
+        end
+    end
 	
 	properties  % meta
 		basename
 		sim_num
 		save = true  % Save output
 		visualization_rate = 0  % Show this many frames per second
-		t_step = 1  % Simulate t_step second intervals
-		t0_start = 0  % Allows continue from previous sim (IC will use last from file number t0_start-1)
-		duration (1,1) double {mustBePositive} = 190
-		padding (1,2) = [10 30]  % Padding before and after seizure
-		source_drive (1, 1) double = 3
+		t_step = 1  % Simulate <t_step> second intervals
+		t0_start  % Allows continue from previous sim (IC will use last from file number t0_start-1)
+		duration (1,1) double {mustBePositive} = 60
+		padding (1,2) = [10 10]  % Padding before and after seizure
+		source_drive (1, 1) double = 2.5
 		post_ictal_source_drive (1,1) double = 1.5
 		subsample (1,1) double {mustBePositive} = Inf  % Allow downsampling when creating mea
 		return_fields (1,:) = {'Qe', 'Ve'}  % Qe required to make mea
@@ -88,25 +111,16 @@ classdef SCMParams < handle
 		source % Define fixed, rotating sources of excitation
 		seed = rng  % Set seed for repeatability
 		label (1,:) char = 'SCM'
-		t0 = 0
+		t0  % used to keep track of progress in sims 
 	end
-	
 	methods  % getters for meta
-		function str = get.basename(p)
-			str = p.basename;
-			if isempty(str)
-				str = sprintf('%s/%s/%s', p.label, p.label, p.label); 
-				p.basename = str;
-			end
-		end
 		
-		function seed_struct = get.seed(p)
-			seed_struct = p.seed;
-			if ~isstruct(seed_struct)
-				seed_struct = rng(seed_struct); 
-				p.seed = seed_struct;
-			end
-		end
+        function t0s = get.t0_start(p)
+            if isempty(p.t0_start), p.t0_start = -p.padding(1); end
+            t0s = p.t0_start;
+        end
+		
+		
 		
 		function num = get.sim_num(P)
 			s = 1;
@@ -123,15 +137,14 @@ classdef SCMParams < handle
 	
 	
 	properties  % model
-		stim_center (1,2) = [0 0]
-		grid_size (1,2) {mustBePositive} = [100 100] % size of grid to simulate (must be even)
+		stim_center (1,2) = [20 20]
+		grid_size (1,2) {mustBePositive} = [50 50] % size of grid to simulate (must be even)
 		dt = 2e-4
-		dx = .3  % (mm) 
-		expansion_rate (1,1) double {mustBeNonnegative} = .1  % in mm^2/s; set to 0 for fixed source
+		dx = .4  % (mm) 
+		expansion_rate (1,1) double {mustBeNonnegative} = .625  % in mm^2/s; set to 0 for fixed source
 		excitability_map
-		IC SCM = SCM
+		IC SCM 
 	end
-	
 	methods  % model
 
 		function dt = get.dt(P)
@@ -143,22 +156,22 @@ classdef SCMParams < handle
 
 		end
 		function grid_size = get.grid_size(p)
-			if mod(p.grid_size, 2), p.grid_size = p.grid_size + mod(p.grid_size, 2); end
+			if any(mod(p.grid_size, 2)), p.grid_size = p.grid_size + mod(p.grid_size, 2); end
 			grid_size = p.grid_size;
 		end
 		function map = get.excitability_map(P)
-			if isempty(P.excitability_map)
-				P.excitability_map = ones(P.grid_size); 
+            map = P.excitability_map;
+			if isempty(map)
+				map = P.default_excitability_map; 
 			end
-			map = P.excitability_map;
 			assert(all(size(map) == P.grid_size))
 		end
 	end
 	
 	
 	properties  % steady states
-		tau_e = 0.02  % excit neuron time-constant (/s) [original = 0.04 s]
-		tau_i = 0.02  % inhib neuron time-constant (/s) [original = 0.04 s]
+		tau_e = 0.04  % excit neuron time-constant (/s) [original = 0.04 s, Martinet = 0.02 s]
+		tau_i = 0.04  % inhib neuron time-constant (/s) [original = 0.04 s, Martinet = 0.02 s]
 
 		% voltage limits
 		Ve_rev = 0  % reversal potential (mV)
@@ -175,7 +188,7 @@ classdef SCMParams < handle
 		gamma_i = 50  % IPSP decay rate (/s)
 
 		% gap-junction diffusive-coupling strength
-		D = 1  % i <--> i steady state (cm^2) [0, 1]
+		D = 0.8  % i <--> i steady state (cm^2) [0, 1]  [Martinet = 1]
 
 		% sigmoid characteristics
 		Qe_max = 30  % sigmoid maximum (s^-1)
@@ -184,7 +197,7 @@ classdef SCMParams < handle
 		theta_i = -58.5
 		sigma_e = 3.0	% sigmoid 'width' (mV)
 		sigma_i = 5.0
-                depo_block = 1  % apply depolarization block
+        depo_block = 1  % apply depolarization block
 
 		% connectivities: j-->k convention (dimensionless)			
 		Nee_a = 2000  % cortico-cortical
@@ -193,14 +206,18 @@ classdef SCMParams < handle
 		Nei_b = 800
 		Nie_b = 600
 		Nii_b = 600
-		% [Nee_sc,Nei_sc]= deal(50, 50)              % subcortical
+		
 
 		
 		% default subcortical fluxes
+        % %% ORIGINAL FORMULATION %%
+        % [Nee_sc,Nei_sc]= deal(50, 50)  % subcortical  
 		% phi_ee_sc = Nee_sc * Qe_max  % original [300]
 		% phi_ei_sc = Nei_sc * Qe_max  % original [300]
-		phi_ee_sc = 150  % original [300]
-		phi_ei_sc = 150  % original [300]
+
+        % %% EDS %%
+		phi_ee_sc = 300  % [original = 300, Martinet = 150]
+		phi_ei_sc = 300  % [original = 300, Martinet = 150]
 
 		% axonal conduction velocity (cm/s), 
 		v = 280  % [original = 140 cm/s]
@@ -256,7 +273,7 @@ classdef SCMParams < handle
 	properties  % potassium
 		tau_K = 200    %time-constant (/s).
 		k_decay = 0.1  %decay rate (/s).
-		kD = 1         %diffusion coefficient (cm^2/s).
+		kD = 100       %diffusion coefficient (mm^2/s).
 		KtoVe = 10     %impact on excitatory population resting voltage.
 		KtoVi = 10     %impact on inhibitory population resting voltage.
 		KtoD = -50    %impact on inhibitory gap junction strength.
@@ -271,11 +288,11 @@ classdef SCMParams < handle
 	
 	
 	properties % electrodes
-		centerNP
+		centerNP  % defaults to grid center
 		dimsNP = [10 10]
 
 		% Macroscale
-		centerEC
+		centerEC  % defaults to grid center
 		scaleEC = 4
 		dimsEC = [3 3]
 	end
@@ -321,16 +338,16 @@ classdef SCMParams < handle
 	
 	
 	properties % noise
-		noise_sf (1,1) double {mustBeNonnegative} = 2
+		noise_sf (1,1) double {mustBeNonnegative} = 4  % [Martinet = 2]
 		noise_sc (1,1) double {mustBeNonnegative} = 0.2;
 	end
 	
 	
 	properties  % sigmoids
-		kdVe_center = 0.8  % center of K-->dVe sigmoid
-		kdVe_width = .1  % ... and width
-		kD_center = .85  % center of K-->Dii sigmoid [use .06 to match Kramer sim]
-		kD_width =  .06  % ... and width [use .01 to match Kramer sim]
+		kdVe_center = 0.8  % center of K-->dVe sigmoid  [Martinet = 0.8]
+		kdVe_width = .1  % ... and width  [Martinet = 0.8]
+		kD_center = 3e-4  % center of K-->Dii sigmoid [Martinet = .06 / .85]
+		kD_width =  5e-4  % ... and width [Martinet = .01 / .06]
 	end
 	
 	
@@ -340,7 +357,7 @@ classdef SCMParams < handle
 				obj.(ff) = P.(ff);
 			end
 		end
-		function extract(P, obj)
+		function P = extract(P, obj)
 			for ff = string(fieldnames(obj)')
 				P.(ff) = obj.(ff);
 			end
@@ -361,11 +378,15 @@ classdef SCMParams < handle
 			end
 		end
 		function meta = get.meta(P)
-			names = ["basename", "sim_num", "save", "visualization_rate", "t_step", "t0_start", "duration", "padding", "source_drive", "post_ictal_source_drive", "subsample", "return_fields", "out_vars", "source", "seed", "label"];
+			names = ["basename", "sim_num", "save", "visualization_rate", ...
+                "t_step", "t0_start", "duration", "padding", ....
+                "source_drive", "post_ictal_source_drive", "subsample", ...
+                "return_fields", "out_vars", "source", "seed", "label"];
 			meta = P.substruct(names);
 		end
 		function model = get.model(P)
-			names = ["stim_center", "grid_size", "dt", "dx", "expansion_rate", "excitability_map"];
+			names = ["stim_center", "grid_size", "dt", "dx", ...
+                "expansion_rate", "excitability_map"];
 			model = P.substruct(names);
 		end
 		function time_constants = get.time_constants(P)
@@ -373,7 +394,8 @@ classdef SCMParams < handle
 			time_constants = P.substruct(names);
 		end
 		function potassium = get.potassium(P)
-			names = ["tau_K", "k_decay", "kD", "KtoVe", "KtoVi", "KtoD", "kR", "k_peak", "k_width"];
+			names = ["tau_K", "k_decay", "kD", "KtoVe", "KtoVi", "KtoD", ...
+                "kR", "k_peak", "k_width"];
 			potassium = P.substruct(names);
 		end
 		function electrodes = get.electrodes(P)
@@ -381,7 +403,10 @@ classdef SCMParams < handle
 			electrodes = P.substruct(names);
 		end
 		function bounds = get.bounds(P)
-			names = ["Dee", "Dii", "K", "Qe", "Qi", "Ve", "Vi", "dVe", "dVi", "Phi_ee", "Phi_ei", "Phi_ie", "Phi_ii", "phi2_ee", "phi2_ei", "phi_ee", "phi_ei", "F_ee", "F_ei", "F_ie", "F_ii"];
+			names = ["Dee", "Dii", "K", "Qe", "Qi", "Ve", "Vi", "dVe", ...
+                "dVi", "Phi_ee", "Phi_ei", "Phi_ie", "Phi_ii", ...
+                "phi2_ee", "phi2_ei", "phi_ee", "phi_ei", "F_ee", ...
+                "F_ei", "F_ie", "F_ii"];
 			bounds = P.substruct(names);
 		end
 		function noise = get.noise(P)
@@ -393,7 +418,13 @@ classdef SCMParams < handle
 			sigmoids = P.substruct(names);
 		end
 		function SS = get.SS(P)
-			names = ["tau_e", "tau_i", "Ve_rev", "Vi_rev", "Ve_rest", "Vi_rest", "rho_e", "rho_i", "gamma_e", "gamma_i", "D", "Qe_max", "Qi_max", "theta_e", "theta_i", "sigma_e", "sigma_i", "Nee_a", "Nei_a", "Nee_b", "Nei_b", "Nie_b", "Nii_b", "phi_ee_sc", "phi_ei_sc", "v", "Lambda", "d_psi_ee", "d_psi_ei", "d_psi_ie", "d_psi_ii", "Nee_ab", "Nei_ab", "depo_block"];
+			names = ["tau_e", "tau_i", "Ve_rev", "Vi_rev", "Ve_rest", ...
+                "Vi_rest", "rho_e", "rho_i", "gamma_e", "gamma_i", "D", ...
+                "Qe_max", "Qi_max", "theta_e", "theta_i", "sigma_e", ...
+                "sigma_i", "Nee_a", "Nei_a", "Nee_b", "Nei_b", "Nie_b", ...
+                "Nii_b", "phi_ee_sc", "phi_ei_sc", "v", "Lambda", ...
+                "d_psi_ee", "d_psi_ei", "d_psi_ie", "d_psi_ii", ...
+                "Nee_ab", "Nei_ab", "depo_block"];
 			SS = P.substruct(names);
 			SS.Dii = SS.D;  % naming used in seizing_cortical_field
 		end

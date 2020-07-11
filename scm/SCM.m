@@ -1,4 +1,4 @@
-classdef SCM < handle
+classdef SCM 
 % classdef SCM
 % Initialize global constants that define the locations of the steady
 % states.  
@@ -70,13 +70,10 @@ classdef SCM < handle
 	
 	methods
 		
-		function resize(S, grid_size)
+		function S = resize(S, grid_size)
 		% resize(SCM, grid_size)
 		% Converts scalar to matrix
 		
-% 			fields = metaclass(S).PropertyList;
-% 			mask = ~cat(1, fields.Constant) & ~cat(1, fields.Dependent);
-% 			for ff = string({fields(mask).Name})
 			for ff = string(properties(S)')
 				if ismember(ff, {'map', 'state'}), continue; end
 				if all(size(S.(ff)) == grid_size), continue; end
