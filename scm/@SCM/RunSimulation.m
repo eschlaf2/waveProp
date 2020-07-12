@@ -17,7 +17,11 @@ if T0_START > -PADDING(1)
     try
         load(sprintf('%s_%d_%03d', BASENAME, SIM_NUM, T0_START - 1), 'last')
     catch ME
-        
+        if ~(strcmpi('MATLAB:load:couldNotReadFile', ME.identifier))
+            rethrow(ME);
+        else
+            last = params.IC;
+        end
     end
 else
 	% ... otherwise, start a fresh sim
