@@ -59,7 +59,7 @@ dx = M.dx;
 dt = M.dt;
 
 % initialize random number generator (from input argument)
-rand_state = sum(100*clock);
+rand_state = params.seed.Seed * (params.t0 + 100);
 rng(rand_state, 'v5normal');
 
 % number of time-steps for simulation
@@ -72,7 +72,6 @@ B_ei = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ei_sc / dt);
 
 %% Define output variables
 
-% Output variables, (*) denotes returned.
 % Some are visualized, some are returned.
 
 out_vars = PM.out_vars;

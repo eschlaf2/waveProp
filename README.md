@@ -51,4 +51,11 @@ plot(mea.Time, mean(mea.lfp, 2));
 ```
 
 
+Martinet, L. E., G. Fiddyment, J. R. Madsen, E. N. Eskandar, W. Truccolo, U. T. Eden, S. S. Cash, and M. A. Kramer. “Human Seizures Couple across Spatial Scales through Travelling Wave Dynamics.” Nature Communications 8 (2017). https://doi.org/10.1038/ncomms14896.
+
+Steyn-Ross, Moira L, D A Steyn-Ross, and J W Sleigh. “Interacting Turing-Hopf Instabilities Drive Symmetry-Breaking Transitions in a Mean-Field Model of the Cortex: A Mechanism for the Slow Oscillation,” n.d. https://doi.org/10.1103/PhysRevX.3.021005.
+
+
+
+
 
