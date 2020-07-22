@@ -1,13 +1,19 @@
 classdef MetricComparison < handle
    methods
        function MC = MetricComparison(WP, metrics)
-           if nargin < 1, return, end
+           if nargin < 1
+               sz = BVNY.load_seizures;
+               N = height(sz);
+               fname = @(ii) sprintf('%s_Seizure%d_fits.mat', ...
+                   sz.patient{ii}, sz.seizure(ii));
+               MC = arrayfun(@(ii) MetricComparison(fname(ii)), 1:N);
+               return
+           end
            if nargin < 2, metrics = []; end
            if ischar(WP), WP = WaveProp.load('files', dir(WP)); end
            MC.Fit = WP;
            if ~isempty(metrics)
-               MC.Metric1 = string(metrics(1));
-               MC.Metric2 = string(metrics(2));
+               MC.Metrics = metrics;
            end
        end
        
@@ -17,6 +23,11 @@ classdef MetricComparison < handle
        function mn = get.mean(MC)
            mn = circ_mean(MC.diff, [], [], 'omitnan');
        end
+       function md = get.median(MC)
+           alpha = MC.diff(~isnan(MC.diff));
+           md = circ_median(alpha);
+           md = angle(exp(1j * md));
+       end
        function c = get.conf(MC)
            [mn, ul] = circ_mean(MC.diff, [], [], 'omitnan');
            c = ul - mn;
@@ -24,12 +35,64 @@ classdef MetricComparison < handle
        function sd = get.std(MC)
            sd = circ_std(MC.diff, [], [], 'omitnan');
        end
-       
+       function out = get.xcorr(MC)
+           % xcorr = [xc, pval]
+           data = MC.direction;
+           [xc, pval] = circ_corrcc(data(:, 1), data(:, 2));
+           out = [xc, pval];
+       end
+       function out = get.kuiper_test(MC)
+            % kuiper_test = [pval, k, K]
+            % [pval, k, K] = circ_kuipertest(data(:, 1), data(:, 2), 100, 1);
+            [pval, k, K] = circ_kuipertest(MC.Data1.Direction, MC.Data2.Direction);
+            out = [pval, k, K];
+       end
+       function dir = get.direction(MC)
+           % returns non-nan directions
+           dir = [MC.Data1.Direction, MC.Data2.Direction];
+           dir(any(isnan(dir), 2), :) = [];
+       end
+       function out = get.mtest(MC)
+           % mtest = [h mu ul ll]
+           alpha = MC.diff;
+           alpha(isnan(alpha)) = [];
+           [h mu ul ll] = circ_mtest(alpha, 0);
+           out = [h mu ul ll];
+       end
+       function pval = get.wwtest(MC)
+           data1 = MC.Data1.Direction;
+           data2 = MC.Data2.Direction;
+           data1(isnan(data1)) = [];
+           data2(isnan(data2)) = [];
+           pval = circ_wwtest(data1, data2);
+       end
+       function kappa = get.kappa(MC)
+           % kappa = circ_kappa(MC.diff)
+           alpha = MC.diff;
+           alpha(isnan(alpha)) = [];
+           kappa = circ_kappa(alpha);
+       end
+       function pval = get.rtest(MC)
+           alpha = MC.diff;
+           alpha(isnan(alpha)) = [];
+           pval = circ_rtest(alpha);
+       end
+       function out = get.ktest(MC)
+           % ktest = [p, f, rbar]
+           data = MC.direction;
+           n = size(data, 1);
+           R1 = n*circ_r(data(:, 1));
+           R2 = n*circ_r(data(:, 2));
+           rbar = (R1+R2)/(2*n);
+           if rbar < 0.7, out = [nan nan rbar]; return, end
+           [p, f] = circ_ktest(data(:, 1), data(:, 2));
+           out = [p, f, rbar];
+       end
        function data1 = get.Data1(MC)
-           data1 = MC.Fit.(MC.Metric1);
+           data1 = MC.Fit.(MC.M1);
        end
        function data2 = get.Data2(MC)
-           data2 = MC.Fit.(MC.Metric2);
+           data2 = MC.Fit.(MC.M2);
        end
        function p = get.Patient(MC)
            info = strsplit(MC.Fit.Name{:}, '_');
@@ -40,6 +103,9 @@ classdef MetricComparison < handle
            s = info(contains(lower(info), 'seizure'));
            s = str2double(s{:}(8:end));
        end
+       function m1 = M1(MC), m1 = MC.Metrics{1}; end
+       function m2 = M2(MC), m2 = MC.Metrics{2}; end
+       function set_metrics(MC, value), for m = MC, m.Metrics = value; end, end
        function set(MC, field, value)
            ss = validatestring(field, properties(MC));
            for m = MC, m.(ss) = value; end
@@ -90,6 +156,7 @@ classdef MetricComparison < handle
 
         include_zero = lowCI <= 0 & hiCI >=0 & ~nanconf;
         theta_small = abs(theta) < pi/4 & ~nanconf;
+        disagree = abs(theta) > pi/4 | nanconf;
 
         x = [1;1] * X;
         y = [lowCI'; hiCI'];
@@ -111,8 +178,10 @@ classdef MetricComparison < handle
             X(include_zero), theta(include_zero), 90, [1 0 0], 'tag', 'CI_incl_0');  
         plot(ax, ...    % indicate small differences with a *
             X(theta_small), theta(theta_small), 'r*', 'tag', 'small_diff');
+        plot(ax, ...    % indicate disagree differences with a star
+            X(disagree), theta(disagree)*0 + .75*pi, 'kp', 'tag', 'disagree');
         ylabel(ax, sprintf('%s - %s', ...
-            MC(1).Metric2, MC(1).Metric1 ...
+            MC(1).M2, MC(1).M1 ...
             ));
         hold(ax, 'off');
         yline(ax, 0);
@@ -121,7 +190,7 @@ classdef MetricComparison < handle
 %         annotation('textbox', ...
 %             'string', {'\circ := CI includes zero'; '* := \theta < \pi/4'}, ...
 %             'Position', [.01 .9 .05 .04], 'FitBoxToText', true);
-        ax.Tag = [MC(1).Metric1 '_' MC(1).Metric2];
+        ax.Tag = [MC(1).M1 '_' MC(1).M2];
 
     end
 
@@ -130,18 +199,27 @@ classdef MetricComparison < handle
    end
    properties
        Fit 
-       Metric1
-       Metric2
+       Metrics (1, 2) = {'M', 'E'}
    end
    properties (Dependent = true, SetAccess = private)
        Data1
        Data2
+       Patient
+       Seizure
+
        diff
        std
        mean
+       median
        conf
-       Patient
-       Seizure
+       xcorr
+       ktest
+       direction
+       kuiper_test  % analogue of KS test
+       mtest  % H0: mean of differences == 0
+       wwtest % H0: the two populations have equal means (returns pval)
+       kappa  % estimate of concentration parameter of VM dist
+       rtest  % Rayleigh test for uniformity. H0: the population is uniformly distributed about the circle
    end
 end
 

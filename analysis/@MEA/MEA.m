@@ -47,13 +47,32 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		Fits
 		Coherent
 		PeakRatio
+        SpatialCoherence
+        NumEvents
+
 	end
 	
 	properties (Access = public, Dependent = true)
 		skipfactor
 		Center
 		Active
-	end
+    end
+    
+    methods  % defined in other files (... REORGANIZE! ...)
+        coh = compute_spatial_coherence(self)
+        function coh = get.SpatialCoherence(self)
+            if isempty(self.SpatialCoherence)
+                self.SpatialCoherence = self.compute_spatial_coherence;
+            end
+            coh = self.SpatialCoherence;
+        end
+        function m = median_mw_spectrum(self)
+            m = nanmedian(self.Spectrum.power(self.Active, :));
+        end
+        function nd = get.NumEvents(self)
+            nd = full(sum(self.event_inds, 'all')) / size(self.Data, 2) / self.Duration;
+        end
+    end
 	
 
 	methods % init, setters and getters

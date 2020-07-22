@@ -764,20 +764,24 @@ classdef WaveProp
 			
 			% Cleaning
 			if args.original
-				fname =@(p, s) sprintf('%s_Seizure%s_Neuroport_10_10_wave_prop.mat', p, s);
+				fname =@(p, s) sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', p, s);
 			else
-				fname =@(p, s) sprintf('%s_Seizure%s_fits.mat', p, s);
+				fname =@(p, s) sprintf('%s_Seizure%d_fits.mat', p, s);
 			end
 			if isempty(args.files)
 				if ischar(args.pat) && ischar(args.seizure)
 					if strcmpi([args.pat args.seizure], '**')
-						fid = fopen('seizures2.txt');
-						A = textscan(fid, '%s %s'); 
-						pats = A{1}; seizures = A{2};
+                        sz = BVNY.load_seizures;
+                        pats = sz.patient;
+                        seizures = sz.seizure;
+% 						fid = fopen('seizures2.txt');
+% 						A = textscan(fid, '%s %s'); 
+% 						pats = A{1}; seizures = A{2};
+%                         fclose(fid);
 						for ii = numel(pats):-1:1
-							files(ii) = dir(fname(pats{ii}, seizures{ii}));
+							files(ii) = dir(fname(pats{ii}, seizures(ii)));
 						end
-						fclose(fid);
+						
 						args.files = files;
 					else
 						args.files = dir(fname(args.pat, args.seizure));
