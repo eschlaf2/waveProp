@@ -364,8 +364,15 @@ classdef SCM < handle
 		function set.SS(P, value)
 			for ff = string(fieldnames(value)')
 				if strcmp(ff, 'Dii'), P.D = value.Dii;
-				elseif strcmp(ff, 'Dee'), continue;
-				else, P.(ff) = value.(ff);
+				elseif ismember(ff, {'Dee', 'd_psi_ee', 'd_psi_ei', 'd_psi_ie', 'd_psi_ii'}), continue;
+                else
+                    try
+                        P.(ff) = value.(ff);
+                    catch ME
+                        if ~strcmpi(ME.identifier, 'MATLAB:class:noSetMethod')
+                            rethrow(ME);
+                        end
+                    end
 				end
 			end
 		end

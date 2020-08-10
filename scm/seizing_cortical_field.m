@@ -256,21 +256,22 @@ EC = rmfield(EC, no_return);
 	function update_extracellular_ion
 		new.K = ...
 			last.K ...
-			+ dt / PK.tau_K .* ( ...
-				- PK.k_decay .* last.K ...  % decay term.
-				+ PK.kR .* ...              % reaction term.
-					1 ./ ( 1 + exp( -( last.Qe + last.Qi ) + 15) ) ...
+			+ dt / (PK.tau_K) .* ( ...
+				- PK.k_decay * (.1) .* last.K ...  % decay term.
+				+ PK.kR * (50).* ...              % reaction term.
+					(2 ./ ( 1 + exp( -( last.Qe + last.Qi ) + 15 ) ) - 1 ) ...
 			) ...
-			+ dt * PK.kD./dx^2 * del2_(last.K);  % diffusion term.
+			+ dt * PK.kD*1./dx^2 * del2_(last.K);  % diffusion term.
 			
 	end
 
 % 6. Update inhibitory gap junction strength, and resting voltages.  
 	function update_gap_resting
-		new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* wD(last.K) - (last.Dii - SS.Dii));
+		new.Dii = last.Dii + dt / (PT.tau_dD * 4) * ( PK.KtoD .* wD(last.K) - (last.Dii - SS.Dii));
 		new.Dee = last.Dii/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
-		new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* wdVe(last.K) - last.dVe);
-		new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
+        
+		new.dVe = last.dVe + dt / (PT.tau_dVe * .5) .* (PK.KtoVe .* wdVe(last.K) - last.dVe);
+		new.dVi = last.dVi + dt / (PT.tau_dVi * .5) .* (PK.KtoVi .* wdVe(last.K) - last.dVi);
 	end
 
 % Correct out of bounds values
@@ -295,7 +296,7 @@ EC = rmfield(EC, no_return);
 				new.dVe(PM.source(:, :, which_source)) = PM.source_drive;
 			else
 				if isnan(PM.post_ictal_source_drive), return; end			
-				new.dVe(new.map) = PM.post_ictal_source_drive;
+% 				new.dVe(new.map) = PM.post_ictal_source_drive;
 			end
 		end
 	end
@@ -325,7 +326,7 @@ EC = rmfield(EC, no_return);
 	function visualize
 		if PM.visualization_rate > 0
 			if ~exist('fig', 'var') || isempty(fig)
-				fig = create_fig_(out_vars, M.grid_size, indsNP, indsEC);
+				fig = create_fig_(params, indsNP, indsEC);
 			end
 			if diff(floor((time(ii) - [dt 0]) * PM.visualization_rate))
 				for sp = 1:numel(fig.ih)
@@ -335,7 +336,8 @@ EC = rmfield(EC, no_return);
 
 				set(fig.ah, 'string', sprintf('T = %0.3f', time(ii)));
 				drawnow;
-			end
+            end
+            if fig.quit_early, assignin('caller', 'BREAK_EARLY', true); end
 		end
 	end
 
@@ -343,12 +345,25 @@ EC = rmfield(EC, no_return);
 
 % Excitability (voltage offset) as a function of potassium
 	function y = wdVe(K)
-		y = 2 ./ ( 1 + exp( -( 2/PS.kdVe_width * (K - PS.kdVe_center) ) ) ) - 1;
+        bounds = PS.kdVe_center + .5*[-1 1]*PS.kdVe_width;
+        
+%         low = K < bounds(1);
+        middle = K >= bounds(1) & K <= bounds(2);
+        high = K > bounds(2);
+        
+        y = middle .* PM.source_drive + high .* PM.post_ictal_source_drive;
+        
 	end
 	
 % Gapjunction functionality as a function of potassium
 	function y = wD(K)
-		y = 1 ./ (1 + exp( -( 2/PS.kD_width * (K - PS.kD_center) ) ));
+% 		y = 1 ./ (1 + exp( -( 2/PS.kD_width * (K - PS.kD_center) ) ));
+        bounds = PS.kD_center + PS.kD_width / 2 * [-1 1];
+        middle = K >= bounds(1) & K <= bounds(2);
+        high = K > bounds(2);
+        
+        y = middle .* [ 1./diff(bounds) * (K - bounds(1)) ] + high .* 1;
+        
 	end
 
 % e-to-e reversal-potential weighting function
@@ -394,16 +409,21 @@ L = [a b a; b -3 b; a b a];  % 9-point stencil Laplacian
 end
 
 %------------------------------------------------------------------------
-function fig = create_fig_(out_vars, grid_size, addyNP, addyEC)
+function fig = create_fig_(params, addyNP, addyEC)
 	stop_at = 'seizing_cortical_field>update_gap_resting';
-	titles = out_vars;
+	titles = params.out_vars;
 	N = numel(titles);
 	fig.fig = figure;
 	fig.quit_early = false;
+    
 	% Create 'Quit' pushbutton in figure window
 	uicontrol('units','normal','position',[.45 .02 .13 .07], ...
 	    'callback',['dbstop in ' stop_at],...
 	    'fontsize',10,'string','Debug');
+    uicontrol('units','normal','position',[.6 .02 .13 .07], ...
+	    'callback','pause',...
+	    'fontsize',10,'string','Pause');
+    
 	dbclear seizing_cortical_field>visualize
 	h = gobjects(N, 1);
 	th = gobjects(N, 1);
@@ -413,7 +433,12 @@ function fig = create_fig_(out_vars, grid_size, addyNP, addyEC)
 	nc = ceil(N / nr);
 	for ii = 1:N
 		h(ii) = subplot(nr,nc,ii);
-		ih(ii) = imagesc(zeros(grid_size));
+        if any(isinf(params.(titles{ii})))
+            ih(ii) = imagesc(zeros(params.grid_size));
+        else
+            ih(ii) = imagesc(zeros(params.grid_size), params.(titles{ii}));
+        end
+		
 		th(ii) = title(titles{ii});
 		colormap bone; axis equal; axis tight; axis ij; colorbar;
 	end
@@ -424,8 +449,8 @@ function fig = create_fig_(out_vars, grid_size, addyNP, addyEC)
 	
 	hold(h(1), 'on')
 	
-	[xE, yE] = ind2sub(grid_size, addyEC);
-	[xN, yN] = ind2sub(grid_size, addyNP);
+	[xE, yE] = ind2sub(params.grid_size, addyEC);
+	[xN, yN] = ind2sub(params.grid_size, addyNP);
 	kE = convhull(xE(:), yE(:));
 	kN = convhull(xN(:), yN(:));
 	plot(h(1), xE(kE), yE(kE), '-', 'color', colorEC);

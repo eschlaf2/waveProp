@@ -30,6 +30,7 @@ end
 
 K = PADDING(2) + DURATION;
 fig = [];
+
 for t0 = PM.t0_start:T_STEP:K-T_STEP  % For each step
 	tic
 	% Update time offset
@@ -52,6 +53,8 @@ for t0 = PM.t0_start:T_STEP:K-T_STEP  % For each step
 	toc
 	% ... update progress.
 	fprintf('Done.\n')  
+    
+   
 end
 
 end
