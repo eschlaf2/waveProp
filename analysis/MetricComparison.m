@@ -32,6 +32,13 @@ classdef MetricComparison < handle
            [mn, ul] = circ_mean(MC.diff, [], [], 'omitnan');
            c = ul - mn;
        end
+       function c = get.conf_onesided(MC)
+           theta = MC.diff;
+           theta(isnan(theta)) = [];
+           mn = abs(MC.mean);
+           t = circ_confmean(theta,0.1);
+           c = mn + t;
+       end
        function sd = get.std(MC)
            sd = circ_std(MC.diff, [], [], 'omitnan');
        end
@@ -49,7 +56,17 @@ classdef MetricComparison < handle
        end
        function dir = get.direction(MC)
            % returns non-nan directions
-           dir = [MC.Data1.Direction, MC.Data2.Direction];
+           data1 = MC.Data1;
+           data2 = MC.Data2;
+           if numel(data1.Direction) > numel(data2.Direction)
+               data1 = data1.resample_t0(data2.time);
+           else
+               data2 = data2.resample_t0(data1.time);
+           end
+           
+           dir = [data1.Direction, data2.Direction];
+           
+           
            dir(any(isnan(dir), 2), :) = [];
        end
        function out = get.mtest(MC)
@@ -58,6 +75,12 @@ classdef MetricComparison < handle
            alpha(isnan(alpha)) = [];
            [h mu ul ll] = circ_mtest(alpha, 0);
            out = [h mu ul ll];
+       end
+       function N = get.proportion_valid(MC)
+           N = numfinite(MC.diff) ./ numel(MC.diff);
+       end
+       function N = get.num_valid(MC)
+           N = numfinite(MC.diff);
        end
        function pval = get.wwtest(MC)
            data1 = MC.Data1.Direction;
@@ -110,6 +133,30 @@ classdef MetricComparison < handle
            ss = validatestring(field, properties(MC));
            for m = MC, m.(ss) = value; end
        end
+       function agree = get.StrongAgree(MC)
+           agree = abs(MC.mean) + MC.conf < MC.H0;
+       end
+       function agree = get.WeakAgree(MC)
+           agree = ~MC.StrongAgree & ...
+               abs(MC.mean) < MC.H0 & ...
+               abs(MC.mean) + MC.conf < pi/2;
+       end
+       function agree = get.Agree(MC)
+           agree = MC.StrongAgree | MC.WeakAgree;
+       end
+       function biased = get.Biased(MC)
+           biased = ~MC.Agree & MC.conf < pi/3;
+       end
+       function disagree = get.Disagree(MC)
+           disagree = ~MC.Agree & ~MC.Biased;
+       end
+       
+        function xx = xlocs(F)
+            patient = {F.Patient};
+            G = findgroups(patient);
+            dG = G(2:end) - G(1:end - 1);
+            xx = (1:numel(patient)) + cumsum([0 logical(dG)]);  % add a gap between patients
+        end
        
     function ax = plot(MC, varargin)
         % Plot the circular mean and standard deviation comparing chosen metrics
@@ -122,9 +169,7 @@ classdef MetricComparison < handle
         % Extract variables from table
         theta = cat(1, MC.mean);
         cconf = cat(1, MC.conf);
-        patient = {MC.Patient};
         seizure = cat(1, MC.Seizure);
-        N = numel(MC);
 
         nanconf = isnan(cconf);
         cconf(nanconf) = pi;
@@ -132,13 +177,14 @@ classdef MetricComparison < handle
         % Compute lower and upper bounds (circular confidence)
         lowCI = theta - cconf;
         hiCI = theta + cconf;
-
+        
 
         %% Make the figure
 
         % Plot the means first so it's easy to label
-        G = findgroups(patient);
-        X = (1:N) + cumsum([0 logical(diff(G))]);  % add a gap between patients
+%         G = findgroups(patient);
+%         X = (1:N) + cumsum([0 logical(diff(G))]);  % add a gap between patients
+        X = MC.xlocs;
         yy = nan(1, max(X));  % gaps should have nan values
         yy(X) = theta;
 
@@ -156,7 +202,8 @@ classdef MetricComparison < handle
 
         include_zero = lowCI <= 0 & hiCI >=0 & ~nanconf;
         theta_small = abs(theta) < pi/4 & ~nanconf;
-        disagree = abs(theta) > pi/4 | nanconf;
+%         disagree = abs(theta)+cconf > pi/4 | nanconf;
+        disagree = cat(1, MC.Disagree) | cat(1, MC.Biased);
 
         x = [1;1] * X;
         y = [lowCI'; hiCI'];
@@ -178,8 +225,9 @@ classdef MetricComparison < handle
             X(include_zero), theta(include_zero), 90, [1 0 0], 'tag', 'CI_incl_0');  
         plot(ax, ...    % indicate small differences with a *
             X(theta_small), theta(theta_small), 'r*', 'tag', 'small_diff');
-        plot(ax, ...    % indicate disagree differences with a star
-            X(disagree), theta(disagree)*0 + .75*pi, 'kp', 'tag', 'disagree');
+        scatter(ax, ...    % indicate disagree differences with a star
+            X(disagree), theta(disagree)*0 + .75*pi, 25, [0 0 0], ...
+            'filled', 'Marker', 'p', 'tag', 'disagree');
         ylabel(ax, sprintf('%s - %s', ...
             MC(1).M2, MC(1).M1 ...
             ));
@@ -193,19 +241,40 @@ classdef MetricComparison < handle
         ax.Tag = [MC(1).M1 '_' MC(1).M2];
 
     end
-
+    function color = get.Color(self)
+        mtc = self.Metrics;
+        cmap = lines;
+        %         cmap = dark2; 
+        testfun =@(x) all(contains(mtc, x));
+        if testfun({'M', 'E'})
+            color = cmap(1, :);
+        elseif testfun({'M', 'D1xwh'})
+            color = cmap(2, :);
+        elseif testfun({'E', 'D1xwh'})
+            color = cmap(3, :);
+        else
+            color = cmap(4, :);
+        end
+    end
 
        
    end
    properties
        Fit 
        Metrics (1, 2) = {'M', 'E'}
+       Color
+       H0 = pi/4
    end
    properties (Dependent = true, SetAccess = private)
        Data1
        Data2
        Patient
        Seizure
+       Agree
+       Disagree
+       WeakAgree
+       StrongAgree
+       Biased
 
        diff
        std
@@ -215,11 +284,14 @@ classdef MetricComparison < handle
        xcorr
        ktest
        direction
+       conf_onesided  % one-sided test (mean < theta, p < .05)
        kuiper_test  % analogue of KS test
        mtest  % H0: mean of differences == 0
        wwtest % H0: the two populations have equal means (returns pval)
        kappa  % estimate of concentration parameter of VM dist
        rtest  % Rayleigh test for uniformity. H0: the population is uniformly distributed about the circle
+       proportion_valid  % proportion of non-nan (finite) comparisons
+       num_valid  % number of non-nan (finite) comparisons
    end
 end
 
@@ -228,10 +300,9 @@ end
 
 function [MC, ax, line_color, args] = parse_inputs_(MC, args)
     line_color = lines(1);
-    
+    ax = [];
     isax = cellfun(@(a) isa(a, 'matlab.graphics.axis.Axes'), args);
-    ax = args{isax};
-    args(isax) = [];
+    if any(isax), ax = args{isax}; args(isax) = []; end
     if isempty(ax), ax = axes(figure); end
     
     char_args = cellfun(@ischar, args);

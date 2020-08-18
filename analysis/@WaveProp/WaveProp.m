@@ -14,6 +14,7 @@ classdef WaveProp
 		ClustSize
 		Quadratic = false
 		RotateBy = 0
+        MinFinite = 10
 % 		HalfWin
 % 		FBand
 	end
@@ -52,7 +53,10 @@ classdef WaveProp
 		First_detection
 		N_detections_early
 		N_detections_late
-	end
+    end
+    methods  % imports
+        [H, centers, T] = hist(obj, window, mean_center, show_directions, h)
+    end
 	
 	methods  % Getters and Setters
 		function inds = get.Inds(s)
@@ -85,13 +89,31 @@ classdef WaveProp
 		function Z = get.complexZ(s)
 			Z = complex(s.Vx, s.Vy);
 			Z = Z(s.Inds);
-		end
+        end
+        function minfinite = get.MinFinite(s)
+            if numel(s.MinFinite) > 1
+                s.MinFinite = max(s.MinFinite);
+            end
+            minfinite = s.MinFinite;
+        end
 		function mask = get.mask(s)
 			M = sqrt(s.Vx.^2 + s.Vy.^2);
 			M(M > 1e6) = nan;
 			M(isoutlier(M)) = nan;
 			M = M(s.Inds);
+            num_finite = sum(isfinite(s.Data), [2 3]);
+            M(num_finite < s.MinFinite(1)) = nan;
 			mask = s.p > s.sig | isnan(M);
+            
+            % mask times when VNS is active in CUCX5
+            if strcmpi(s.Name, 'cucx5_seizure3')
+                vns_times = s.time >= 13 & s.time <= 29;
+                mask = mask | vns_times;
+            end
+            if strcmpi(s.Name, 'cucx5_seizure6')
+                vns_times = s.time >= 46 & s.time <= 62;
+                mask = mask | vns_times;
+            end
 		end
 		function D = get.Data(s)
 			if size(s.Data, 1) ~= numel(s.t0)
@@ -227,7 +249,7 @@ classdef WaveProp
 			[ax, tt] = WaveProp.parse_plot_inputs(varargin{:});
 			if ndims(s.Data) == 3
 				[~, which_t] = min(abs(tt - s.time));
-				data = s.Data(:, :, which_t);
+				data = squeeze(s.Data(which_t, :, :));
 				vx = s.Vx(which_t);
 				vy = s.Vy(which_t);
 			else
@@ -245,66 +267,6 @@ classdef WaveProp
 				'MaxHeadSize', 1)
 			hold(ax, 'off')
 			ax.Tag = checkname(['figs' filesep s.Name '_' class(s) '_' num2str(tt) '_plot2D']);
-		end
-		function [H, centers, T] = hist(obj, window, mean_center, show_directions, h)
-			% [H, edges, T] = hist(window=1, mean_center=true, show_directions=true, h=gcf)
-			
-			if nargin < 5, h = gcf; end
-			if nargin < 4 || isempty(show_directions), show_directions = true; end
-			if nargin < 3 || isempty(mean_center), mean_center = true; end
-			if nargin < 2 || isempty(window), window = 1; end
-			t = obj.time;
-			if mean_center
-				obj.Direction = angle(exp(1j*(obj.Direction - obj.mean)));
-			end
-% 			dir = exp(obj.Vx + 1j*obj.Vy);
-			T = t(1):.01:t(end)+.01;
-			edges = linspace(-pi, pi, 65);
-			H = nan(length(edges)-1, length(T));
-			for ii = 1:length(T)
-				t_inds = abs(t - T(ii)) <= window/2;
-				dir = obj.Direction(t_inds);
-				H(:, ii) = histcounts(dir, edges) ./ window;
-			end
-            TL = tiledlayout(h, 1, 9);
-            ax_summ = nexttile(TL, [1, 2]);
-            ax_main = nexttile(TL, [1, 7]);
-            
-
-			win = gausswin(round(pi/4 / diff(edges(1:2)))) .* gausswin(round(window ./ diff(T(1:2))))';
-			win = win / sum(win, 'all');
-			H = [H; H; H];
-			centers = unwrap(repmat(edges(1:end-1)' + diff(edges(1:2)/2), 3, 1)) - 2*pi;
-			H = conv2(H, win, 'same');
-			angle_mask = abs(centers) <= pi;
-			centers = centers(angle_mask);
-			H = H(angle_mask, :);
-			contourf(ax_main, T, centers, H, quantile(H(:), .1:.05:.9), 'linestyle', 'none'); %conv2(H, ones(4, window/2*1e3)/(2*window*1e3), 'same'));
-			if show_directions
-				NP = ax_main.NextPlot;
-				ax_main.NextPlot = 'add';
-				plot(ax_main, obj.time, obj.Direction, '.', 'markersize', 10);
-				ax_main.NextPlot = NP;
-			end
-			colorbar(ax_main);
-            
-            
-			
-% 			axis(ax, 'xy');
-			plot(ax_summ, smoothdata(max(H, [], 2)), centers, 'linewidth', 2);
-			axis(ax_summ, 'tight');
-			xticks(ax_summ, []); yticks(ax_summ, []);
-			xlabel(ax_main, 'Time (s)')
-			ylabel(ax_main, 'Direction')
-            
-            ax_main.Tag = 'Main';
-            ax_summ.Tag = 'Summ';
-% 			SR = 1/min(diff(t));
-% 			W = ones(floor(SR * window), 1);
-% 			T = min(t):1/SR:max(t)+1/SR;
-% 			D = zeros(size(T));
-% 			t_inds = interp1(T, 1:length(T), t, 'nearest');
-% 			D(t_inds) = dir;
 		end
 		function [d, xi, bw] = ksdensity(obj, ax, rotateby, xres, bw, varargin)
 			% [d, xi, bw] = ksdensity(ax=gca, rotateby=0, xres=pi/500, bw=.15*pi/3, ::plot directives::)
@@ -497,7 +459,7 @@ classdef WaveProp
 	
 	methods (Static)
 		function [ax, tt, directive] = parse_plot_inputs(varargin)
-			ax = gca; tt = 0;
+			ax = []; tt = 0;
 			for arg = varargin
 				if isa(arg{:}, 'matlab.graphics.axis.Axes')
 					ax = arg{:};
@@ -508,7 +470,8 @@ classdef WaveProp
 				else
 					error("Unrecognized input")
 				end
-			end
+            end
+            if isempty(ax), ax = axes(figure); end
 		end
 		
 		function [mat, times] = WP2mat(obj, field, times)

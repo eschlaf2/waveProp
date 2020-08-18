@@ -89,6 +89,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			mea.SRO = temp.SamplingRate;
 			mea.AllTime = temp.Time;
 			mea.Raw = temp.Data;
+            
 
 			for f = fieldnames(temp)'
 				switch f{:}
@@ -99,10 +100,13 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 					otherwise
 						continue
 				end
-			end
-			
+            end
 			[mea.patient, mea.seizure] = mea.get_info(mea.Path);
-			
+%             if strcmpi(mea.patient, 'cucx5')
+%                 disp('Whitening data from CUCX5 ...')
+%                 mea.Raw = zca_whitening(single(temp.Data));
+%                 disp('Done.');
+%             end
 		end
 		function name = get.Name(mea)
 			name = [mea.patient '_Seizure' mea.seizure];
@@ -384,8 +388,12 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		function mua = get.mua(mea)
 			mua = mea.mua;
 			if isempty(mua)
+%                 disp('Whitening ...')
+%                 data = zca_whitening(single(mea.Raw));
+
+                data = single(mea.Raw);
 				disp('Filtering mua ...')
-				mua = mea.filter(mea.Raw, mea.SRO, [300 3000]);
+				mua = mea.filter(data, mea.SRO, [300 3000]);
 				
 				disp('Done')
 				mea.artefacts = mea.get_artefacts(mua, mea.params.artefact_thresh);
@@ -475,7 +483,13 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 				s.BSI = bsi;
 			end
 			
-		end
+        end
+        function fit = get.Fits(s)
+            if isempty(s.Fits)
+                s.Fits = WaveProp.load(s);
+            end
+            fit = s.Fits;
+        end
 		function wt = get.WaveTimes(s)
 			if isempty(s.WaveTimes)
 				wt = s.compute_wave_times(s);
@@ -605,7 +619,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			if nargin < 3, min_peak_height = -Inf; end
 			switch method
 				case 'bsi'
-					data = zscore(mean(s.BSI, 2));
+					data = zscore(nanmean(s.BSI, 2));
 					minProm = 0;
 				case 'lfp'
 					data = -zscore(mean(s.lfp, 2));
@@ -967,7 +981,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 				'', '\pi/2', '', '\pi'});
 			ylabel(ax, {'Direction', 'Normalized Signal'})
 			xlabel(ax, 'Time (s)');
-			title(ax, [s.patient s.seizure]);
+			title(ax, [s.patient ' ' s.seizure]);
 			ax.NextPlot = NP;
 			fr.ax = ax;
 			fr.frline = frline;

@@ -3,10 +3,11 @@ classdef MaxDescent < WaveProp
 	properties
 		HalfWin = 0.05
 		FBand = [1 50]
+        Ascent = false
 	end
 	
 	properties (Hidden = true)
-		ParamNames = ["Position" "HalfWin" "FBand"]
+		ParamNames = ["Position" "HalfWin" "FBand" "Ascent"]
 	end
 	
 	methods
@@ -41,6 +42,7 @@ classdef MaxDescent < WaveProp
 			t_inds = abs(mea.Time - obj.t0) <= obj.HalfWin;
 			t = mea.Time(t_inds);
 			data = mea.MaxDescentData;
+            if obj.Ascent, data = -data; end
 % 			if all(obj.FBand == [2 50])
 % 				data = zscore(mea.lfp);
 % 			else
