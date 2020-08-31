@@ -59,7 +59,8 @@ dx = M.dx;
 dt = M.dt;
 
 % initialize random number generator (from input argument)
-rand_state = sum(100*clock);
+rand_state = 1e3*PM.sim_num + round(params.t0);
+% rand_state = sum(100*clock);
 rng(rand_state, 'v5normal');
 
 % number of time-steps for simulation

@@ -37,10 +37,12 @@ try rng(params.meta.seed); catch ME; end
 
 create_directory(params);
 run_simulation(params);
-convert_to_mea(params);
+convert_to_mea(params.meta);
 
+if ~isfield(params, 'label'), params.label = 'SCM'; end
+% if ~isfield(params, 'padding'), params.padding = params.meta.padding; end
 fname = sprintf('%s/%s/%s_Seizure%d_Neuroport_%d_%d.mat', ...
-			pwd, params.label, params.label, params.sim_num, params.padding);
+    pwd, params.label, params.label, params.meta.sim_num, params.meta.padding);
 paramfile = '';
 % analyze_wave_directions;
 
@@ -108,8 +110,11 @@ end
 end
 
 function convert_to_mea(PM)
+    
 	if ~isfield(PM, 'label'), PM.label = 'SCM'; end
-    if ~isfield(PM, 'basename'), PM.basename = 'SCM/SCM/SCM'; end
+    if ~isfield(PM, 'basename'), PM.basename = PM.meta.basename; end
+    if ~isfield(PM, 'subsample'), PM.subsample = PM.meta.subsample; end
+    if ~isfield(PM, 'padding'), PM.padding = PM.meta.padding; end
 	files = dir(sprintf('%s_%d_*mat', PM.basename, PM.sim_num));
 	addpath(files(1).folder);
 	load(files(1).name, 'last');
