@@ -289,7 +289,8 @@ EC = rmfield(EC, no_return);
 % Update source and expand wavefront
 	function update_source
 		if time(ii) > 0 
-			[new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx^2, M.excitability_map);
+			[new.map, new.state] = update_map_smooth(last.state, M.expansion_rate * dt / dx^2, M.excitability_map, dt);
+%             [new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx^2, M.excitability_map, dt);
 			if time(ii) <= PM.duration
 				new.dVe(new.map) = PM.source_drive; 
 				if isempty(PM.source), return, end

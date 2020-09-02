@@ -1,4 +1,4 @@
-function [map,state] = update_map(state, expansion_rate, excitability_map)
+function [map,state] = update_map(state, expansion_rate, excitability_map, ~)
 
 %% Initialization
 if isstruct(state) 
