@@ -11,6 +11,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		Position
 		Time
 		SamplingRate = 1000
+        Units = '0.25 microvolts'
 		event_inds
 	end
 	
@@ -647,7 +648,38 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 				'w', w, 'p', p, 'outliers', outliers);
 			
 			
-		end
+        end
+        
+        function [C, q, t, ps, f] = cepstrogram(mea, data, freqrange)
+            % [C, q, t, ps, f] = cepstrogram(data=mea.Data, freqrange=[0.3 100]);
+            
+            if nargin < 2 || isempty(data), data = mea.Data; end
+            if nargin < 3 || isempty(freqrange), freqrange = [0.3 100]; end
+            freqrange(1) = max(freqrange(1), 0.3);
+            
+            SR = mea.SamplingRate;
+            Nch = size(data, 2);
+            ps = cell(Nch, 1);
+            f = exp(linspace(log(freqrange(1)), log(freqrange(2)), 1024));
+            
+            for ch = 1:Nch
+                [~, ~, t, ps{ch}] = ...
+                    spectrogram(data(:, ch), SR, .9*SR, f, SR); 
+            end
+            
+            
+            C = zeros(4096, numel(t), Nch, 'single');
+            for ch = 1:Nch
+%                 ceps = zeros(size(C));
+                for tt = 1:numel(t)
+%                     [ceps(:, tt), q] = pspectrum(pow2db(ps{ch}(:, tt)), f);
+                    [C(:, tt, ch), q] = pspectrum(pow2db(ps{ch}(:, tt)), f);
+
+                end
+%                 C = C + pow2db(ceps);
+            end
+            save(['cepstrograms/' mea.patient '_' mea.seizure], 'C', 'q', 't', 'ps', 'f');
+        end
 		
 		function [S, fs] = pspectrum(mea, data, fs, range)
 			% [S, fs] = pspectrum(data=Data, fs=SamplingRate, range=[0 100])
@@ -783,7 +815,8 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			out.r2 = r;
 		end
 		function [S, frq, coi, W] = morlet_wavelet(mea, data, fs, range, varargin)
-			% [S, frq, coi, W] = mea.morlet_wavelet(data=Data, fs=SamplingRate, range=[1 50], ::'mean'::)
+			% [S, frq, coi, W] = ...
+            %       mea.morlet_wavelet(data=Data, fs=SamplingRate, range=[1 50], ::'mean'::)
 			if nargin < 4 || isempty(range), range = [1 50]; end
 			if nargin < 3 || isempty(fs), fs = mea.SamplingRate; end
 			if nargin < 2 || isempty(data), data = mea.Data; end

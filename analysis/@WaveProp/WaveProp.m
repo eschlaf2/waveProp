@@ -2,6 +2,8 @@ classdef WaveProp
 	
 	properties 
 		Name
+        Patient
+        Seizure
 		Vx = nan
 		Vy = nan
 		p = nan
@@ -17,7 +19,13 @@ classdef WaveProp
         MinFinite = 10
 % 		HalfWin
 % 		FBand
-	end
+    end
+    
+    
+    properties (Transient = true, Hidden = false)
+        Original = false
+        
+    end
 	
 	properties (Transient = true, Hidden = true)
 % 		t_inds
@@ -40,7 +48,7 @@ classdef WaveProp
 		t0
 	end
 	
-	properties (Dependent = true, Hidden = true)
+	properties (Dependent = true, Hidden = false)
 
 		Z
 		mask
@@ -53,12 +61,21 @@ classdef WaveProp
 		First_detection
 		N_detections_early
 		N_detections_late
+        FName
     end
     methods  % imports
         [H, centers, T] = hist(obj, window, mean_center, show_directions, h)
     end
 	
 	methods  % Getters and Setters
+        
+        function fname = get.FName(self)
+            if self.Original
+                fname = sprintf('wave_prop/%s_Seizure%s_Neuroport_10_10_wave_prop.mat', self.Patient, self.Seizure);
+            else
+                fname = sprintf('%s_Seizure%s_fits.mat', self.Patient, self.Seizure);
+            end
+        end
 		function inds = get.Inds(s)
 			inds = s.Inds;
 			if isempty(inds)
@@ -323,7 +340,9 @@ classdef WaveProp
 				ff = validatestring(varargin{ii}, [obj.ParamNames(:); obj.WPParamNames(:)]);
 				obj.(ff) = varargin{ii+1};
 			end
-		end
+        end
+        
+        
 		
 		%% Updates
 		function sN = refit_data(s)
@@ -727,14 +746,14 @@ classdef WaveProp
 			
 			% Cleaning
 			if args.original
-				fname =@(p, s) sprintf('%s_Seizure%d_Neuroport_10_10_wave_prop.mat', p, s);
+				fname =@(p, s) sprintf('wave_prop/%s_Seizure%s_Neuroport_10_10_wave_prop.mat', p, s);
 			else
-				fname =@(p, s) sprintf('%s_Seizure%d_fits.mat', p, s);
+				fname =@(p, s) sprintf('%s_Seizure%s_fits.mat', p, s);
 			end
 			if isempty(args.files)
 				if ischar(args.pat) && ischar(args.seizure)
 					if strcmpi([args.pat args.seizure], '**')
-                        sz = BVNY.load_seizures;
+                        sz = SeizureInfo;
                         pats = sz.patient;
                         seizures = sz.seizure;
 % 						fid = fopen('seizures2.txt');
@@ -742,7 +761,10 @@ classdef WaveProp
 % 						pats = A{1}; seizures = A{2};
 %                         fclose(fid);
 						for ii = numel(pats):-1:1
-							files(ii) = dir(fname(pats{ii}, seizures(ii)));
+                            fstruct = dir(fname(pats{ii}, seizures(ii)));
+                            if ~isempty(fstruct)
+                                files(ii) = fstruct;
+                            end
 						end
 						
 						args.files = files;
@@ -799,6 +821,8 @@ classdef WaveProp
 						metrics = fieldnames(res); 
 					else
 						res = load([files(ii).folder filesep files(ii).name], metrics{:});
+                        
+                        
 						not_member = ~ismember(metrics, fieldnames(res));
 						if any(not_member)
 							fits = rmfield(fits, metrics(not_member));
@@ -813,6 +837,7 @@ classdef WaveProp
 					end
 				end	
 				for ff = string(fieldnames(fits)')
+%                     if strcmpi(ff, 'fits'), continue; end
 					if ischar(fits(1).(ff))
 						F.(ff) = {fits.(ff)};
 					else

@@ -243,7 +243,11 @@ classdef MetricComparison < handle
     end
     function color = get.Color(self)
         mtc = self.Metrics;
-        cmap = lines;
+%         cmap = lines;
+        cmap = ...
+            [215,48,31; ...
+            252,141,89; ...
+            253,204,138] / 255;
         %         cmap = dark2; 
         testfun =@(x) all(contains(mtc, x));
         if testfun({'M', 'E'})

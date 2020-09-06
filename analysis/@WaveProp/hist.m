@@ -1,8 +1,12 @@
-function [H, centers, T] = hist(obj, window, mean_center, show_directions, h)
-    % [H, edges, T] = hist(window=1, mean_center=true, show_directions=true, h=gcf)
+function [H, centers, T] = ...
+        hist(obj, window, mean_center, show_directions, h, angular_res)
+    % [H, edges, T] =  ...
+    %       hist(window=1, mean_center=true, show_directions=true, ...
+    %           h=gcf, angular_res=64)
 
     % Parse inputs
-    if nargin < 5, h = gcf; end
+    if nargin < 6, angular_res = 64; end
+    if nargin < 5 || isempty(h), h = gcf; end
     if nargin < 4 || isempty(show_directions), show_directions = true; end
     if nargin < 3 || isempty(mean_center), mean_center = true; end
     if nargin < 2 || isempty(window), window = 1; end
@@ -12,7 +16,7 @@ function [H, centers, T] = hist(obj, window, mean_center, show_directions, h)
     TL = tiledlayout(h, 1, 9);
     ax_summ = nexttile(TL, [1, 2]);
     ax_main = nexttile(TL, [1, 7]);
-    EDGES = linspace(-pi, pi, 65);
+    EDGES = linspace(-pi, pi, angular_res + 1);
     
     % Compute windowed empirical distributions
     [H, T] = compute_moving_hist_(obj, EDGES, window);
@@ -35,6 +39,7 @@ end
 
 %% Local functions
 function [H, T] = compute_moving_hist_(obj, edges, window)
+    
     t = obj.time;
     T = t(1):.01:t(end)+.01;
     H = nan(length(edges)-1, length(T));
@@ -49,6 +54,7 @@ function [H, centers] = smooth_circular_(H, T, edges, window)
     % Performs smoothing of directional data by replicating the data in the
     % +/- 2pi directions, smoothing and then selecting the data in interval
     % [-pi pi]
+    
     win = gausswin(round(pi/4 / diff(edges(1:2)))) ...
         .* gausswin(round(window ./ diff(T(1:2))))';
     win = win / sum(win, 'all');
