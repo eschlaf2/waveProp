@@ -1,5 +1,6 @@
 function [] = create_epoch(pat, seizures, varargin)
-%% Function to create an Epoch file
+% Function to create an Epoch file
+% create_epoch(pat, seizures=[], 'padding', [10 10], 'datapath', pwd)
 
 %% Parse input and set defaults
 p = inputParser;

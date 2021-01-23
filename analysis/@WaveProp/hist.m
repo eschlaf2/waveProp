@@ -1,34 +1,49 @@
 function [H, centers, T] = ...
-        hist(obj, window, mean_center, show_directions, h, angular_res)
+        hist(obj, window, mean_center, show_directions, h, angular_res, use_particle_smoother)
     % [H, edges, T] =  ...
-    %       hist(window=1, mean_center=true, show_directions=true, ...
-    %           h=gcf, angular_res=64)
+    %       hist(window=0, mean_center=false, show_directions=true, ...
+    %           h=gcf, angular_res=64, use_particle_smoother=false)
 
     % Parse inputs
-    if nargin < 6, angular_res = 64; end
+    if nargin < 7, use_particle_smoother = false; end
+    if nargin < 6 || isempty(angular_res), angular_res = 64; end
     if nargin < 5 || isempty(h), h = gcf; end
-    if nargin < 4 || isempty(show_directions), show_directions = true; end
-    if nargin < 3 || isempty(mean_center), mean_center = true; end
+    if nargin < 4 || isempty(show_directions), show_directions = false; end
+    if nargin < 3 || isempty(mean_center), mean_center = false; end
     if nargin < 2 || isempty(window), window = 1; end
     if mean_center
         obj.Direction = angle(exp(1j*(obj.Direction - obj.mean)));
     end
+    if all(isnan(obj.Direction)), disp('No detections.'); [H, centers, T] = deal(nan); return; end
     TL = tiledlayout(h, 1, 9);
     ax_summ = nexttile(TL, [1, 2]);
     ax_main = nexttile(TL, [1, 7]);
-    EDGES = linspace(-pi, pi, angular_res + 1);
+%     EDGES = linspace(-pi, pi, angular_res + 1);
+    xi = 1.25 * pi * linspace(-1, 1, round(1.5 * angular_res));
     
     % Compute windowed empirical distributions
-    [H, T] = compute_moving_hist_(obj, EDGES, window);
+    if ~use_particle_smoother
+        [H, T, centers] = compute_moving_histn_(obj, window, xi);
+    end
     
-    % Smooth result 
-    [H, centers] = smooth_circular_(H, T, EDGES, window);
     
     % Create 2D contour plot of windowed histograms
-    hist2D_(ax_main, T, centers, H, show_directions);
+    if use_particle_smoother
+        obj.particle_smoother(ax_main, [], [], [], [], window);
+    else
+        hist2D_(ax_main, T, centers, H);
+        
+        if show_directions
+            NP = ax_main.NextPlot;
+            ax.NextPlot = 'add';
+            plot(ax, obj.time, obj.Direction, '.', ...
+                'markersize', 10);
+            ax_main.NextPlot = NP;
+        end
+    end
 
     % Create 1D plot of direction histograms
-    hist1D_(ax_summ, obj, EDGES);
+    hist1D_(ax_summ, obj);
 
     % Tag axes so they are easy to identify later
     ax_main.Tag = 'Main';
@@ -67,16 +82,23 @@ function [H, centers] = smooth_circular_(H, T, edges, window)
     H = H(angle_mask, :);
 end
 
-function hist2D_(ax, T, centers, H, show_directions)
+function [dens, sub_t, xi] = compute_moving_histn_(obj, window, xi)
+    t = obj.time;
+    sub_t = t(1):.1:t(end);
+    dens = zeros(numel(xi), numel(sub_t));
+    for ii = 1:numel(sub_t)
+        inds = t > sub_t(ii) - window/2 & t < sub_t(ii) + window/2;
+        dirs = obj.Direction(inds);
+        if sum(isfinite(dirs)) < 1, continue; end
+        dirs = [dirs + 2*pi; dirs; dirs - 2*pi];
+        dens(:, ii) = ksdensity(dirs, xi, 'bandwidth', pi/16); 
+    end
+end
+
+function hist2D_(ax, T, centers, H)
     contourf(ax, T, centers, H, quantile(H(:), .1:.05:.9), ...
         'linestyle', 'none'); 
-    if show_directions
-        NP = ax.NextPlot;
-        ax.NextPlot = 'add';
-        plot(ax, obj.time, obj.Direction, '.', ...
-            'markersize', 10);
-        ax.NextPlot = NP;
-    end
+    
     colorbar(ax);
     xlabel(ax, 'Time (s)')
     ylabel(ax, 'Direction')
@@ -84,14 +106,12 @@ function hist2D_(ax, T, centers, H, show_directions)
     grid(ax, 'on');
 end
 
-function hist1D_(ax, obj, edges)
-    H = histcounts(obj.Direction, edges, 'normalization', 'pdf');
-    centers = movmean(edges, 2); centers = centers(2:end);
-    H = smoothdata([H, H, H]);
-    C = [centers - 2*pi, centers, centers + 2*pi];
-    mask = abs(C) <= 1.25*pi;
-    plot(ax, H(mask), C(mask), ...
-        'linewidth', 2);
+function hist1D_(ax, obj)
+    dir = obj.Direction;
+    [H, C] = ksdensity([dir - 2*pi; dir; dir + 2*pi], ...
+        1.25 * pi * linspace(-1, 1, 100), ...
+        'bandwidth', pi/8);
+    plot(ax, H, C, 'linewidth', 2);
     axis(ax, 'tight');
     xticks(ax, []); yticks(ax, [-pi pi]); grid(ax, 'on');
     

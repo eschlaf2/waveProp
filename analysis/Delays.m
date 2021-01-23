@@ -28,22 +28,28 @@ classdef Delays < WaveProp
 						D.SamplingRate = obj.(ff);
 						if isempty(D.Time)
 							D.Time = 1:size(data, 1)' / obj.(ff);
-						end
+                        end
+                    case 'patient'
+                        D.Patient = obj.(ff);
+                    case 'seizure'
+                        D.Seizure = obj.(ff);
 					otherwise
 						continue
 				end
 			end
 			if isempty(t0), t0 = mean(D.Time); end
 			D.t0 = t0;
+            D.NCh = length(D.Position);
 			D = D.parse_inputs(varargin{:});
 			[D.window, D.T] = D.get_window(data);
 			[data, D.Freq] = D.get_data();
-			if numel(unique(data)) < 3, return, end
+% 			if numel(unique(data)) < 3, return, end
 			D.Data = -data;
 			D = D.compile_results(); 	
 		end
 
-	end
+    end
+    
 	properties
 		HalfWin = .5
 		FBand = [1 13]
@@ -59,6 +65,7 @@ classdef Delays < WaveProp
 		FFTPad = 4
 		CohConf = 0.05
 		T
+        NCh
 		
 	end
 
@@ -98,18 +105,17 @@ classdef Delays < WaveProp
 			if isempty(ntapers)
 				ntapers = floor(2 * (obj.T .* obj.BW)) - 1;  % one less than the shannon number
 			end
-			if numel(ntapers) == 1 && ntapers < 5, warning('Number of tapers is less than 5: %d', ntapers); end
+            if numel(ntapers) == 1 && ntapers < 5
+                ntapers = max(ntapers, 5);
+                warning('Number of tapers changed to 5 (from %d).', ntapers); 
+            end
 		end
 	end
-	properties (Dependent = true, Access = private)
+	properties (Dependent = true, Access = public)
 		RefTrace
-		NCh
 	end
 	methods  % getters for dependent properties
-		function N = get.NCh(D)
-			N = size(D.Data);
-			N = prod(N(2:end));
-		end
+		
 		function reference = get.RefTrace(D)
 			switch D.Reference
 				case 'mean'
@@ -119,7 +125,8 @@ classdef Delays < WaveProp
 				otherwise
 					error('Reference %s not recognized', D.Reference);
 			end
-		end
+        end
+        
 		function p = params(D)
 			% Create the params struct that will be passed to chronux
 			% function conherencyc
@@ -136,13 +143,16 @@ classdef Delays < WaveProp
 	properties (Hidden = true)
 		DefaultMinFreq = 3
 		ParamNames = ["Position" "HalfWin" "FBand" "MinFreq" "Reference" ...
-			"MaskBy" "BW" "NTapers" "FFTPad" "CohConf"]
+			"MaskBy" "BW" "NTapers" "FFTPad" "CohConf" "Type"]
 	end
 	
 	methods
 		
         function freq = get.Freq(D)
-            freq = D.Freq;
+%             freq = D.Freq;
+            freq = reshape(D.Freq, [], 2, D.NCh);
+            
+            return
             switch class(freq)
                 case 'cell'
                     if numel(freq) == numel(D.time)
@@ -157,6 +167,7 @@ classdef Delays < WaveProp
                     end
             end
         end
+        
 		function [data_win, T] = get_window(D, data)
 			t_inds = abs(D.Time - D.t0) <= D.HalfWin;
 			T = range(D.Time(t_inds));
@@ -183,33 +194,53 @@ classdef Delays < WaveProp
 					error('Value of ''MaskBy'' unrecognized.')
 			end
 			phi(~mask) = nan;
-			freq = repmat(freq(:), 1, D.NCh);
+			freq = repmat(freq(:), 1, size(phi, 2));
 			freq(~mask) = nan;
 			freq_out = [min(freq); max(freq)];
-		end
+        end
+        
 		function delay = phi2delay(D, phi, freq)
 			switch lower(D.Type)
 				case 'group'
 					delay = D.group_delay(phi, freq);      % compute delays on each electrode based on coherence
 				case 'phase'
 					delay = D.phase_delay(phi, freq);
+                case 'regress'
+                    delay = D.regress_delay(phi, freq);
 				otherwise
 					error("'Type' not recognized. Must be 'group' or 'phase'.")
 			end
-		end
+        end
+        
 	end
 	
 	
 	%% Static methods
 	methods (Static)
 		
+        function delay = regress_delay(phi, freq)
+            % computes group delay be fitting a line to phi(f) and
+            % returning slope
+
+            [d1, ~, ~, ~, stats] = arrayfun(@(ii) ...
+                regress(phi(:, ii), [ones(size(freq)); freq]'), ...
+                1:size(phi, 2), 'uni', 0);
+            d1 = cat(2, d1{:})';
+            stats = cat(1, stats{:});
+            d1(stats(:, 3) >= .05) = nan;
+            delay = -d1(:, 2) ./ (2*pi);
+        end
 		function delay = group_delay(phi, freq)
-			df = diff(freq);
-			delay = nanmean(-diff_phase(phi) ./ df(:));
-		end
+             % computes group delay by taking mean dphi/df
+            df = diff(freq);
+			delay = nanmean(-diff_phase(phi) ./ df(:)) / (2*pi);
+
+        end
+        
 		function delay = phase_delay(phi, freq)
-			delay = nanmean(-phi ./ freq(:));
-		end
+			delay = nanmean(-phi ./ freq(:)) / (2*pi);
+        end
+        
 		function mask = coh_mask(coh, min_length)
 			finite_coh = isfinite(coh);
 			N = size(coh, 2);
@@ -227,7 +258,8 @@ classdef Delays < WaveProp
 				if isempty(so), continue, end
 				mask(:, ii) = G == so(1);
 			end
-		end
+        end
+        
 		function mask = reduce_data(valid, min_length)
 % 			valid = isfinite(valid);
 			N = size(valid, 2);
@@ -242,7 +274,8 @@ classdef Delays < WaveProp
 % 				data_r(starts(ind):ends(ind), ii) = ...
 % 					data(starts(ind):ends(ind), ii);
 			end
-		end
+        end
+        
 		function [coh, phi, freq, coh_conf] = compute_coherence(window, reference, params)
 
 			window = window - nanmean(window);
@@ -257,7 +290,8 @@ classdef Delays < WaveProp
 			window = window - nanmean(window);
 			reference = nanmean(window, 2);
 			
-		end
+        end
+        
 		function reference = central_electrode(window, position)
 			center = mean(position);
 			dist2center = sum((position - center).^2, 2);
@@ -270,25 +304,3 @@ classdef Delays < WaveProp
 	
 	
 end
-% 		function [params, compute_inds] = set_coherence_params(Time, T, band)
-% 
-% 		% 	band = [1 13];                  % Select a frequency range to analyze
-% 			W = 3/T;                          % Bandwidth
-% 			NTAPERS = round(2*(T * W) - 1);        % Choose the # of tapers.
-% 			OVERLAP_COMPLEMENT = 1;         % T - OVERLAP (s)
-% 
-% 			samplingRate = 1 / diff(Time(1:2));
-% 
-% 			params.tapers = [T * W, NTAPERS];  % ... time-bandwidth product and tapers.
-% 			params.Fs = samplingRate; % ... sampling rate
-% 			params.pad = 4;                 % ... 2^(ceil(log2(T)) + pad)
-% 			params.fpass = band;            % ... freq range to pass
-% 			params.err = [1 0.05];          % ... theoretical error bars, p=0.05.
-% 			params.T = T;
-% 
-% 			nsamp = numel(Time);                                % Total number of samples
-% 			step = OVERLAP_COMPLEMENT * samplingRate;           % Compute coherence every OVERLAP_COMPLEMENT
-% 			lastSamplePoint = nsamp - ceil(T * samplingRate) + 1;     % Leave a long enough window at the end to calculate coherence
-% 			compute_inds = round(1 : step : lastSamplePoint);    
-% 
-% 		end

@@ -13,6 +13,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		SamplingRate = 1000
         Units = '0.25 microvolts'
 		event_inds
+        
 	end
 	
 	properties (Hidden = true)
@@ -25,7 +26,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		PairwiseCoherence
 	end
 	
-	properties (Access = public, Hidden = true)
+	properties (Transient = true)
 		params = init_mea_params();
 		SRO
 		lfp
@@ -42,7 +43,6 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 % 		metrics
 		
 		Spectrum
-		BSI
 		WaveTimes
 		ExcludedChannels
 		Fits
@@ -89,9 +89,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			temp = load(mea.Path);
 			mea.SRO = temp.SamplingRate;
 			mea.AllTime = temp.Time;
-			mea.Raw = temp.Data;
-            
-
+			
 			for f = fieldnames(temp)'
 				switch f{:}
 					case {'Data', 'SamplingRate', 'Time', 'Path'}
@@ -103,12 +101,79 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 				end
             end
 			[mea.patient, mea.seizure] = mea.get_info(mea.Path);
-%             if strcmpi(mea.patient, 'cucx5')
-%                 disp('Whitening data from CUCX5 ...')
-%                 mea.Raw = zca_whitening(single(temp.Data));
-%                 disp('Done.');
-%             end
-		end
+            
+            if strcmpi(mea.patient, 'c7')  % lead disconnected when seizure generalized
+                time = mea.AllTime;
+                temp.Data(time > 34.17, :) = 0;
+            end
+            if contains(mea.patient, 'CUCX')
+                % The the passband for cereplex filters is [0.01Hz-10kHz];
+                % for Neuroport it is [0.3Hz-7.5kHz]
+                % [Cereplex specs] https://www.blackrockmicro.com/neuroscience-research-products/neural-data-acquisition-systems/cereplex-direct-daq/
+                % [Neuroport specs] https://www.blackrockmicro.com/neuroscience-research-products/neural-data-acquisition-systems/neuroport-daq-system/
+                % [some info on filtering (pg. 22)] https://www.blackrockmicro.com/wp-content/ifu/LB-0574_Central_Software_Suite_IFU.pdf
+                
+                % These settings create the right passband and they result
+                % in similar power spectra to those in NP patients (i.e.
+                % low power in low frequencies)
+%                 d = designfilt('highpassiir', 'FilterOrder', 1, ...
+%                     'StopbandFrequency', 0.3, ... 
+%                     'StopbandAttenuation', 10, ...
+%                     'SampleRate', temp.SamplingRate); 
+%                 temp.Data = filtfilt(d, double(temp.Data));
+            end
+            
+            % Remove bad channels. Detect channels that are outliers in PC
+            % space (using 95% of variance explained). Outliers := > 3 MAD
+            % from PC center of mass
+            S = warning; warning('off');
+            mea.BadChannels = [];
+            [coeff, ~, ~, ~, explained] = pca(single(temp.Data));
+            num_pc = find(cumsum(explained) >= 95, 1);
+            outs = isoutlier(vecnorm(coeff(:, 1:num_pc), 2, 2));
+            mea.BadChannels = find(outs);
+            warning(S);
+            
+            mea.Raw = temp.Data;
+        end
+        
+        function whiten(self)
+            % This cleans up CUCX5 well (removes clear peak in firing rate
+            % from VNS. 
+            disp('Whitening data ...')
+            badch = self.BadChannels;
+            self.BadChannels = [];
+            raw = self.Raw;
+            self.BadChannels = badch;
+            mask = true(1, size(raw, 2));
+            mask(self.BadChannels) = false;
+            raw(:, mask) = zca_whitening(single(raw(:, mask)));
+            self.Raw = raw;
+            disp('Done.')
+            
+        end
+        function car(self)
+            % Perform common average referencing (this had a big effect on
+            % D10 method)
+            
+            badch = self.BadChannels;
+            self.BadChannels = [];
+            good = true(1, size(self.Raw, 2));
+            good(badch) = false;
+            self.Raw = single(self.Raw) - nanmean(single(self.Raw(:, good)), 2);
+            self.BadChannels = badch;
+        end
+        function pca_reconstruct(self)
+            disp('Reconstructing data ...');
+            d = load(self.Path, 'Data');
+            mask = true(1, size(d.Data, 2));
+            mask(self.BadChannels) = false;
+            [coeff, score] = pca(single(d.Data(:, mask)));
+            d.Data(:, mask) = score(:, 2:end) * coeff(:, 2:end)';
+            self.Raw = d.Data;
+            disp('Done.')
+        end
+        
 		function name = get.Name(mea)
 			name = [mea.patient '_Seizure' mea.seizure];
 		end
@@ -238,7 +303,20 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 				S.frq = frq;
 				mea.Spectrum = S;
 			end
-		end
+        end
+        
+        
+        function exclude = exclude_by_iw(mea)
+            load(['iw_mats/' mea.Name], 'iw')
+            if iw.main_wave(mea.Name) == 0
+                exclude = [];
+            else
+                iw.wave = iw.main_wave(mea.Name);
+                exclude = iw.outliers;
+            end
+            mea.ExcludedChannels = exclude;
+        end
+        
 		function out = exclude_by_coh(mea, electrode)
 			% Excludes channels that have coh<.8 relative to electrode
 			% Usage:
@@ -300,10 +378,8 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			if isempty(raw); mea.load; raw = mea.Raw; end
 			raw(:, mea.BadChannels) = [];
 			raw(:, mea.ExcludedChannels) = [];
-		end
-% 		function set.Raw(mea, raw)
-% 			mea.Raw(:, mea.locs) = raw;
-% 		end
+        end
+
 		function p = get.Path(mea)
 			file = dir(mea.Path);
 			p = fullfile(file(1).folder, file(1).name);
@@ -376,6 +452,8 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			lfp = mea.lfp;
 			if isempty(lfp)
 				fprintf('Filtering lfp ... ')
+%                 lfp = mea.filter(double(mea.Raw), mea.SRO, [1 50]); 
+%                 lfp = single(resample(double(lfp), 1, mea.skipfactor));
 				lfp = mea.filter(mea.Data, mea.SamplingRate, [1 50]); 
 				mea.lfp = lfp;
 				fprintf('Done. \n')
@@ -392,7 +470,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 %                 disp('Whitening ...')
 %                 data = zca_whitening(single(mea.Raw));
 
-                data = single(mea.Raw);
+                data = single(mea.Raw) - nanmean(mea.Raw, 2);  % perform common average referencing before filtering to reduce sensor noise
 				disp('Filtering mua ...')
 				mua = mea.filter(data, mea.SRO, [300 3000]);
 				
@@ -403,14 +481,15 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			end
 		end
 		function EI = get.event_inds(mea)
-			EI = mea.event_inds;
-			
-			if isempty(EI)
+% 			EI = mea.event_inds;
+% 			
+% 			if isempty(EI)
 				data = mea.baseline_zscore(mea.mua, mea.AllTime);
 				intervalM = mea.SRO / 1e3 * mea.params.min_dist;  % samples per MIN_DIST
 
 				% find events on each channel
 				events = false(size(data));
+                
 				for ch = 1:size(data, 2)
 					temp = mea.interp_nan(data(:, ch));
 					if ~any(abs(zscore(temp)) > mea.params.event_thresh)
@@ -423,15 +502,13 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 				end
 				EI = sparse(events);
 				mea.event_inds = EI;
-			elseif ~issparse(EI)
-				sz = size(mea.Raw);
-				[i, j] = ind2sub(sz, EI);
-				EI = sparse(i, j, true, sz(1), sz(2));
-			end
-			
-% 			if ~isempty(EI) && ~iscell(EI)
-% 				EI = {EI, size(mea.Raw)};
+% 			elseif ~issparse(EI)
+% 				sz = size(mea.Raw);
+% 				[i, j] = ind2sub(sz, EI);
+% 				EI = sparse(i, j, true, sz(1), sz(2));
 % 			end
+			
+
 		end
 		function ET = get.event_times(mea)
 			ET = mea.event_times;
@@ -477,13 +554,16 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			m = fieldnames(s.Fits);
 		end
 		
-		function bsi = get.BSI(s)
-			bsi = s.BSI;
-			if isempty(s.BSI)
-				bsi = s.compute_bsi(s);
-				s.BSI = bsi;
-			end
-			
+		function [bsi, edges] = BSI(mea, binsize)
+            % [bsi, edges] = mea.BSI(binsize=mea.params.fr_window);
+            % computes binned spike increments using <binsize> (ms)
+			if nargin < 2, binsize = mea.params.fr_window; end
+            binsize = binsize / 1e3;  % convert from ms to s
+            [ev_ch, ev_t] = deal(mea.event_times{:});
+            edges = mea.Time(1):binsize:mea.Time(end) + binsize;
+            G = findgroups(ev_ch);
+            bsi = splitapply(@(x) histcounts(x, edges), ev_t, G);
+			edges = edges(1:end-1);
         end
         function fit = get.Fits(s)
             if isempty(s.Fits)
@@ -505,7 +585,8 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		end
 		function locs = get.locs(s)
 			locs = sub2ind(max(s.Position), s.Position(:, 1), s.Position(:, 2));
-		end
+        end
+        
 		function exclude_by_std(s)
 			sd = isoutlier(std(s.Data));
 			ch = 1:100;  % assuming all meas have <=100 channels
@@ -536,12 +617,17 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 						])';
 
 				end
-			end
-			ch = 1:max([mea.BadChannels(:); excluded(:)]);
-			ch(mea.BadChannels) = [];
-			mea.BadChannels = unique([mea.BadChannels(:); ch(excluded)']);
+            end
+            mea.ExcludedChannels = excluded;
 			
-		end
+        end
+        function excluded = exclude_by_pca(self)
+            [coeff, ~, ~, ~, explained] = pca(self.Data(self.Active, :));
+            N = find(cumsum(explained) > 90, 1);
+            c = normalize(coeff(:, 1:N));
+            excluded = vecnorm(c, 2, 2) > 2;
+            self.ExcludedChannels = excluded;
+        end
 		
 		function inds = which_t(s, t0)
 			[~, inds] = min(abs(s.Time - t0));
@@ -581,33 +667,17 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			wng = warning;
 			warning('off');
 			D(N) = Delays(mea, times(N), varargin{:});
-			num_workers = getenv('NSLOTS');
-			if 1  %isempty(num_workers)
-				
-				tic
-				for ii = 1:N-1
-					if ~mod(ii, 10)
-						fprintf('Computed delay %d/%d (%0.2f seconds)\n', ii-1, N, toc); 
-						tic; 
-					end
-					t0 = times(ii);
-					D(ii) = Delays(mea, t0, varargin{:});		
-				end
-			else
-% 				clust = parcluster;
-% 				parpool(clust);				
-				delay_fun = @(t0) Delays(mea, t0, varargin{:});
-				parfor(ii = 1:N, str2double(num_workers))
-					warning('off');
-					t0 = times(ii);
-% 					D(ii) = Delays(mea, t0, varargin{:});
-					D(ii) = delay_fun(t0);
-					if ~mod(ii, 10)
-						fprintf('Computed delay %d/%d (parfor)\n', ii-1, N); 
-					end
-				end
-% 				delete(gcp('nocreate'));
-			end
+			
+            tic
+            for ii = 1:N-1
+                if ~mod(ii, 10)
+                    fprintf('Computed delay %d/%d (%0.2f seconds)\n', ii-1, N, toc); 
+                    tic; 
+                end
+                t0 = times(ii);
+                D(ii) = Delays(mea, t0, varargin{:});		
+            end
+			
 			D = WaveProp.resize_obj(D);
 			D.Name = mea.Name;
 			warning(wng);
@@ -617,27 +687,32 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		function [wt, peaks] = get_wave_times(s, method, min_peak_height)
 			% [wt, peaks] = get_wave_times(method='events', min_peak_height=-Inf)
 			if nargin < 2, method = 'events'; end
-			if nargin < 3, min_peak_height = -Inf; end
+			if nargin < 3, min_peak_height = 1; end
+            method = validatestring(method, {'bsi', 'lfp', ...
+                'maxdescent', 'lfp_lo', 'events'});
 			switch method
 				case 'bsi'
 					data = zscore(nanmean(s.BSI, 2));
 					minProm = 0;
 				case 'lfp'
-					data = -zscore(mean(s.lfp, 2));
-					minProm = 0;
+					data = -normalize(mean(normalize(s.lfp), 2));
+					minProm = 1;
+                case 'maxdescent'
+                    dlfpN = diff(normalize(s.lfp));
+                    data = -normalize(mean(dlfpN, 2));
+                    minProm = 1;
 				case 'lfp_lo'
-					data = -zscore(mean(s.lfp_lo, 2));
-					minProm = 0;
+					data = -zscore(mean(normalize(s.lfp_lo), 2));
+					minProm = 1;
 				case 'events'
-					data = mean(s.firing_rate, 2);
-					data = data ./ nanstd(data);
-					minProm = 0;
+					data = normalize(mean(s.firing_rate, 2), 'scale');
+					minProm = 1;
 				otherwise
 					error('Method not recognized')
 			end
 			[pks, lcs, w, p] = findpeaks(data, s.SamplingRate, ...
 				'MinPeakHeight', min_peak_height, ...
-				'MinPeakDistance', 10*1e-3, ...
+				'MinPeakDistance', 0, ...  %10e-3, ...
 				'MinPeakProminence', minProm);
 % 				'MinPeakHeight', 1);
 			lcs = round(lcs * s.SamplingRate);
@@ -847,13 +922,14 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 	
 	methods (Static)
 		
-		function bsi = compute_bsi(s)
-			N = numel(s.event_times);
-			edges = [s.Time(:); Inf];
-			bsi = nan(size(s.Data));
-			for ii = 1:N
-				bsi(:, ii) = histcounts(s.event_times{ii}, edges);
-			end
+		function [bsi, edges] = compute_bsi(mea, binsize)
+            if nargin < 2, binsize = mea.params.fr_window; end
+            binsize = binsize / 1e3;  % convert from ms to s
+            [ev_ch, ev_t] = deal(mea.event_times{:});
+            edges = mea.Time(1):binsize:mea.Time(end) + binsize;
+            G = findgroups(ev_ch);
+            bsi = splitapply(@(x) histcounts(x, edges), ev_t, G);
+			
 		end
 		
 		function data = baseline_zscore(data, time)
@@ -863,6 +939,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			else
 				mn = mean(data(time < 0, :), 1, 'omitnan');     % get the mean of the preictal baseline
 				sd = std(data(time < 0, :), 'omitnan');            % ... and the sd
+                sd(sd == 0) = 1;
 			end
 			data = (data - mn) ./ sd;                       % zscore based on preictal state
 
@@ -885,36 +962,34 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		end
 		
 		
-		function data = filter(data, sampling_rate, band)
+		function [data, band] = filter(data, sampling_rate, band)
         % data = filter(data, sampling_rate, band);  % (static)
 			if band(2) > sampling_rate / 2 / 1.1
 				band(2) = (sampling_rate / 2 - 1) / 1.1;
 				fprintf('Setting CutoffFrequency2 to %.1f\n', band(2)); 
 			end
-% 			bpFilt = designfilt('bandpassiir','FilterOrder',150, ...
-% 				'HalfPowerFrequency1',band(1),'HalfPowerFrequency2',band(2), ...
-% 				'SampleRate', sampling_rate);
-			if band(1) == 0
-				bpFilt = designfilt('lowpassfir', 'filterorder', 150, ...
-					'passbandfrequency', band(2), ...
-					'stopbandfrequency', 1.1*band(2), ...
-					'samplerate', sampling_rate);
-% 				bpFilt = designfilt('lowpassiir', ...
-% 					'PassbandFrequency', band(2), ...
-% 					'StopbandFrequency', 1.1*band(2), ...
-% 					'PassbandRipple', .5, 'StopbandAttenuation', 65, ...
-% 					'SampleRate', sampling_rate);
-			else
-				bpFilt = designfilt('bandpassfir','FilterOrder',150, ...
-					'CutoffFrequency1',band(1),'Cutofffrequency2',band(2), ...
+
+            if band(1) == 0, band(1) = 1; end  % Neuroports pre-filter to [.3-10k] Hz
+			
+				bpFilt = designfilt('bandpassfir', ...
+                    'FilterOrder',150, ...
+					'CutoffFrequency1',band(1), ...
+                    'Cutofffrequency2',band(2), ...
 					'SampleRate', sampling_rate);
-% 				bpFilt = designfilt('bandpassiir', ...
-% 					'StopbandFrequency1', .1 * band(1), 'PassbandFrequency1', band(1), ...
-% 					'PassbandFrequency2', band(2), 'StopbandFrequency2', 1.1*band(2), ...
-% 					'StopbandAttenuation1', 65, 'PassbandRipple', .5, ...
-% 					'StopbandAttenuation2', 65, 'SampleRate', sampling_rate, ...
-% 					'MatchExactly', 'passband');
-			end
+                
+                % Use this if you want to get a tighter band (or use higher
+                % filter order above [~1e3])
+%                 bpFilt = designfilt('bandpassfir', ...
+%                     'StopbandFrequency1', max(.3, .3*band(1)), ...
+%                     'PassbandFrequency1', band(1), ...
+%                     'PassbandFrequency2', band(2), ...
+%                     'StopbandFrequency2', 1.1*band(2), ...
+%                     'StopbandAttenuation1', 60, ...
+%                     'PassbandRipple', 1, ...
+%                     'StopbandAttenuation2', 60, ...
+%                     'SampleRate', sampling_rate);
+                
+			
 			data = single(filtfilt(bpFilt, double(data)));
 		end
 		function firing_rate = compute_firing_rate(mea)
@@ -924,33 +999,90 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 
 			% Compute spike rate
 			firing_rate = downsample(...
-					smoothdata(mea.mua_events, 1, 'movmean', window), ...
-					mea.skipfactor ...
+					smoothdata(double(full(mea.mua_events)), 1, 'movmean', window), ...  % mean spikes per sample
+                    mea.skipfactor ...
 				) * mea.SRO;  % convert to spikes per second 
 		end
 		
 	end
 	
 	methods  % Plotting
-		function plot_panels(mea, times, layout, h)
-        % mea.plot_panels(times, layout=[], h=gcf)
-			if nargin < 4, h = gcf; end
-			if nargin < 3, layout = []; end
-			if isempty(layout)
-				layout = [ceil(numel(times)/7) 7];
-			end
+		function plot_panels(mea, times, data, layout, h, style)
+        % mea.plot_panels(times, data=mea.Data, layout=[], h=gcf, style='')
+			if nargin < 6 || isempty(style), style = ''; end
+            if nargin < 5 || isempty(h), h = gcf; end
+			if nargin < 4 , layout = []; end
+            if nargin < 3, data = []; end
+			
+            style = validatestring(style, {'', 'scatter', 'raw'});
 			set(0, 'currentfigure', h);
+            clf(h);
+            if isempty(layout)
+                T = tiledlayout(h, 'flow');
+            else
+                T = tiledlayout(h, layout(1), layout(2));
+            end
+
+            T.Tag = 'panels';
+            
 			inds = mea.time2inds(times);
-			data = zscore(mea.Data);
-			r = layout(1); c = layout(2);
+			if isempty(data), data = zscore(mea.Data); end
+            data = data(inds, :);
+            
 			temp = nan(max(mea.Position));
+            
+            % prep scatter params
+            if ismember(style, {'scatter', ''})
+                ax = nexttile(T, 1);
+                axis(ax, 'square');
+                units = ax.Units;
+                set(ax, 'units', 'points');
+                pos = ax.Position;
+                ax.Units = units;
+                pt_width = max(min(pos([3 4])) / 11, 1);
+                siz_min = max(.3 * pt_width, 1);  % 1.733);
+                siz_max = (2.5 * pt_width);
+                sd_min = 2;  % show range of 2 sd from mean ...
+                sd_max = max(quantile(abs(data), .999, 'all'), 4);  % to at least 4 sd from mean
+                siz_dat = rescale(abs(data), siz_min, siz_max, ...
+                    'inputmin', sd_min, ...
+                    'inputmax', sd_max).^2;
+                col_dat = single(data > 0) - single(data < 0);
+            end
+            
+            % start plotting
 			for ii = 1:length(inds)
-				subplot(r, c, ii)
-				temp(mea.locs) = data(inds(ii), :);
-				imagesc(temp, [-2 2]);
-				xticks([]);
-				yticks([]);
-				colormap gray
+                nexttile(T, ii);
+                switch style
+                    case {'', 'scatter'}
+                        if ii == 1
+                            % Don't show very small values
+                            mask = abs(data) < sd_min;
+                            data(mask) = nan;
+                            siz_dat(mask) = nan;
+                            col_dat(mask) = nan;
+                        end
+                        
+                        scatter( ...
+                            mea.Position(:, 1), mea.Position(:, 2), ...  % x, y
+                            siz_dat(ii, :), ...  % size
+                            col_dat(ii, :), ...  % color
+                            'filled');
+                        axis square
+                        colormap(lines)
+                        set(gca, 'clim', [-2 2]);
+                    case 'raw'
+                        temp(mea.locs) = data(ii, :);
+                        imagesc(temp, [-1 1]);
+                        
+                        colormap gray
+                    otherwise
+                        error('style ''%s'' not recognized.', style)
+                end
+                xticks([]);
+                yticks([]);
+                ax = T.Children;
+                set(ax, 'xlim', [0 11], 'ylim', [0 11], 'box', 'on');
 				if ii == 1
 					title(num2str(times(ii)));
 				end
@@ -1034,6 +1166,9 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 	end
 	
 end
+
+
+%% Local fun
 
 
 

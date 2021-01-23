@@ -11,6 +11,7 @@ classdef MaxDescent < WaveProp
 	end
 	
 	methods
+        
 		function obj = MaxDescent(data, t0, varargin)
 			
 			if nargin < 1, return, end
@@ -20,6 +21,7 @@ classdef MaxDescent < WaveProp
 				obj.t0 = t0;
 				obj.HalfWin = mea.params.half_win / 1e3;
 				obj.Position = mea.Position;
+                obj.Name = mea.Name;
 				obj = obj.parse_inputs(varargin{:});
 				if isempty(mea.MaxDescentData)
 					mea.MaxDescentData = zscore(mea.filter(mea.Data, mea.SamplingRate, obj.FBand));
@@ -37,19 +39,16 @@ classdef MaxDescent < WaveProp
 % 			if numel(unique(obj.Data(~isnan(obj.Data)))) < 3, return, end
 			obj = obj.compile_results;
 			
-		end
+        end
+        
 		function [window, t] = get_window(obj, mea)
 			t_inds = abs(mea.Time - obj.t0) <= obj.HalfWin;
 			t = mea.Time(t_inds);
 			data = mea.MaxDescentData;
             if obj.Ascent, data = -data; end
-% 			if all(obj.FBand == [2 50])
-% 				data = zscore(mea.lfp);
-% 			else
-% 				data = mea.filter(mea.Data, mea.SamplingRate, obj.FBand);
-% 			end
 			window = data(t_inds, :);
-		end
+        end
+        
 		function data = get_data(~, window)
 			
 			window = window - window(1, :);  % set first time point as baseline (for visualization early)
@@ -62,7 +61,8 @@ classdef MaxDescent < WaveProp
 			data = time_point;
 			data(non_decreasing | bdry | inactive) = nan;
 			
-		end
+        end
+        
 	end
 	
 	

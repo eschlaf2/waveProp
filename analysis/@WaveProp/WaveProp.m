@@ -10,13 +10,12 @@ classdef WaveProp
 		Beta = nan(1, 6)
 		Curvature = nan
 		Data
-		time
 		sig = 0.05
 		NClust
 		ClustSize
 		Quadratic = false
 		RotateBy = 0
-        MinFinite = 10
+        MinFinite = 30
 % 		HalfWin
 % 		FBand
     end
@@ -24,7 +23,6 @@ classdef WaveProp
     
     properties (Transient = true, Hidden = false)
         Original = false
-        
     end
 	
 	properties (Transient = true, Hidden = true)
@@ -32,6 +30,7 @@ classdef WaveProp
 % 		res
 		
 		Magnitude
+        AltMagnitude
 		Direction
 		Time
 		Position
@@ -51,11 +50,12 @@ classdef WaveProp
 	properties (Dependent = true, Hidden = false)
 
 		Z
+        time
 		mask
 		logp
 		NormedMagnitude
-		Phi_mean_early
-		Phi_mean_late
+% 		Phi_mean_early
+% 		Phi_mean_late
 		Phi_std_early
 		Phi_std_late
 		First_detection
@@ -63,8 +63,10 @@ classdef WaveProp
 		N_detections_late
         FName
     end
+    
     methods  % imports
         [H, centers, T] = hist(obj, window, mean_center, show_directions, h)
+        ax = particle_smoother(W, ax, NPARTS, SPREAD_FACTOR, SD_WIN, ANG_RES, SMOOTHING_WIN, SHOW_DIRECTIONS, SHOW_EVOLUTION)
     end
 	
 	methods  % Getters and Setters
@@ -76,12 +78,36 @@ classdef WaveProp
                 fname = sprintf('%s_Seizure%s_fits.mat', self.Patient, self.Seizure);
             end
         end
+        
+        function pat = get.Patient(self)
+            if isempty(self.Patient)
+                info = strsplit(self.Name, {'_', 'Seizure'});
+                self.Patient = info{1};
+                self.Seizure = info{2};
+            end
+            pat = self.Patient;
+        end
+        
+        function sz = get.Seizure(self)
+            if isempty(self.Seizure)
+                info = strsplit(self.Name, {'_', 'Seizure'});
+                self.Patient = info{1};
+                self.Seizure = info{2};
+            end
+            sz = self.Seizure;
+        end
+        
 		function inds = get.Inds(s)
 			inds = s.Inds;
 			if isempty(inds)
 				inds = (1:numel(s.t0))';
 			end
-		end
+        end
+        
+        function self = set.time(self, value)
+            self.t0 = value;
+        end
+        
 		function obj = set.Beta(obj, val)
 			assert(isempty(val) || any(size(val) == 6));
 			if isempty(val) || size(val, 2) == 6
@@ -89,30 +115,36 @@ classdef WaveProp
 			else
 				obj.Beta = val';
 			end
-		end
+        end
+        
 		function beta = get.Beta(obj)
 			beta = obj.Beta(obj.Inds, :);
-		end
+        end
+        
 		function mgn = get.NormedMagnitude(obj)
 			mgn = obj.Magnitude;
 			mgn(isoutlier(mgn)) = nan;
 			mgn = (mgn - nanmean(mgn)) / nanstd(mgn);
 			mgn = mgn(obj.Inds);
-		end
+        end
+        
 		function logp = get.logp(s)
-			logp = -log(s.p)/log(5);
+			logp = -log(s.p)/log(10);
 			logp = logp(s.Inds);
-		end
+        end
+        
 		function Z = get.complexZ(s)
 			Z = complex(s.Vx, s.Vy);
 			Z = Z(s.Inds);
         end
+        
         function minfinite = get.MinFinite(s)
             if numel(s.MinFinite) > 1
                 s.MinFinite = max(s.MinFinite);
             end
             minfinite = s.MinFinite;
         end
+        
 		function mask = get.mask(s)
 			M = sqrt(s.Vx.^2 + s.Vy.^2);
 			M(M > 1e6) = nan;
@@ -131,7 +163,8 @@ classdef WaveProp
                 vns_times = s.time >= 46 & s.time <= 62;
                 mask = mask | vns_times;
             end
-		end
+        end
+        
 		function D = get.Data(s)
 			if size(s.Data, 1) ~= numel(s.t0)
 				time_dim = find(size(s.Data) == numel(s.t0));
@@ -144,36 +177,54 @@ classdef WaveProp
 				D = s.Data;
 			end
 			D = D(s.Inds, :, :);
-		end
+        end
+        
 		function time = get.time(s)
 			time = s.t0;
 			time = time(s.Inds);
-		end
+        end
+        
 		function Z = get.Z(s)
 			Z = s.Direction;
 			Z = Z(s.Inds);
-		end
-		function Curvature = get.Curvature(s)
-			Curvature = s.Curvature;
-			Curvature(s.mask) = nan;
-			Curvature = Curvature(s.Inds);
-		end
+        end
+        
+        function C = get.Curvature(s)
+            if ~s.Quadratic, C = 0; return; end
+			C = s.Curvature;
+            if numel(C) == 1 && numel(s.Inds) > 1
+                C = C * ones(size(s.Inds));
+            end
+			C(s.mask) = nan;
+			C = C(s.Inds);
+        end
+        
 		function RB = get.RotateBy(s)
 			RB = s.RotateBy .* ones(size(s.Vx));
 			RB = RB(s.Inds);
-		end
+        end
+        
 		function D = get.Direction(s)
 			D = atan2(s.Vy, s.Vx);
 			D = D(s.Inds);
 			D(s.mask) = nan;
 			D = D - s.RotateBy;
 			D = angle(exp(1j * D));  % Keep in range [-pi pi]
-		end
-		function M = get.Magnitude(s)
-			M = sqrt(s.Vx.^2 +  s.Vy.^2) / 400;  % Fits return electrodes/second
-			M(s.mask) = nan;
-			M = M(s.Inds);
-		end
+        end
+        
+		function M = get.Magnitude(self)
+            % in mm/s
+			M = sqrt(self.Vx.^2 +  self.Vy.^2) * .4;  % Fits return electrodes/second. Convert to mm/s
+			M = M(self.Inds);
+            M(self.mask) = nan;
+        end
+        function M = get.AltMagnitude(self)
+            t_ext = range(self.Data, [2 3]);  % time taken for wave to cross MEA
+            M = 5.67 ./ t_ext;  % speed in mm/second (5.67 mm = length of MEA diagonal)
+            M = M(self.Inds);
+            M(self.mask) = nan;
+        end
+        
 		function psig = get.p(s)
 			psig = s.p(s.Inds);
 		end
@@ -185,15 +236,17 @@ classdef WaveProp
 		function l = late(s)
 			l = s.time > s.Late(1) & s.time < s.Late(2);
 		end
-		function phimn = get.Phi_mean_early(s)
-			phimn = circ_mean(s.Direction(s.early), [], [], 'omitnan');
-			phimn(s.N_detections_early < s.MinDetections) = nan;
+		function [phimn, conf] = Phi_mean_early(s)
+            if s.N_detections_early < s.MinDetections, [phimn, conf] = deal(nan); return; end
+			[phimn, ul] = circ_mean(s.Direction(s.early), [], [], 'omitnan');
+			conf = ul - phimn;
 			phimn = angle(exp(1j*phimn));  % keep in range [-pi pi]
 		end
 		
-		function phimn = get.Phi_mean_late(s)
-			phimn = circ_mean(s.Direction(s.late), [], [], 'omitnan');
-			phimn(s.N_detections_late < s.MinDetections) = nan;
+		function [phimn, conf] = Phi_mean_late(s)
+            if s.N_detections_late < s.MinDetections, [phimn, conf] = deal(nan); return; end
+			[phimn, ul] = circ_mean(s.Direction(s.late), [], [], 'omitnan');
+			conf = ul - phimn;
 			phimn = angle(exp(1j*phimn));  % keep in range [-pi pi]
 		end
 		function phisd = get.Phi_std_early(s)
@@ -232,7 +285,8 @@ classdef WaveProp
 				otherwise
 					ax = obj.plot2D(varargin{:});
 			end
-		end
+        end
+        
 		function ax = plot3D(obj, varargin)
 			% ax = plot(obj, t0, ax); % if object has only one time point, t0=obj.time
 			[ax, tt] = WaveProp.parse_plot_inputs(varargin{:});
@@ -260,7 +314,8 @@ classdef WaveProp
 			hold(ax, 'off');
 			ax.Tag = checkname(['figs' filesep obj.Name '_' class(obj) '_' num2str(F.time) '_plot3D']);
 			
-		end
+        end
+        
 		function ax = plot2D(s, varargin)
 			% ax = plot2D(obj, tt, ax)
 			[ax, tt] = WaveProp.parse_plot_inputs(varargin{:});
@@ -281,10 +336,11 @@ classdef WaveProp
 			X = (size(data) + 1) / 2;
 			quiver(ax, X(1), X(2), vx, vy, s.scale_quiver, ...
 				'LineWidth', 2, ...
-				'MaxHeadSize', 1)
+				'MaxHeadSize', 1, 'color', [1 0 0])
 			hold(ax, 'off')
 			ax.Tag = checkname(['figs' filesep s.Name '_' class(s) '_' num2str(tt) '_plot2D']);
-		end
+        end
+        
 		function [d, xi, bw] = ksdensity(obj, ax, rotateby, xres, bw, varargin)
 			% [d, xi, bw] = ksdensity(ax=gca, rotateby=0, xres=pi/500, bw=.15*pi/3, ::plot directives::)
 			if nargin < 5 || isempty(bw), bw = .15*pi/3; end
@@ -297,10 +353,8 @@ classdef WaveProp
 				temp = obj.Direction;
 			end
 			temp = [temp(:) - 2*pi; temp(:); temp(:) + 2*pi];
-		% 	ksdensity([repmat(ct.(f{:}), 3, 1) temp], [x1 x2], 'bandwidth', [5 .15*pi/3]);
 			gridx2 = linspace(-3*pi, 3*pi, 6*xres + 1);
 			[d, xi, bw] = ksdensity(temp, gridx2, 'bandwidth', bw);
-% 			plot(ax, xi, d/max(d), varargin{:});
 			plot(ax, xi, d, varargin{:});
 			xlim(ax, [-pi pi])
 		end
@@ -308,6 +362,7 @@ classdef WaveProp
 		%% Main
 		function obj = compile_results(obj, varargin)
 			% obj = compile_results(::'nocluster'::)
+            
 			CLUSTER = true;
 			if ismember('nocluster', varargin), CLUSTER = false; end
 			temp = nan(max(obj.Position));
@@ -334,12 +389,29 @@ classdef WaveProp
 			obj.Direction = angle(ZZ);
 			temp(locs) = data;
 			obj.Data = single(temp);
-		end
+        end
+        
 		function obj = parse_inputs(obj, varargin)
 			for ii = 1:2:numel(varargin)
 				ff = validatestring(varargin{ii}, [obj.ParamNames(:); obj.WPParamNames(:)]);
 				obj.(ff) = varargin{ii+1};
 			end
+        end
+        
+        function cst = consistency(obj, W)
+            % cst = obj.consistency(W=1000);
+            % Default to 1000 ms window
+            if nargin < 2, W = 1000; end  
+            k = round(W/diff(obj.time(1:2)) / 1e3);  % convert window from ms to samples
+            c = cos(obj.Direction);
+            s = sin(obj.Direction);
+            cS = movmean(c, k, 'omitnan');
+            sS = movmean(s, k, 'omitnan');
+            
+            cst = vecnorm([cS sS], 2, 2);
+            N = movsum(isfinite(c), k);
+            cst(N < 5) = nan;
+            
         end
         
         
@@ -359,7 +431,8 @@ classdef WaveProp
 			sN.Position = [p1(:) p2(:)];
 			sN = sN.compile_results('nocluster');
 			warning(W);
-		end
+        end
+        
 		function s = compute_curvature(s)
 			S = warning;
 			warning('off', 'stats:statrobustfit:IterationLimit');
@@ -387,13 +460,21 @@ classdef WaveProp
 			end
 			warning(S);
 			s.Inds = INDS;  % re-apply time filter
-		end
+        end
+        
 		function [mn, ci] = mean(s, data)
 			if nargin < 2, data = s.Direction; end
             if all(isnan(data)), mn = nan; ci = nan; return; end
 			[mn, ul] = circ_mean(data, [], [], 'omitnan');
 			ci = ul - mn;
-		end
+        end
+        
+        function sd = std(s, data)
+            if nargin < 2, data = s.Direction; end
+            if all(isnan(data)), sd = nan; return; end
+            sd = circ_std(data(~isnan(data)));
+        end
+        
 		function F = sub(obj, ind)
 			obj.Inds = [];
 			N = min(numel(obj.time), numel(obj.Vx));
@@ -403,6 +484,7 @@ classdef WaveProp
 				temp = obj.(f);
 				sz = size(temp);
 
+                try
 				if all(sz < N) || ischar(obj.(f))
 					F.(f) = temp;
 				elseif isvector(temp)
@@ -417,17 +499,26 @@ classdef WaveProp
 					temp = reshape(temp, N, []);
 					data = reshape(temp(ind, :), [1 sz(2:end)]);
 					F.(f) = data;
-				end
+                end
+                catch ME
+                    if ~strcmpi(ME.identifier, 'MATLAB:class:noSetMethod')
+                        rethrow(ME)
+                    else
+                        continue
+                    end
+                end
 
 			end
-		end
+        end
+        
 		function F = split(obj)
 			N = min(numel(obj.time), numel(obj.Vx));
 			F(N) = obj.sub(N);
 			for ii = 1:N
 				F(ii) = obj.sub(ii);
 			end
-		end
+        end
+        
 		function d = diff(s, other)
 			other = other.resample_t0(s.time);
 % 			t_inds = interp1(other.time, 1:length(other.time), s.time, 'nearest', 'extrap');
@@ -473,9 +564,7 @@ classdef WaveProp
 		end
 		
 	end
-	
-%% Static methods
-	
+		
 	methods (Static)
 		function [ax, tt, directive] = parse_plot_inputs(varargin)
 			ax = []; tt = 0;
@@ -560,7 +649,7 @@ classdef WaveProp
 			%   Optional: if the last input is 'plot', a representation of the delays
 			%   at each electrode position with the fitted plane will be shown.
 
-			MIN_RATIO_FINITE = 0.05;   % we require 50% of electrodes to have a defined delay
+			MIN_RATIO_FINITE = 0.05;   % we require 5% of electrodes to have a defined delay (this is overwritten later by MinFinite)
 
 			P0 = nan;
 			b = nan;
@@ -578,8 +667,10 @@ classdef WaveProp
 % 				H = [0 1 0; 0 0 1];  % These are default values
 % 				c = [0 ; 0];
 				P0 = linhyptest(b, stats.covb, [], [], stats.dfe);  % perform F test that last two coefs are both 0.
-			end
-		end
+            end
+            
+        end
+        
 		function [V, p, beta] = fit_data(data, position, quadratic)
 			if nargin < 3, quadratic = false; end
 			V = nan(1, 2);
@@ -610,7 +701,8 @@ classdef WaveProp
 			end
 % 			beta = circshift(beta, -1);
 			V = pinv(beta(2:3));
-		end
+        end
+        
 		function [reduced_data, T] = use_largest_cluster(data, position)
 			% Use the largest cluster of data points for lfp methods
 			warning('off', 'stats:clusterdata:MissingDataRemoved');
@@ -634,7 +726,8 @@ classdef WaveProp
 % 			bounds = dataS(divides(largest+[0 1]) + [1; 0]);
 % 			reduced_data = data;
 % 			reduced_data(data < bounds(1) | data > bounds(2)) = nan;
-		end
+        end
+        
 		function S = resize_obj(s, to_struct)
 			if nargin < 2, to_struct = false;  end
 			
@@ -649,37 +742,68 @@ classdef WaveProp
 			S.t0 = cat(1, s.t0);
 			S.Vx = cat(1, s.Vx);
 			S.Vy = cat(1, s.Vy);
+            S.Data = cat(1, s.Data);
 			S.Inds = [];
+            
 % 			S.Magnitude = cat(1, s.Magnitude);
-			for f = string(fieldnames(s)')
+            mco = metaclass(s).PropertyList;
+            FF = {mco.Name};
+            FF(cat(1, mco.Dependent) | cat(1, mco.Hidden) | cat(1, mco.Transient)) = [];
+			for f = string(FF)
 				if ismember(lower(f), ...
 						{'quadratic', 'sig', 'halfwin', 'fband', ...
 						'name', 'minfreq', 'p', 'magnitude', 'Vx', 'Vy', ...
-                        'samplingrate'})
+                        'samplingrate', 'patient', 'seizure'})
 					continue
 				end
 				if isempty(s(1).(f)), continue,
-% 				elseif ismember(lower(f), {'data', 'freq'})
-% 					S.(f) = cat(3, s.(f));
-				else
+                else
+                    temp = cat(1, s.(f));
                     try
-					    S.(f) = cat(1, s.(f));					
-                    catch ME
-                        if ~strcmp(ME.identifier, 'MATLAB:catenate:dimensionMismatch'), rethrow(ME);
+%                         temp = cat(1, s.(f));
+                        t2 = temp;
+                        if ismatrix(temp)
+                            t2 = unique(temp, 'rows');
+                        elseif isvector(S.(f))
+                            t2 = unique(temp);
                         end
-                        S.(f) = {s.(f)};
+                        
+                        if size(t2, 1) == 1  % if all rows are the same, just keep one
+                            S.(f) = t2;
+                        else  % otherwise, preserve size
+                            S.(f) = temp;
+                        end
+					    
+                    catch ME  
+                        % some of the older saves had different sizes. 
+                        % Join these as cells and then reshape by hand
+                        switch ME.identifier
+                            case 'MATLAB:catenate:dimensionMismatch'
+                                S.(f) = {s.(f)};
+                            case 'MATLAB:class:noSetMethod'
+                                continue
+                            otherwise
+                                rethrow(ME);
+                        end
+                        
                     end
+                    
+
 				end
-			end
+            end
 			
-		end
+        end
+        
 		function obj = struct2obj(fstruct)
 			% Usage: obj = struct2obj(res)
 			
 			obj = WaveProp;
 			assert(nargin == 1);
 			obj.Name = fstruct.Name;
-			obj.time = fstruct.computeTimes/1e3;
+            nn = strsplit(fstruct.Name, {'_', 'Seizure'});
+            obj.Patient = nn{1};
+            obj.Seizure = nn{2};
+			obj.t0 = fstruct.computeTimes/1e3;
 
 			data = fstruct.data;
 			position = fstruct.position;
@@ -753,26 +877,31 @@ classdef WaveProp
 			if isempty(args.files)
 				if ischar(args.pat) && ischar(args.seizure)
 					if strcmpi([args.pat args.seizure], '**')
+                        
                         sz = SeizureInfo;
                         pats = sz.patient;
                         seizures = sz.seizure;
-% 						fid = fopen('seizures2.txt');
-% 						A = textscan(fid, '%s %s'); 
-% 						pats = A{1}; seizures = A{2};
-%                         fclose(fid);
+
+                        
 						for ii = numel(pats):-1:1
-                            fstruct = dir(fname(pats{ii}, seizures(ii)));
+                            fstruct = dir(fname(pats{ii}, num2str(seizures(ii))));
                             if ~isempty(fstruct)
                                 files(ii) = fstruct;
                             end
 						end
 						
 						args.files = files;
+                        
+                        args.seizures = arrayfun(@(ii) ...
+                            [sz.patient{ii} '_Seizure' num2str(sz.seizure(ii))], ...
+                            (1:numel(pats)), 'uni', 0);
+                        
 					else
 						args.files = dir(fname(args.pat, args.seizure));
+                        args.seizures = [args.pat '_Seizure' args.seizure];
 					end
-				else
-
+                else
+                    error('You need to add this functionality: args.seizures not defined for this');
 					ii = 1;
 					for p = 1:numel(args.pat)
 						for s = 1:numel(args.seizure)
@@ -791,8 +920,105 @@ classdef WaveProp
 
 			end
 
-		end
-		function fits = load(varargin)
+        end
+        
+
+        function fits = load(mea, metrics)
+            % fits = WaveProp.load(mea=[]);
+            % Inputs:
+            %    mea - can be (1) an MEA class object, (2) a character
+            %          string name of a subfolder of WaveFits (i.e.
+            %          'MG49_Seizure43'), or (3) it can be empty in which
+            %          case fits from all seizures in SeizureInfo will load
+            
+            if nargin < 2, metrics = []; end
+            if nargin < 1 || isempty(mea)
+                sz = SeizureInfo;
+                metrics = findsharedmetrics_(sz);
+                for ii = numel(sz.patient):-1:1
+                    names{ii} = sprintf('%s_Seizure%d', sz.patient{ii}, sz.seizure(ii));
+                    fits(ii) = WaveProp.load( names{ii}, metrics);
+                end
+                F.Name = names;
+                F.Original = false(size(names));
+                for ff = metrics
+                    F.(ff{:}) = cat(1, fits.(ff{:})); 
+                end
+                fits = F;
+                
+            elseif ischar(mea)
+                fits = foldercontents2struct_(['WaveFits/' mea], metrics);
+                fits.Name = {mea};  % convert to cell to match previous version of load
+            elseif isa(mea, 'MEA')
+                fits = foldercontents2struct_(['WaveFits/' mea.Name], metrics);
+                fits.Name = {mea.Name};  % convert to cell to match previous version of load
+            end
+            
+            
+        end
+        
+        function fits = COMPLICATEDload(varargin)
+            
+            
+            if nargin > 0 && isa(varargin{1}, 'MEA')
+                s = varargin{1};
+                varargin(1) = [];
+            end
+            
+            args = WaveProp.parse_load(varargin{:});
+            
+            if isa(s, 'MEA')
+                fname = ['WaveFits/' s.Name];  % folder name
+                [fits, metrics] = foldercontents2struct_(fname);
+            else
+                files = args.files;
+				seizures = args.seizures;
+				metrics = args.metrics;
+				nF = numel(seizures);
+				for ii = nF:-1:1
+                    fprintf('%d: loading %s\n', ii, seizures{ii});
+                    if args.original
+                        res = load([files(ii).folder filesep files(ii).name]); 
+                        fit_temp = WaveProp.file2fit(res);
+                        for mm = metrics
+                            fits(ii).(mm{:}) = fit_temp.(mm{:}); 
+                        end
+						fits(ii).Original = true;
+                        
+                    elseif ii == nF && isempty(metrics)
+                        path = ['WaveFits/' seizures{ii}];
+                        [res, metrics] = foldercontents2struct_(path);
+                        
+                    else
+                        res = foldercontents2struct_(path);
+                        
+						not_member = ~ismember(metrics, fieldnames(res));
+						if any(not_member)
+							fits = rmfield(res, metrics(not_member));
+							metrics(not_member) = [];
+						end
+					end
+					if ~args.original
+						res.Name = strrep(seizures{ii}, '.mat', '');
+                        res.Original = args.original;
+						fits(ii) = res;
+                    end
+
+				end	
+				for ff = string(fieldnames(fits)')
+%                     if strcmpi(ff, 'fits'), continue; end
+					if ischar(fits(1).(ff))
+						F.(ff) = {fits.(ff)};
+					else
+						F.(ff) = cat(1, fits.(ff)); 
+					end
+				end
+				fits = F;
+			end	
+            
+        end
+        
+		function fits = ZZload(varargin)
 			s = [];
 			if nargin > 0 && isa(varargin{1}, 'MEA')
 				s = varargin{1};
@@ -802,7 +1028,7 @@ classdef WaveProp
 			if isa(s, 'MEA')
 				if args.original
 					fname = sprintf( ...
-						'%s_Seizure%s_Neuroport_10_10_wave_prop.mat', ...
+						'wave_prop/%s_Seizure%s_Neuroport_10_10_wave_prop.mat', ...
 						s.patient, s.seizure);
 				else
 					fname = [s.Name '_fits.mat'];
@@ -816,7 +1042,10 @@ classdef WaveProp
 				metrics = args.metrics;
 				nF = numel(files);
 				for ii = nF:-1:1
-					if ii == nF && isempty(metrics)
+                    fprintf('%d: loading %s\n', ii, files(ii).name);
+                    if args.original
+                        res = load([files(ii).folder filesep files(ii).name]); 
+                    elseif ii == nF && isempty(metrics)
 						res = load([files(ii).folder filesep files(ii).name]);
 						metrics = fieldnames(res); 
 					else
@@ -825,16 +1054,22 @@ classdef WaveProp
                         
 						not_member = ~ismember(metrics, fieldnames(res));
 						if any(not_member)
-							fits = rmfield(fits, metrics(not_member));
+							fits = rmfield(res, metrics(not_member));
 							metrics(not_member) = [];
 						end
 					end
 					if args.original
-						fits(ii) = WaveProp.file2fit(res);
+                        fit_temp = WaveProp.file2fit(res);
+                        for mm = metrics
+                            fits(ii).(mm{:}) = fit_temp.(mm{:}); 
+                        end
+						fits(ii).Original = true;
 					else
 						res.Name = strrep(files(ii).name, '.mat', '');
+                        res.Original = args.original;
 						fits(ii) = res;
-					end
+                    end
+
 				end	
 				for ff = string(fieldnames(fits)')
 %                     if strcmpi(ff, 'fits'), continue; end
@@ -846,7 +1081,8 @@ classdef WaveProp
 				end
 				fits = F;
 			end						
-		end
+        end
+        
 		function [out, S, dir_stats] = summary_stats(F, varargin)
 			% [out, S, dir_stats] = WP.summary_stats(F, ::'noplot'::, ::'mea'::)
 			% Generates stats for each patient
@@ -924,7 +1160,8 @@ classdef WaveProp
 				legend(ax, metrics)
 			end
 			
-		end
+        end
+        
 		function out = compute_dir_stats(phi, times, thresh)
 			if nargin < 3, thresh = pi/64; end
 			[dphi, phi_uw, phi_std] = deal(nan(size(phi)));
@@ -963,7 +1200,8 @@ classdef WaveProp
 			out.phi_std = phi_std;
 			out.phi_uw = phi_uw;
 			
-		end
+        end
+        
 		function out = summary_comparison(F, varargin)
 			% out = summary_comparison(F, ::fig=gcf::, ::'save'::)
 			% Generates stats comparing pairs of metrics
@@ -1036,4 +1274,29 @@ end
 function n = numfinite_(X)
 % n = sum(isfinite(X), dim='all')
 n = sum(isfinite(X), 'all');
+end
+
+function [fits, metrics] = foldercontents2struct_(path, metrics)
+    if nargin < 2 || isempty(metrics)
+        metrics = {dir([path filesep '*.mat']).name};
+        metrics = cellfun(@(ss) strrep(ss, '.mat', ''), ...
+                metrics, 'uni', 0);
+    end
+    for ff = metrics
+        fit = load([path filesep ff{:}]);
+        pn = fieldnames(fit);
+        fits.(ff{:}) = fit.(pn{:});
+    end
+end
+
+function metrics = findsharedmetrics_(sz)
+    N = numel(sz.patient);
+    mtc = arrayfun(@(ii) ...
+        dir(sprintf('WaveFits/%s_Seizure%d/*mat', ...
+            sz.patient{ii}, sz.seizure(ii))...
+        ), 1:N, 'uni', 0);
+    temp = cellfun(@(xx) {xx.name}, mtc, 'uni', 0);
+    [cc, M] = histcounts(categorical(cat(2, temp{:})));
+    metrics = strrep(M(cc == N), '.mat', '');
+        
 end

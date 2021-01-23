@@ -19,7 +19,7 @@ p('delay_band', [1 13]);  % frequency band for coherence
 p('show_plots', false, @islogical);  % show detailed plots during analysis
 
 %% mua_firing_rate
-p('fr_window', 100);  % window length for smoothing firing rate (ms)
+p('fr_window', 20);  % window length for smoothing firing rate (ms)
 
 %% mua_events
 p('event_thresh', 4, isnonneg);      % min peak distance from baseline (in negative direction) [sd]

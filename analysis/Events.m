@@ -19,6 +19,7 @@ classdef Events < WaveProp
 			obj.HalfWin = mea.params.half_win / 1e3;
 			obj = obj.parse_inputs(varargin{:});
 			obj.Position = mea.Position;
+            obj.Name = mea.Name;
 % 			[window, T] = obj.get_window(mea);
 
 			data = obj.get_data(mea.event_times, t0);
