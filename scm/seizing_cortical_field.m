@@ -59,7 +59,7 @@ dx = M.dx;
 dt = M.dt;
 
 % initialize random number generator (from input argument)
-rand_state = params.seed.Seed * (params.t0 + 100);
+rand_state = params.sim_num * 1000 + params.t0;
 rng(rand_state, 'v5normal');
 
 % number of time-steps for simulation
@@ -91,7 +91,7 @@ new = last;  % initialize
 
 
 %% Simulation
-new = last;
+% new = last;
 for ii = 1: Nsteps
 	
 	% Update equations (update <new> values)
