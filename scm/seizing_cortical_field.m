@@ -50,6 +50,7 @@ PN = params.noise;
 SS = params.SS;
 MX = params.bounds;
 PS = params.sigmoids;
+% OF = params.offsets;  % Consider moving dVe here here...
 
 %% A few convenience variables
 
@@ -92,7 +93,7 @@ new = last;  % initialize
 
 %% Simulation
 % new = last;
-for ii = 1: Nsteps
+for ii = 1:Nsteps
 	
 	% Update equations (update <new> values)
 	update_wave_equations;
@@ -107,7 +108,7 @@ for ii = 1: Nsteps
 	
 	% Set the "source" locations' excitatory population resting voltage and
 	% expand the wavefront
-	update_source
+    update_drive
 
 	% sanity check!
 	if any(any(isnan(last.Qe)))
@@ -266,6 +267,7 @@ EC = rmfield(EC, no_return);
 	end
 
 % 6. Update inhibitory gap junction strength, and resting voltages.  
+   
 	function update_gap_resting
 		new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* wD(last.K) - (last.Dii - SS.Dii));
 		new.Dee = last.Dii/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
@@ -285,19 +287,39 @@ EC = rmfield(EC, no_return);
 	end
 
 % Update source and expand wavefront
-	function update_source
-		if time(ii) > 0 
-			[new.map, new.state] = update_map(last.state, M.expansion_rate * dt / dx, M.excitability_map);
-			if time(ii) <= PM.duration
-				new.dVe(new.map) = PM.source_drive; 
-				if isempty(PM.source), return, end
-				which_source = mod(floor(time(ii) / 2), size(PM.source, 3)) + 1;
-				new.dVe(PM.source(:, :, which_source)) = PM.source_drive;
-			else
-				if isnan(PM.post_ictal_source_drive), return; end			
-				new.dVe(new.map) = PM.post_ictal_source_drive;
-			end
-		end
+	function update_drive
+        
+        switch PM.drive_style
+            case {'', 'excitatory'}
+                if time(ii) > 0 
+                    [new.map, new.state] = update_map( ...
+                        last.state, M.expansion_rate * dt / dx, ...
+                        M.excitability_map);
+                    if time(ii) <= PM.duration
+                        new.dVe(new.map) = PM.source_drive; 
+                        if isempty(PM.source), return, end
+                        which_source = mod(floor(time(ii) / 2), size(PM.source, 3)) + 1;
+                        new.dVe(PM.source(:, :, which_source)) = PM.source_drive;
+                    else
+                        if isnan(PM.post_ictal_source_drive), return; end			
+                        new.dVe(new.map) = PM.post_ictal_source_drive;
+                    end
+                end
+            case 'inhibitory'
+                if time(ii) > 0
+                    [new.map, new.state] = update_map( ...
+                        last.state, M.expansion_rate * dt / dx, ...
+                        M.excitability_map);
+                    if time(ii) <= PM.duration
+                        new.Dii(new.map) = params.I_drive; 
+                    else
+                        if isnan(PM.post_ictal_source_drive), return; end			
+                        new.dVe(new.map) = PM.post_ictal_source_drive;
+                    end
+                end
+            otherwise
+                error('Drive style ''%s'' not recognized');
+        end
 	end
 
 %% Nested logistical functions

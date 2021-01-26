@@ -1,48 +1,120 @@
 classdef SCM < handle
 	
 	methods  % constructor and other operators
-		function P = SCM(varargin)
-			if nargin == 0, P = P.init(); return; end
+		function scm = SCM(varargin)
+			if nargin == 0, scm = scm.init(); return; end
 			switch class(varargin{1})
 				case 'SCM'
-					P = varargin{1};
+					scm = varargin{1};
 				case 'struct'
 					
 					if isfield(varargin{1}, 'model')  % old params struct
 						params = varargin{1};
 					%	P.extract(params.meta);
-						P.IC = SCMState(params.IC);
+						scm.IC = SCMState(params.IC);
 						model = params.model;
 						
 						for ff = string(fieldnames(model)')
-							if ~ismember(ff, properties(P)), continue, end
+							if ~ismember(ff, properties(scm)), continue, end
 							if isempty(model.(ff)), continue; end
 							switch ff
 								case "IC"
 									continue
 								case {"noise" "sigmoids" "electrodes" "bounds" "time_constants"} 
-									P.extract(model.(ff));
+									scm.extract(model.(ff));
 								case "K"
-									P.potassium = model.K;
+									scm.potassium = model.K;
 								otherwise
-									P.(ff) = model.(ff);
+									scm.(ff) = model.(ff);
 							end
 							
 						end
-						P = P.extract(params.meta);
+						scm = scm.extract(params.meta);
 						
 					else
 						for arg = varargin
-							P = P.extract(arg{:});
+							scm = scm.extract(arg{:});
 						end
 					end
 				case 'char'
-					for ii = 1:2:nargin
-						ff = validatestring(varargin{ii}, fieldnames(P));
-						P.(ff) = varargin{ii + 1};
-					end
+                    if nargin == 1
+                        mdl = validatestring(varargin{1}, ...
+                            {'steyn-ross', 'martinet', 'wip', ...
+                            'new_Edriven'});
+                        switch mdl
+                            case 'steyn-ross'
+                                scm = scm.init();
+                                scm.tau_dVe = Inf;  % voltage offsets are fixed
+                                scm.tau_dVi = Inf;
+                                scm.tau_dD = Inf;  % gap junction coupling is fixed
+                                scm.depo_block = false;
+                                scm.v = 140;
+                                scm.IC.dVe = 1.5;
+                                scm.IC.dVi = 0;
+                                scm.D = .35;  % set this to whatever you like to change equilibrium
+                                  % Note that lower than this doesn't
+                                  % really look like the TW from the paper
+                                  % though. Not sure what's wrong; could
+                                  % just be that it needs firing injection
+                                  % to push it into "up-state" (EDS.
+                                  % 1/25/21)
+                                scm.IC.Dii = scm.D;
+                            case 'martinet'
+                                scm = scm.init();
+                                scm.D = 1;
+                            case 'new_Edriven'
+                                scm = SCM('steyn');
+                                scm.save = false;
+                                scm.visualization_rate = 10;
+                                scm.out_vars = {'Qe', 'Ve', 'Qi', 'Vi', 'map', 'state'};
+                                scm.D = 0.15;
+                                scm.IC.Dii = scm.D;
+                                scm.padding = [2 60];
+                                scm.duration = 10;
+                                scm.v = 140;
+                                scm.noise_sf = 1;
+                                scm.source_drive = 3;
+                                scm.post_ictal_source_drive = nan;
+                                
+                                x = 20; y = 10;
+                                scm.stim_center = [x y+30];
+                                scm.source = false(scm.grid_size);
+                                scm.source(x, y) = true;
+                                scm.Ve_rest = scm.Ve_rest * ones(scm.grid_size);
+                                scm.Ve_rest(x, y) = scm.Ve_rest(x, y) + 1;
+                                
+                            case 'wip'
+                                scm = SCM('steyn');
+                                scm.save = false;
+                                scm.visualization_rate = 10;
+                                scm.out_vars = {'Qe', 'Ve', 'Qi', 'Vi', 'map', 'state'};
+                                scm.D = 0.15;
+                                scm.IC.Dii = scm.D;
+                                scm.padding = [2 60];
+                                scm.duration = 10;
+                                scm.v = 140;
+                                scm.noise_sf = 1;
+                                scm.source_drive = 3;
+                                scm.post_ictal_source_drive = nan;
+                                
+                                x = 20; y = 10;
+                                scm.stim_center = [x y+30];
+                                scm.source = false(scm.grid_size);
+                                scm.source(x, y) = true;
+                                scm.Ve_rest = scm.Ve_rest * ones(scm.grid_size);
+                                scm.Ve_rest(x, y) = scm.Ve_rest(x, y) + 1;
+                                
+                            otherwise
+                                error('Input ''%s'' not recognized.', mdl)
+                        end
+                    else
+                        for ii = 1:2:nargin
+                            ff = validatestring(varargin{ii}, fieldnames(scm));
+                            scm.(ff) = varargin{ii + 1};
+                        end
+                    end
 			end
-            P = P.init();
+            scm = scm.init();
 			
 		end
         function P = init(P)
@@ -50,9 +122,9 @@ classdef SCM < handle
 				str = sprintf('%s/%s/%s', P.label, P.label, P.label); 
 				P.basename = str;
             end
-            if ~isstruct(P.seed)  % set seed
-				P.seed = rng(P.seed);
-            end
+%             if ~isstruct(P.seed)  % set seed
+% 				P.seed = rng(P.seed);
+%             end
             if isempty(P.IC), P.IC = []; end  % set default IC
 			P.IC = P.IC.resize(P.grid_size);
 			if all(P.stim_center)
@@ -101,10 +173,11 @@ classdef SCM < handle
 		subsample (1,1) double {mustBePositive} = Inf  % Allow downsampling when creating mea
 		return_fields (1,:) = {'Qe', 'Ve'}  % Qe required to make mea
 		out_vars (1,:) = {'Qe', 'Ve'}  % Define which variables you would like to visualize (can be any in IC)
-		source % Define fixed, rotating sources of excitation
-		seed = rng  % Set seed for repeatability
+		source % Define fixed, alternating sources of excitation
+% 		seed = rng  % Set seed for repeatability
 		label (1,:) char = 'SCM'
 		t0  % used to keep track of progress in sims 
+        drive_style (1,:) char = 'excitatory'
 	end
 
 	methods  % getters for meta
@@ -136,7 +209,7 @@ classdef SCM < handle
 		dt = 2e-4
 		dx = .4  % (mm) 
 		expansion_rate (1,1) double {mustBeNonnegative} = .625  % in mm^2/s; set to 0 for fixed source
-		excitability_map
+		excitability_map  % boundary to IW spread
 		IC SCMState 
 
 	end
@@ -235,16 +308,16 @@ classdef SCM < handle
 	end
 	methods
 		function d_psi_ee = get.d_psi_ee(S)
-			d_psi_ee = -1/(S.Ve_rev - S.Ve_rest);
+			d_psi_ee = -1./(S.Ve_rev - S.Ve_rest);
 		end
 		function d_psi_ei = get.d_psi_ei(S)
-			d_psi_ei = -1/(S.Ve_rev - S.Vi_rest);
+			d_psi_ei = -1./(S.Ve_rev - S.Vi_rest);
 		end
 		function d_psi_ie = get.d_psi_ie(S)
-			d_psi_ie = -1/(S.Vi_rev - S.Ve_rest);
+			d_psi_ie = -1./(S.Vi_rev - S.Ve_rest);
 		end
 		function d_psi_ii = get.d_psi_ii(S)
-			d_psi_ii = -1/(S.Vi_rev - S.Vi_rest);
+			d_psi_ii = -1./(S.Vi_rev - S.Vi_rest);
 		end
 		
 		% Nee and Nie totals for cortico-cortical plus intracortical
@@ -377,7 +450,7 @@ classdef SCM < handle
 			names = ["basename", "sim_num", "save", "visualization_rate", ...
                 "t_step", "t0_start", "duration", "padding", ....
                 "source_drive", "post_ictal_source_drive", "subsample", ...
-                "return_fields", "out_vars", "source", "seed", "label"];
+                "return_fields", "out_vars", "source", "label", "drive_style"];  % "seed", 
 			meta = P.substruct(names);
 		end
 		function model = get.model(P)
