@@ -255,24 +255,33 @@ EC = rmfield(EC, no_return);
 
 % 5. Update extracellular ion.
 	function update_extracellular_ion
+        FR = last.Qe + last.Qi;
 		new.K = ...
 			last.K ...
 			+ dt / PK.tau_K .* ( ...
 				- PK.k_decay .* last.K ...  % decay term.
 				+ PK.kR .* ...              % reaction term.
-					1 ./ ( 1 + exp( -( last.Qe + last.Qi ) + 15) ) ...
-			) ...
-			+ dt * PK.kD./dx^2 * del2_(last.K);  % diffusion term.
+					FR ./ ( 1 + exp( -FR + 15) ) ...
+                + PK.kD ./ dx^2 * del2_(last.K) ...  % diffusion term.
+			);
+% 			+ dt * PK.kD./dx^2 * del2_(last.K);  % diffusion term.
 			
 	end
 
 % 6. Update inhibitory gap junction strength, and resting voltages.  
    
 	function update_gap_resting
-		new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* wD(last.K) - (last.Dii - SS.Dii));
-		new.Dee = last.Dii/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
-		new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* wdVe(last.K) - last.dVe);
-		new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
+        if 0  % From when I was looking at updating this mechanism
+            new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* wD(last.K) - (last.Dii - SS.Dii)); %#ok<UNRCH>
+            new.Dee = last.Dii/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
+            new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* wdVe(last.K) - last.dVe);
+            new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
+        else  % original Martinet formulation
+            new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
+            new.Dee = new.Dii/100;
+            new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* last.K );
+            new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* last.K );
+        end
 	end
 
 % Correct out of bounds values
@@ -306,16 +315,32 @@ EC = rmfield(EC, no_return);
                     end
                 end
             case 'inhibitory'
-                if time(ii) > 0
-                    [new.map, new.state] = update_map( ...
-                        last.state, M.expansion_rate * dt / dx, ...
-                        M.excitability_map);
+                if time(ii) >= 0 && ~mod(time(ii), .1)
+%                     [new.map, new.state] = update_map( ...  % This uses a contagion style update
+%                         last.state, M.expansion_rate * dt / dx, ...
+%                         M.excitability_map);
+                    new.map = expanding_ring(params, time(ii));
+                    new.map(params.excitability_map == 0) = false;
+                    new.state = last.state;
+                    new.state(new.map) = 1;
+                    recruited = last.state == 1 & new.map == false;
+                    new.state(recruited) = 2;
+                    
+                    new.Dii(new.map) = params.I_drive;  % jump to I_drive value
+%                     new.Dii(~new.map) = params.D;  % return to steady state value
+                    new.Dii(new.state == 2) = params.post_ictal_I_drive;  % return to steady state value
                     if time(ii) <= PM.duration
-                        new.Dii(new.map) = params.I_drive; 
+                        
+                        if ~isempty(PM.source)
+                            new.dVe(PM.source) = PM.source_drive;
+                        end
                     else
-                        if isnan(PM.post_ictal_source_drive), return; end			
-                        new.dVe(new.map) = PM.post_ictal_source_drive;
+
+                        if ~isempty(PM.source)
+                            new.dVe(PM.source) = PM.post_ictal_source_drive;
+                        end
                     end
+                    new.Dee = new.Dii / 100;
                 end
             otherwise
                 error('Drive style ''%s'' not recognized');
