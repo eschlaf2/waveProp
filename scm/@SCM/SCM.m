@@ -62,6 +62,29 @@ classdef SCM < handle
                             case 'martinet'
                                 scm = scm.init();
                                 scm.D = 1;
+                                scm.visualization_rate = 1;
+                                scm.padding = [1 10];
+                                scm.out_vars = {'Qe', 'Ve', 'Qi', 'Vi', 'Dii', 'K'};
+                                
+                                scm.save = 0;
+                                scm.dx = .3;
+                                
+                                scm.phi_ee_sc = 150;
+                                scm.phi_ei_sc = 150;
+                                
+                                [xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
+                                source = false(scm.grid_size);
+                                source(abs(xx - scm.stim_center(1)) <= 1 & ...
+                                    abs(yy - scm.stim_center(2)) <=1) = true;
+                                scm.source = source;
+                                
+                                scm.expansion_rate = 0;  % No IW
+                                scm.IC.dVe = 1;
+                                
+                                scm.noise_sf = 2;
+                                scm.noise_sc = .2;
+                                
+                                
                             case 'new_Edriven'
                                 scm = SCM('steyn');
                                 scm.save = false;
@@ -71,7 +94,7 @@ classdef SCM < handle
                                 scm.IC.Dii = scm.D;
                                 scm.padding = [2 60];
                                 scm.duration = 10;
-                                scm.v = 140;
+                                scm.v = 300;
                                 scm.noise_sf = 1;
                                 scm.source_drive = 3;
                                 scm.post_ictal_source_drive = nan;
@@ -81,28 +104,40 @@ classdef SCM < handle
                                 scm.source = false(scm.grid_size);
                                 scm.source(x, y) = true;
                                 scm.Ve_rest = scm.Ve_rest * ones(scm.grid_size);
-                                scm.Ve_rest(x, y) = scm.Ve_rest(x, y) + 1;
+                                scm.Ve_rest(x, y) = scm.Ve_rest(x, y) + .25;
                                 
                             case 'wip'
-                                scm = SCM('steyn');
-                                scm.save = false;
-                                scm.visualization_rate = 10;
-                                scm.out_vars = {'Qe', 'Ve', 'Qi', 'Vi', 'map', 'state'};
-                                scm.D = 0.15;
-                                scm.IC.Dii = scm.D;
+                                % Looks reasonable so far but
+                                scm = SCM('new_Edriven');
+                                
+                                scm.sim_num = 1;
+                                scm.IC.dVe = zeros(scm.grid_size);
+                                scm.IC.dVe(scm.excitability_map > 0) = 1.4;
                                 scm.padding = [2 60];
                                 scm.duration = 10;
-                                scm.v = 140;
-                                scm.noise_sf = 1;
-                                scm.source_drive = 3;
-                                scm.post_ictal_source_drive = nan;
+                                scm.D = 0.35;
+                                scm.IC.Dii = scm.D;
+                                scm.v = 180;
                                 
-                                x = 20; y = 10;
-                                scm.stim_center = [x y+30];
-                                scm.source = false(scm.grid_size);
-                                scm.source(x, y) = true;
-                                scm.Ve_rest = scm.Ve_rest * ones(scm.grid_size);
-                                scm.Ve_rest(x, y) = scm.Ve_rest(x, y) + 1;
+                                scm.dVe = [-Inf 5];
+                                scm.source_drive = 5;  % raise dVe when source is on (3 works here when there is a slight increase in Ve_rest [0.25] at this spot; setting at 3 with increase in Ve_rest generates spirals at the end)
+                                scm.post_ictal_source_drive = 1.5;  % ... put it back to 1.5 when it's off
+                                
+                                scm.I_drive = .7;
+                                scm.post_ictal_I_drive = 0;
+                                scm.drive_style = 'inhibitory';
+                                scm.out_vars = ...
+                                    {'Qe', 'Ve', 'Qi', 'state', 'Dii', 'dVe'};
+                                
+                                
+                                scm.expansion_rate = 2;  % put this down 
+                                    % lower when you're ready - high just
+                                    % to double check implementation looks
+                                    % right
+                                    
+%                                 scm.dx = .04;
+%                                 scm.dt = 1e-5;
+                                
                                 
                             otherwise
                                 error('Input ''%s'' not recognized.', mdl)
@@ -170,6 +205,8 @@ classdef SCM < handle
 		padding (1,2) = [10 10]  % Padding before and after seizure
 		source_drive (1, 1) double = 2.5
 		post_ictal_source_drive (1,1) double = 1.5
+        I_drive (1, 1) double = .7  % Allow inhibitory driving (EDS, 1/26/21)
+        post_ictal_I_drive (1, 1) double = nan  % Allow inhibitory driving (EDS, 1/26/21)
 		subsample (1,1) double {mustBePositive} = Inf  % Allow downsampling when creating mea
 		return_fields (1,:) = {'Qe', 'Ve'}  % Qe required to make mea
 		out_vars (1,:) = {'Qe', 'Ve'}  % Define which variables you would like to visualize (can be any in IC)
@@ -177,7 +214,7 @@ classdef SCM < handle
 % 		seed = rng  % Set seed for repeatability
 		label (1,:) char = 'SCM'
 		t0  % used to keep track of progress in sims 
-        drive_style (1,:) char = 'excitatory'
+        drive_style (1,:) char = 'excitatory'  % Allow inhibitory driving (EDS, 1/26/21)
 	end
 
 	methods  % getters for meta
@@ -342,7 +379,7 @@ classdef SCM < handle
 	properties  % potassium
 		tau_K = 200    %time-constant (/s).
 		k_decay = 0.1  %decay rate (/s).
-		kD = 100       %diffusion coefficient (mm^2/s).
+		kD = 1       %diffusion coefficient (cm^2/s).
 		KtoVe = 10     %impact on excitatory population resting voltage.
 		KtoVi = 10     %impact on inhibitory population resting voltage.
 		KtoD = -50    %impact on inhibitory gap junction strength.
