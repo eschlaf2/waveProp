@@ -41,6 +41,7 @@ convert_to_mea_(params);
 
 % analyze_wave_directions_(params);
 
+
 %% Subroutines
 function create_directory_(params)
 
@@ -106,9 +107,13 @@ end
 
 end
 
+
 function convert_to_mea_(PM)
     if ~PM.save, return, end
 	if ~isfield(PM, 'label'), PM.label = 'SCM'; end
+    if ~isfield(PM, 'basename'), PM.basename = PM.meta.basename; end
+    if ~isfield(PM, 'subsample'), PM.subsample = PM.meta.subsample; end
+    if ~isfield(PM, 'padding'), PM.padding = PM.meta.padding; end
 	files = dir(sprintf('%s_%d_*mat', PM.basename, PM.sim_num));
 	addpath(files(1).folder);
 	load(files(1).name, 'last');
