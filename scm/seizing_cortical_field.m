@@ -71,6 +71,13 @@ time = ( 0 : Nsteps - 1 )' * dt + params.t0;
 B_ee = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ee_sc / dt);
 B_ei = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ei_sc / dt);
 
+% wave equation coefficients
+VLdt = SS.v * SS.Lambda * dt;
+c1 = VLdt.^2;
+c2 = 2 - 2*VLdt - VLdt.^2;
+c3 = 2*VLdt - 1;
+c4 = (SS.v * dt / dx).^2;
+
 %% Define output variables
 
 % Some are visualized, some are returned.
@@ -132,7 +139,8 @@ EC = rmfield(EC, no_return);
 
 % 1. update wave equations
 	function update_wave_equations
-		new.phi2_ee = ...
+       
+        new.phi2_ee = ...
 			last.phi2_ee ...
 			+ dt * ( ...
 				-2 * SS.v .* SS.Lambda .* last.phi2_ee ...
@@ -149,8 +157,18 @@ EC = rmfield(EC, no_return);
 			) ...
 			+ dt * (SS.v / dx)^2 * del2_(last.phi_ei);
 							 
-		new.phi_ee = last.phi_ee + dt * last.phi2_ee;
-		new.phi_ei = last.phi_ei + dt * last.phi2_ei;
+		new.phi_ee = last.phi_ee + dt * new.phi2_ee;
+		new.phi_ei = last.phi_ei + dt * new.phi2_ei;
+        
+%         new.phi_ee = ...
+%             c1*last.Qe + c2*last.phi_ee + c3*last.phi2_ee + ...
+%             c4 * del2_(last.phi_ee);
+%         new.phi2_ee = last.phi_ee;
+%         
+%         new.phi_ei = ...
+%             c1*last.Qe + c2*last.phi_ei + c3*last.phi2_ei + ...
+%             c4 * del2_(last.phi_ei);
+%         new.phi2_ei = last.phi_ei;
 		
 	end
 
@@ -168,7 +186,7 @@ EC = rmfield(EC, no_return);
 				+ B_ee .* randn(Nx, Ny) ...       % subcortical (random)
 			);
 		
-		new.Phi_ee = last.Phi_ee + dt * last.F_ee;
+		new.Phi_ee = last.Phi_ee + dt * new.F_ee;
 
 	%%%% E-to-I %%%%
 		new.F_ei = last.F_ei ...
@@ -181,7 +199,7 @@ EC = rmfield(EC, no_return);
 				+ B_ei .* randn(Nx, Ny)...   %subcortical (random)
 			);
 		
-		new.Phi_ei = last.Phi_ei + dt * last.F_ei;
+		new.Phi_ei = last.Phi_ei + dt * new.F_ei;
 
 	%%%% I-to-E %%%%
 		new.F_ie = last.F_ie ...
@@ -191,7 +209,7 @@ EC = rmfield(EC, no_return);
 				+ SS.Nie_b * last.Qi ...     %short range
 			);
 		
-		new.Phi_ie = last.Phi_ie + dt * last.F_ie;
+		new.Phi_ie = last.Phi_ie + dt * new.F_ie;
 
 	%%%% I-to-I %%%%
 		new.F_ii = last.F_ii ...
@@ -200,7 +218,7 @@ EC = rmfield(EC, no_return);
 				- last.Phi_ii ...
 				+ SS.Nii_b * last.Qi ...  %short range
 			);
-		new.Phi_ii = last.Phi_ii + dt * last.F_ii;
+		new.Phi_ii = last.Phi_ii + dt * new.F_ii;
 
 	end
 
@@ -275,12 +293,14 @@ EC = rmfield(EC, no_return);
             new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* wD(last.K) - (last.Dii - SS.Dii)); %#ok<UNRCH>
             new.Dee = last.Dii/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* wdVe(last.K) - last.dVe);
-            new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
+%             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
+            new.dVi = dVi(time(ii), M.grid_size);
         else  % original Martinet formulation
             new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
-            new.Dee = new.Dii/100;
+            new.Dee = new.Dii/100;  % Testing constant Dee (EDS, 2/2/21)
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* last.K );
-            new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* last.K );
+%             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* last.K );
+            new.dVi = dVi(time(ii), M.grid_size);
         end
 	end
 
@@ -423,14 +443,38 @@ end
 % ------------------------------------------------------------------------
 %% Supplementary functions
 
+
+function offset = dVi(t, gs)
+    if t < 0, offset = zeros(gs); return; end
+    WIDTH = 4;  % try one with WIDTH=2 as well
+    RATE = 1;
+    iw0 = [20 40];
+    
+    [xx, yy] = ndgrid(1:gs(1), 1:gs(2));
+    xx = xx - iw0(1); yy = yy - iw0(2);
+    D = sqrt(xx.^2 + yy.^2);
+    
+    r1 = D <= RATE * t & D >= RATE * t - WIDTH;  % outer ring
+    r2 = D <= RATE * t - WIDTH & D >= RATE * t - 2*WIDTH;  % inner ring
+    
+    offset = zeros(gs);
+    offset(r1) = 20;
+    offset(r2) = -20;
+    
+    
+    
+end
+
 %------------------------------------------------------------------------
 function Y = del2_(X)
 
-% L = [0 1 0; 1 -4 1; 0 1 0];  % 5-point stencil Laplacian
+L = [0 1 0; 1 -4 1; 0 1 0];  % 5-point stencil Laplacian
+% Y = convolve2(X, L, 'wrap');
+% return
 % r = 4/3 * (1 + 1 / sqrt(2));
 % b = 1 / r; a = 1 / (sqrt(2) * r);
-a = .25; b = .5;
-L = [a b a; b -3 b; a b a];  % 9-point stencil Laplacian
+% a = .25; b = .5;
+% L = [a b a; b -3 b; a b a];  % 9-point stencil Laplacian
 
 % zero-flux BCs
 	X = [repmat(X(1, :), 2, 1); X; repmat(X(end, :), 2, 1)];
