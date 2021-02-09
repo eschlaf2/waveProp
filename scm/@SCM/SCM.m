@@ -40,7 +40,7 @@ classdef SCM < handle
                     if nargin == 1
                         mdl = validatestring(varargin{1}, ...
                             {'steyn-ross', 'martinet', 'wip', ...
-                            'new_Edriven'});
+                            'draft_Idriven'});
                         switch mdl
                             case 'steyn-ross'
                                 scm = scm.init();
@@ -69,8 +69,8 @@ classdef SCM < handle
                                 scm.save = 0;
                                 scm.dx = .3;
                                 
-                                scm.phi_ee_sc = 150;
-                                scm.phi_ei_sc = 150;
+                                scm.phi_ee_sc = 750;
+                                scm.phi_ei_sc = 750;
                                 
                                 [xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
                                 source = false(scm.grid_size);
@@ -84,21 +84,22 @@ classdef SCM < handle
                                 scm.noise_sf = 2;
                                 scm.noise_sc = .2;
                                 
+                            case 'draft_Idriven'
+                                % Looks reasonable so far but
                                 
-                            case 'new_Edriven'
-                                scm = SCM('steyn');
+                                scm = SCM('steyn');  % Kill all potassium dynamics (manually control dVe and Dii)
+                                scm.sim_num = 1;
                                 scm.save = false;
                                 scm.visualization_rate = 10;
                                 scm.out_vars = {'Qe', 'Ve', 'Qi', 'Vi', 'map', 'state'};
-                                scm.D = 0.15;
-                                scm.IC.Dii = scm.D;
-                                scm.padding = [2 60];
-                                scm.duration = 10;
-                                scm.v = 300;
-                                scm.noise_sf = 1;
+%                                 scm.noise_sf = 1;
                                 scm.source_drive = 3;
                                 scm.post_ictal_source_drive = nan;
                                 
+                                % Increase Ve_rest at a point (this
+                                % generates spirals which perpetuate the
+                                % seizure after IW passage/FS offset;
+                                % desirable for slow movement?)
                                 x = 20; y = 10;
                                 scm.stim_center = [x y+30];
                                 scm.source = false(scm.grid_size);
@@ -106,11 +107,7 @@ classdef SCM < handle
                                 scm.Ve_rest = scm.Ve_rest * ones(scm.grid_size);
                                 scm.Ve_rest(x, y) = scm.Ve_rest(x, y) + .25;
                                 
-                            case 'wip'
-                                % Looks reasonable so far but
-                                scm = SCM('new_Edriven');
                                 
-                                scm.sim_num = 1;
                                 scm.IC.dVe = zeros(scm.grid_size);
                                 scm.IC.dVe(scm.excitability_map > 0) = 1.4;
                                 scm.padding = [2 60];
@@ -137,6 +134,50 @@ classdef SCM < handle
                                     
 %                                 scm.dx = .04;
 %                                 scm.dt = 1e-5;
+                            case 'wip'
+                                % Looking for a dVe/dVi pair that
+                                % generates diffuse TW
+                                
+                                scm = SCM('steyn');  % no dynamics on external drives
+%                                 scm = scm.init();
+%                                 scm.depo_block = false;
+%                                 scm.v = 140;
+scm.grid_size = [50 50];
+                                scm.sim_num = 4;
+                                scm.save = false;
+                                scm.visualization_rate = 10;
+                                scm.padding = [10 5];
+                                scm.duration = 60;
+                                scm.expansion_rate = 0;  % no source expansion for now
+
+                                
+% scm.IC.dVi = zeros(scm.grid_size);
+% scm.IC.dVi(scm.excitability_map == 0) = 1;
+% scm.IC.dVi = -2;
+scm.IC.dVe = 1.5;
+% scm.IC.dVe = zeros(scm.grid_size);
+% scm.IC.dVe(scm.excitability_map > 0) = 1.5;
+% scm.source = scm.excitability_map > 0;
+% scm.IC.dVe(scm.stim_center) = 2;
+scm.dVi = [-5 5];
+              
+scm.phi_ee_sc = 300;
+scm.phi_ei_sc = 300;
+                                
+scm.D = .3;
+scm.IC.Dii = scm.D;
+scm.IC.Dee = scm.D/100;
+scm.out_vars = {'Qe', 'Qi', 'dVi', 'Vi', 'Dii', 'dVe'};
+% scm.IC.Qe = 18.47;
+% scm.IC.Qi = 32.68;
+% scm.IC.Ve = -57.71;
+% scm.IC.Vi = -58.01;
+scm.source_drive = 5;
+% scm.IC.dVi = .1;
+scm.dx = 0.1;
+scm.dimsNP = [4 4];
+% scm.dt = 1e-4;
+scm.dt = 2e-4;
                                 
                                 
                             otherwise
@@ -244,8 +285,8 @@ classdef SCM < handle
 		stim_center (1,2) = [20 20]
 		grid_size (1,2) {mustBePositive} = [50 50] % size of grid to simulate (must be even)
 		dt = 2e-4
-		dx = .4  % (mm) 
-		expansion_rate (1,1) double {mustBeNonnegative} = .625  % in mm^2/s; set to 0 for fixed source
+		dx = .4  % (cm) 
+		expansion_rate (1,1) double {mustBeNonnegative} = .625  % in cm^2/s; set to 0 for fixed source
 		excitability_map  % boundary to IW spread
 		IC SCMState 
 
@@ -318,12 +359,12 @@ classdef SCM < handle
 		% default subcortical fluxes
         % %% ORIGINAL FORMULATION %%
         % [Nee_sc,Nei_sc]= deal(50, 50)  % subcortical  
-		% phi_ee_sc = Nee_sc * Qe_max  % original [300]
-		% phi_ei_sc = Nei_sc * Qe_max  % original [300]
+		% phi_ee_sc = Nee_sc * Qe_max  % original [1500]
+		% phi_ei_sc = Nei_sc * Qe_max  % original [1500]
 
         % %% EDS %%
-		phi_ee_sc = 300  % [original = 300, Martinet = 150]
-		phi_ei_sc = 300  % [original = 300, Martinet = 150]
+		phi_ee_sc = 1500  
+		phi_ei_sc = 1500  
 
 		% axonal conduction velocity (cm/s), 
 		v = 280  % [original = 140 cm/s]
