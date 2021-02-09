@@ -8,6 +8,14 @@ function Preview(sim)
         end
         sim.Qe_movie = Qe_movie;
     end
-    h = figure();
-    movie(h, sim.Qe_movie);
+    h = figure(); fullwidth(true);
+    T = tiledlayout(h, 10, 20);
+    for ii = 1:min(numel(sim.Qe_movie), 200)
+        nexttile(T, ii); 
+        imagesc(sim.Qe_movie(ii).cdata); 
+        colormap(sim.Qe_movie(ii).colormap);
+        xticks([]); yticks([]);
+        axis square;
+    end
+%     movie(h, sim.Qe_movie);
 end
