@@ -142,13 +142,12 @@ classdef SCM < handle
 %                                 scm = scm.init();
 %                                 scm.v = 140;
 scm.grid_size = [50 50];
-                                scm.sim_num = 900;
+                                scm.sim_num = 960;
 %                                 scm.save = false;
 %                                 scm.visualization_rate = 10;
                                 scm.padding = [2 10];
                                 scm.duration = 60;
                                 scm.expansion_rate = 0;  % no source expansion for now
-
                                 
 % scm.IC.dVi = zeros(scm.grid_size);
 % scm.IC.dVi(scm.excitability_map == 0) = 1;

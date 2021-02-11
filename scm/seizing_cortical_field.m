@@ -448,7 +448,7 @@ end
 
 function [offset_i, offset_e] = dVi(t, gs, dVe)
     if t < 0, offset_i = zeros(gs); offset_e = dVe; return; end
-    WIDTH = 3;  % I think WIDTH probably needs to be at least Lambda to prevent excitatory transmission from inner to outer
+    WIDTH = 4;  % I think WIDTH probably needs to be at least Lambda to prevent excitatory transmission from inner to outer
     RATE = 1;  % in dx/s (so if dx = .1 cm, this is in mm/s)
     iw0 = [20 40];
     
@@ -457,15 +457,16 @@ function [offset_i, offset_e] = dVi(t, gs, dVe)
     D = sqrt(xx.^2 + yy.^2);
     
     r1 = D <= RATE * t & D >= RATE * t - WIDTH;  % outer ring
-    r2 = D <= RATE * t - WIDTH & D >= RATE * t + (t/100 - 2) * WIDTH;  % inner ring  (40)
+    r2 = D <= RATE * t - WIDTH & D >= RATE * t + (t/60 - 2) * WIDTH;  % inner ring  (40)
     r3 = D < RATE*t - 2*WIDTH;  % inside IW
     
     offset_i = zeros(gs);
-    offset_i(r1) = 5; % 20
-    offset_i(r2) = -5; % -20 (dVi is bounded but setting this very high makes integration 
+    offset_i(r1) = 5; 
+    offset_i(r2) = -5; 
     offset_i(r3) = 0;
     offset_e = dVe;
-    offset_e(D <= RATE * t) = 1.4;
+    offset_e(r1 | r2) = 1.5;
+    offset_e(r3) = 1.4;
     
     
     
