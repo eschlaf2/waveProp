@@ -140,14 +140,13 @@ classdef SCM < handle
                                 
                                 scm = SCM('steyn');  % no dynamics on external drives
 %                                 scm = scm.init();
-%                                 scm.depo_block = false;
 %                                 scm.v = 140;
 scm.grid_size = [50 50];
-                                scm.sim_num = 150058;
-%                                 scm.save = false;
-%                                 scm.visualization_rate = 10;
-                                scm.padding = [5 60];
-                                scm.duration = 10;
+                                scm.sim_num = 900;
+                                scm.save = false;
+                                scm.visualization_rate = 10;
+                                scm.padding = [2 10];
+                                scm.duration = 60;
                                 scm.expansion_rate = 0;  % no source expansion for now
 
                                 
@@ -166,16 +165,17 @@ scm.dVi = [-Inf Inf];
               
 % scm.phi_ee_sc = 300;
 % scm.phi_ei_sc = 300;
-                                
+
+% scm.t0_start = 30;
 scm.D = .3;
 scm.IC.Dii = scm.D;
-scm.IC.Dee = scm.D/100;
+scm.IC.Dee = scm.D/10;
 scm.out_vars = {'Qe', 'Qi', 'dVi', 'Vi', 'Dii', 'dVe'};
 % scm.IC.Qe = 18.47;
 % scm.IC.Qi = 32.68;
 % scm.IC.Ve = -57.71;
 % scm.IC.Vi = -58.01;
-scm.source_drive = 5;
+scm.source_drive = 4;
 % scm.IC.dVi = .1;
 scm.dx = 0.1;
 scm.dimsNP = [4 4];
