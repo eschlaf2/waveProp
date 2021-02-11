@@ -143,8 +143,8 @@ classdef SCM < handle
 %                                 scm.v = 140;
 scm.grid_size = [50 50];
                                 scm.sim_num = 900;
-                                scm.save = false;
-                                scm.visualization_rate = 10;
+%                                 scm.save = false;
+%                                 scm.visualization_rate = 10;
                                 scm.padding = [2 10];
                                 scm.duration = 60;
                                 scm.expansion_rate = 0;  % no source expansion for now
