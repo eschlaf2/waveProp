@@ -71,12 +71,12 @@ time = ( 0 : Nsteps - 1 )' * dt + params.t0;
 B_ee = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ee_sc / dt);
 B_ei = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ei_sc / dt);
 
-% wave equation coefficients
-VLdt = SS.v * SS.Lambda * dt;
-c1 = VLdt.^2;
-c2 = 2 - 2*VLdt - VLdt.^2;
-c3 = 2*VLdt - 1;
-c4 = (SS.v * dt / dx).^2;
+% % wave equation coefficients (as implemented in original Steyn-Ross sim)
+% VLdt = SS.v * SS.Lambda * dt;
+% c1 = VLdt.^2;
+% c2 = 2 - 2*VLdt - VLdt.^2;
+% c3 = 2*VLdt - 1;
+% c4 = (SS.v * dt / dx).^2;
 
 %% Define output variables
 
@@ -251,7 +251,7 @@ EC = rmfield(EC, no_return);
 					exp(-pi / ( sqrt(3) * SS.sigma_e ) .* ( last.Ve - SS.theta_e )) ...
 				) ...
 			) ...     %The E voltage must be big enough,
-			- SS.Qe_max * ( ...
+			- SS.depo_block * SS.Qe_max * ( ...
 				1 ./ ( 1 + ...
 					exp(-pi / ( sqrt(3) * SS.sigma_e ) .* ( last.Ve - ( SS.theta_e + 30 ) )) ...
 				) ...
@@ -263,7 +263,7 @@ EC = rmfield(EC, no_return);
 					exp(-pi / ( sqrt(3) * SS.sigma_i ) .* ( last.Vi - SS.theta_i )) ...
 				) ...
 			) ...     %The I voltage must be big enough,
-			- SS.Qi_max * ( ...
+			- SS.depo_block * SS.Qi_max * ( ...
 				1 ./ ( 1 + ...
 					exp(-pi / ( sqrt(3) * SS.sigma_i ) .* ( last.Vi - ( SS.theta_i + 30 ) )) ...
 				) ...
@@ -294,13 +294,15 @@ EC = rmfield(EC, no_return);
             new.Dee = last.Dii/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* wdVe(last.K) - last.dVe);
 %             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
-            new.dVi = dVi(time(ii), M.grid_size);
+            [new.dVi, new.dVe] = dVi(time(ii), M.grid_size, new.dVe);
+            new.dVe(params.excitability_map == 0) = 0;
         else  % original Martinet formulation
             new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
             new.Dee = new.Dii/100;  % Testing constant Dee (EDS, 2/2/21)
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* last.K );
 %             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* last.K );
-            new.dVi = dVi(time(ii), M.grid_size);
+            [new.dVi, new.dVe] = dVi(time(ii), M.grid_size, new.dVe);
+            new.dVe(params.excitability_map == 0) = 0;
         end
 	end
 
@@ -444,10 +446,10 @@ end
 %% Supplementary functions
 
 
-function offset = dVi(t, gs)
-    if t < 0, offset = zeros(gs); return; end
-    WIDTH = 4;  % try one with WIDTH=2 as well
-    RATE = 1;
+function [offset_i, offset_e] = dVi(t, gs, dVe)
+    if t < 0, offset_i = zeros(gs); offset_e = dVe; return; end
+    WIDTH = 4;  % I think WIDTH probably needs to be at least Lambda to prevent excitatory transmission from inner to outer
+    RATE = 1;  % in dx/s (so if dx = .1 cm, this is in mm/s)
     iw0 = [20 40];
     
     [xx, yy] = ndgrid(1:gs(1), 1:gs(2));
@@ -456,10 +458,14 @@ function offset = dVi(t, gs)
     
     r1 = D <= RATE * t & D >= RATE * t - WIDTH;  % outer ring
     r2 = D <= RATE * t - WIDTH & D >= RATE * t - 2*WIDTH;  % inner ring
+    r3 = D < RATE*t - 2*WIDTH;
     
-    offset = zeros(gs);
-    offset(r1) = 20;
-    offset(r2) = -20;
+    offset_i = zeros(gs);
+    offset_i(r1) = 5; % 20
+    offset_i(r2) = -8; % -20 (dVi is bounded but setting this very high makes integration 
+    offset_i(r3) = 0;
+    offset_e = dVe;
+    offset_e(D <= RATE * t) = 1.5;
     
     
     

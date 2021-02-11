@@ -143,26 +143,29 @@ classdef SCM < handle
 %                                 scm.depo_block = false;
 %                                 scm.v = 140;
 scm.grid_size = [50 50];
-                                scm.sim_num = 4;
-                                scm.save = false;
-                                scm.visualization_rate = 10;
-                                scm.padding = [10 5];
-                                scm.duration = 60;
+                                scm.sim_num = 150058;
+%                                 scm.save = false;
+%                                 scm.visualization_rate = 10;
+                                scm.padding = [5 60];
+                                scm.duration = 10;
                                 scm.expansion_rate = 0;  % no source expansion for now
 
                                 
 % scm.IC.dVi = zeros(scm.grid_size);
 % scm.IC.dVi(scm.excitability_map == 0) = 1;
 % scm.IC.dVi = -2;
-scm.IC.dVe = 1.5;
+scm.dVe = [-Inf, 5];
+scm.depo_block = true;
+scm.IC.dVe = 1.4;
 % scm.IC.dVe = zeros(scm.grid_size);
-% scm.IC.dVe(scm.excitability_map > 0) = 1.5;
+% scm.IC.dVe(scm.excitability_map > 0) = 1.4;
+
 % scm.source = scm.excitability_map > 0;
 % scm.IC.dVe(scm.stim_center) = 2;
-scm.dVi = [-5 5];
+scm.dVi = [-Inf Inf];
               
-scm.phi_ee_sc = 300;
-scm.phi_ei_sc = 300;
+% scm.phi_ee_sc = 300;
+% scm.phi_ei_sc = 300;
                                 
 scm.D = .3;
 scm.IC.Dii = scm.D;
