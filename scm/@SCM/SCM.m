@@ -146,7 +146,7 @@ scm.grid_size = [50 50];
                                 scm.save = false;
                                 scm.visualization_rate = 10;
                                 scm.padding = [20 10];
-                                scm.duration = 60;
+                                scm.duration = 10;
                                 scm.expansion_rate = 0;  % no source expansion for now
 
 % scm.t0_start = -1;
@@ -164,15 +164,15 @@ scm.IC.dVe = 1.5;
 % scm.IC.dVe(scm.stim_center) = 2;
 scm.dVi = [-Inf Inf];
               
-% scm.phi_ee_sc = 300;
-% scm.phi_ei_sc = 300;
+scm.phi_ee_sc = 300;
+scm.phi_ei_sc = 300;
 
 
-scm.dVi = [.1 .1];
-scm.D = .7;  % Not used right now in dynamics
+% scm.dVi = [.1 .1];
+scm.D = .65;  % Not used right now in dynamics
 scm.IC.Dii = scm.D;
-scm.IC.Dii = ndgrid(linspace(.01, .6, 50), 1:50);
-% scm.IC.Dee = scm.D/10;  % not used in Martinet formulation (always
+% scm.IC.Dii = ndgrid(linspace(.01, .4, 50), 1:50);
+scm.IC.Dee = scm.D/40;  % not used in Martinet formulation (always
 % updates to Dii/100)
 scm.out_vars = {'Qe', 'Qi', 'dVi', 'Vi', 'Dii', 'dVe'};
 % scm.IC.Qe = 18.47;
@@ -180,11 +180,11 @@ scm.out_vars = {'Qe', 'Qi', 'dVi', 'Vi', 'Dii', 'dVe'};
 % scm.IC.Ve = -57.71;
 % scm.IC.Vi = -58.01;
 scm.source_drive = 4;
-% scm.IC.dVi = .1;
-scm.dx = 0.1;
+scm.IC.dVi = .1;
+scm.dx = 0.3;
 scm.dimsNP = [4 4];
 % scm.dt = 1e-4;
-scm.dt = 1e-4;
+scm.dt = 2e-4;
                                 
                                 
                             otherwise
