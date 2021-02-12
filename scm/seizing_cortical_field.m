@@ -298,7 +298,7 @@ EC = rmfield(EC, no_return);
             new.dVe(params.excitability_map == 0) = 0;
         else  % original Martinet formulation
             new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
-            new.Dee = new.Dii/100;  % Testing constant Dee (EDS, 2/2/21)
+            new.Dee = new.Dii/100;  
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* last.K );
 %             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* last.K );
             [new.dVi, new.dVe] = dVi(time(ii), M.grid_size, new.dVe);
@@ -450,7 +450,7 @@ function [offset_i, offset_e] = dVi(t, gs, dVe)
     if t < 0, offset_i = zeros(gs); offset_e = dVe; return; end
     WIDTH = 4;  % I think WIDTH probably needs to be at least Lambda to prevent excitatory transmission from inner to outer
     RATE = 1;  % in dx/s (so if dx = .1 cm, this is in mm/s)
-    iw0 = [20 40];
+    iw0 = [20 30];
     
     [xx, yy] = ndgrid(1:gs(1), 1:gs(2));
     xx = xx - iw0(1); yy = yy - iw0(2);
@@ -465,7 +465,7 @@ function [offset_i, offset_e] = dVi(t, gs, dVe)
     offset_i(r2) = -5; 
     offset_i(r3) = 0;
     offset_e = dVe;
-    offset_e(r1 | r2) = 1.5;
+    offset_e(r1 | r2) = 1.4;
     offset_e(r3) = 1.4;
     
     
