@@ -41,8 +41,8 @@ classdef SCMState
 			% instead of 1 (original IC in <map_type='ictal_wavefront'> scenario).
 
 			
-			Dee = 0.01;  % e <--> e gap-junction diffusive-coupling strength (electrodes)
-			Dii = 1;  % i <--> i gap-junction diffusive-coupling strength in all space (electrodes)
+			Dee = 0.008;  % e <--> e gap-junction diffusive-coupling strength (electrodes)
+			Dii = 0.8;  % i <--> i gap-junction diffusive-coupling strength in all space (electrodes)
 			K = 0;  % extracellular potassium concentration (cm^2)
 			Qe = 0;  % Activity of excitatory population.
 			Qi = 0;  % Activity of inhibitory population.
