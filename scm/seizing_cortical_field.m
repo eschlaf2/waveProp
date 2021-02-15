@@ -296,12 +296,16 @@ EC = rmfield(EC, no_return);
 %             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
             [new.dVi, new.dVe] = dVi(time(ii), M.grid_size, new.dVe);
             new.dVe(params.excitability_map == 0) = 0;
-        else  % original Martinet formulation
+        elseif 1  % original Martinet formulation
             new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
-%             new.Dee = new.Dii/100; 
-            new.Dee = last.Dee;
+            new.Dee = new.Dii/100; 
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* last.K );
-%             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* last.K );
+            new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* last.K );
+        else  % messing with high inhibition ring
+            new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
+            new.Dee = new.Dii/100; 
+%             new.Dee = last.Dee;
+            new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* last.K );
             [new.dVi, new.dVe] = dVi(time(ii), M.grid_size, new.dVe);
 %             new.dVe(params.excitability_map == 0) = 0;
         end

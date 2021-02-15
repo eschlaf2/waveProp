@@ -60,17 +60,16 @@ classdef SCM < handle
                                   % 1/25/21)
                                 scm.IC.Dii = scm.D;
                             case 'martinet'
+                                % Fixed source Martinet model
                                 scm = scm.init();
-                                scm.D = 1;
-                                scm.visualization_rate = 1;
-                                scm.padding = [1 10];
+                                scm.sim_num = 1;
+                                scm.padding = [5 10];
                                 scm.out_vars = {'Qe', 'Ve', 'Qi', 'Vi', 'Dii', 'K'};
                                 
-                                scm.save = 0;
+                                scm.visualization_rate = 0;
+                                scm.save = true;
                                 scm.dx = .3;
-                                
-                                scm.phi_ee_sc = 750;
-                                scm.phi_ei_sc = 750;
+                                scm.source_drive = 3;
                                 
                                 [xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
                                 source = false(scm.grid_size);
@@ -217,7 +216,7 @@ scm.dt = 2e-4;
 			end
         end
 
-
+        
         function rotate(self, theta), self.Rotate(theta); end  % legacy
         function Run(self)
             self.CreateDirectory;
@@ -360,18 +359,9 @@ scm.dt = 2e-4;
 		Nei_b = 800
 		Nie_b = 600
 		Nii_b = 600
+        Nee_sc = 50
+        Nei_sc = 50
 		
-
-		
-		% default subcortical fluxes
-        % %% ORIGINAL FORMULATION %%
-        % [Nee_sc,Nei_sc]= deal(50, 50)  % subcortical  
-		% phi_ee_sc = Nee_sc * Qe_max  % original [1500]
-		% phi_ei_sc = Nei_sc * Qe_max  % original [1500]
-
-        % %% EDS %%
-		phi_ee_sc = 1500  
-		phi_ei_sc = 1500  
 
 		% axonal conduction velocity (cm/s), 
 		v = 280  % [original = 140 cm/s]
@@ -380,6 +370,17 @@ scm.dt = 2e-4;
 		Lambda = 4.0			
 	end 
 	properties (Dependent = true)
+        
+        % default subcortical fluxes
+        % %% ORIGINAL FORMULATION %%
+        % [Nee_sc,Nei_sc]= deal(50, 50)  % subcortical  
+		% phi_ee_sc = Nee_sc * Qe_max  % original [1500]
+		% phi_ei_sc = Nei_sc * Qe_max  % original [1500]
+
+        % %% EDS %%
+		phi_ee_sc
+		phi_ei_sc
+        
 		% d/dV derivatives of psi_ij weighting functions
 		d_psi_ee 
 		d_psi_ei 
@@ -392,6 +393,13 @@ scm.dt = 2e-4;
 
 	end
 	methods
+        function phi_ee_sc = get.phi_ee_sc(self)
+            phi_ee_sc = self.Nee_sc * self.Qe_max;
+        end
+        function phi_ei_sc = get.phi_ei_sc(self)
+            phi_ei_sc = self.Nei_sc * self.Qe_max;
+        end
+
 		function d_psi_ee = get.d_psi_ee(S)
 			d_psi_ee = -1./(S.Ve_rev - S.Ve_rest);
 		end
@@ -407,10 +415,10 @@ scm.dt = 2e-4;
 		
 		% Nee and Nie totals for cortico-cortical plus intracortical
 		function N = get.Nee_ab(S)
-			N = S.Nee_a + S.Nee_b;
+            N = S.Nee_a + S.Nee_b;
 		end
 		function N = get.Nei_ab(S)
-			N = S.Nei_a + S.Nei_b;
+            N = S.Nei_a + S.Nei_b;
 		end
 
 	end
