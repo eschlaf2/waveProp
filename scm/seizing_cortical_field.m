@@ -294,10 +294,9 @@ EC = rmfield(EC, no_return);
             new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* wD(last.K) - (last.Dii - SS.Dii)); %#ok<UNRCH>
             new.Dee = last.Dii/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* wdVe(last.K) - last.dVe);
-%             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
-            [new.dVi, new.dVe] = dVi(time(ii), M.grid_size, new.dVe);
-            new.dVe(params.excitability_map == 0) = 0;
-        elseif 0  % original Martinet formulation
+            new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
+           
+        elseif 1  % original Martinet formulation
             new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
             new.Dee = new.Dii/100; 
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* last.K );
@@ -349,6 +348,7 @@ EC = rmfield(EC, no_return);
                         last.state, M.expansion_rate * dt / dx, ...
                         M.excitability_map, dt);
                     if time(ii) <= PM.duration
+                        
                         new.dVi(new.map) = params.I_drive;
                         if isempty(PM.source), return, end
                         which_source = mod(floor(time(ii) / 2), size(PM.source, 3)) + 1;

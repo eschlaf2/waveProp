@@ -137,40 +137,41 @@ classdef SCM < handle
                                 % Looking for a dVe/dVi pair that
                                 % generates diffuse TW
                                 
-                                scm = SCM('martinet');  % no dynamics on external drives
-                                scm.v = 140;
-scm.grid_size = [50 50];
+                                scm = SCM('steyn');  % no dynamics on external drives
+                                scm.grid_size = [50 50];
                                 scm.sim_num = 2;
                                 scm.save = true;
-                                scm.visualization_rate = 0;
+                                scm.visualization_rate = 10;
                                 scm.padding = [2 10];
                                 scm.duration = 30;
-scm.expansion_rate = 0;  % no source expansion for now
+scm.expansion_rate = .5;  % This might end up being a little fast
+scm.excitability_map(scm.excitability_map > 0) = 1;
+scm.I_drive = 500;
+% scm.noise_sf = 4;  % (match SR)
+
                                 scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi'};
 
 scm.t0_start = 0;
 scm.stim_center = [40 30];
-% scm.Qi_max = 55;
-% scm.IC.dVi = zeros(scm.grid_size);
-% scm.IC.dVi(scm.excitability_map == 0) = 1;
-% scm.IC.dVi = -2;
+
 scm.dVe = [-Inf, 5];
 scm.depo_block = true;
-scm.IC.dVe = 1.4;
+% scm.IC.dVe = 1.4;
 scm.Qi = [0 Inf];
-scm.I_drive = 1e3;
+
 
 scm.IC.dVe = zeros(scm.grid_size);
 scm.IC.dVe(scm.excitability_map > 0) = 1.4;
 
 % scm.source = scm.excitability_map > 0;
 % scm.IC.dVe(scm.stim_center) = 2;
-scm.dVi = [-Inf Inf];
+scm.dVi = [-Inf .1];
+scm.Dii = [0.2 Inf];
               
 % scm.dVi = [.1 .1];
 scm.D = .35;  % Not used right now in dynamics
 scm.IC.Dii = scm.D;
-% scm.drive_style = 'inhibitory';
+scm.drive_style = 'inhibitory';
 % scm.IC.Dii = ndgrid(linspace(.01, .4, 50), 1:50);
 % scm.IC.Dee = scm.D/100;  % not used in Martinet formulation (always
 % updates to Dii/100)
