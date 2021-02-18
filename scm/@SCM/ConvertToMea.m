@@ -8,7 +8,7 @@ function ConvertToMea(PM)
 	im = round(rescale(last.Ve) * (length(cmap) - 1)) + 1;
 	movQ(numel(files) - 1) = im2frame(im, cmap);
 	movV(numel(files) - 1) = im2frame(im, cmap);
-	[qe, ve, tt] = deal(cell(numel(files) - 1 , 1));
+	[qe, ve, qi, vi, tt] = deal(cell(numel(files) - 1 , 1));
 
     file_inds = cellfun(@(f) strsplit(f, {'_', '.'}), {files.name}, 'uni', 0);
     file_inds = cellfun(@(f) str2double(strrep(f{end - 1}, 'M', '-')), file_inds);
@@ -25,12 +25,23 @@ function ConvertToMea(PM)
 		movV(ii) = im2frame(round(rescale(last.Ve) * (length(cmap) - 1)) + 1, cmap);
 		qe{ii} = NP.Qe;
 		ve{ii} = NP.Ve;
+        qi{ii} = NP.Qi;
+        vi{ii} = NP.Vi;  % Looking at depolarization block
 		tt{ii} = time;
         ii = ii + 1;
 	end
 	
-% 	ve_mat = -cat(1, ve{:});
+	ve_mat = cat(1, ve{:});
+    vi_mat = cat(1, vi{:});  % Looking at depolarization block (dbstop here and then <assignin('base', 'vi_mat', vi_mat);>
+    qi_mat = cat(1, qi{:});
 	qe_mat = cat(1, qe{:});
+    
+    % Just for testing... remove these later
+    assignin('base', 've_mat', ve_mat);
+    assignin('base', 'vi_mat', vi_mat);
+    assignin('base', 'qi_mat', qi_mat);
+    assignin('base', 'qe_mat', qe_mat);
+
 	time = cat(1, tt{:});
 	sample_rate = min(round(1/mean(diff(time))/1e3)*1e3, PM.subsample);
 	dt = 1 / sample_rate;

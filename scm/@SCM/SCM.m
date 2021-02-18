@@ -137,50 +137,52 @@ classdef SCM < handle
                                 % Looking for a dVe/dVi pair that
                                 % generates diffuse TW
                                 
-                                scm = SCM('steyn');  % no dynamics on external drives
-%                                 scm = scm.init();
-%                                 scm.v = 140;
+                                scm = SCM('martinet');  % no dynamics on external drives
+                                scm.v = 140;
 scm.grid_size = [50 50];
-                                scm.sim_num = 1;
-                                scm.save = false;
-                                scm.visualization_rate = 10;
-                                scm.padding = [20 10];
-                                scm.duration = 10;
-                                scm.expansion_rate = 0;  % no source expansion for now
+                                scm.sim_num = 2;
+                                scm.save = true;
+                                scm.visualization_rate = 0;
+                                scm.padding = [2 10];
+                                scm.duration = 30;
+scm.expansion_rate = 0;  % no source expansion for now
+                                scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi'};
 
-% scm.t0_start = -1;
+scm.t0_start = 0;
 scm.stim_center = [40 30];
+% scm.Qi_max = 55;
 % scm.IC.dVi = zeros(scm.grid_size);
 % scm.IC.dVi(scm.excitability_map == 0) = 1;
 % scm.IC.dVi = -2;
 scm.dVe = [-Inf, 5];
 scm.depo_block = true;
-scm.IC.dVe = 1.5;
-% scm.IC.dVe = zeros(scm.grid_size);
-% scm.IC.dVe(scm.excitability_map > 0) = 1.4;
+scm.IC.dVe = 1.4;
+scm.Qi = [0 Inf];
+scm.I_drive = 1e3;
+
+scm.IC.dVe = zeros(scm.grid_size);
+scm.IC.dVe(scm.excitability_map > 0) = 1.4;
 
 % scm.source = scm.excitability_map > 0;
 % scm.IC.dVe(scm.stim_center) = 2;
 scm.dVi = [-Inf Inf];
               
-scm.phi_ee_sc = 300;
-scm.phi_ei_sc = 300;
-
-
 % scm.dVi = [.1 .1];
-scm.D = .65;  % Not used right now in dynamics
+scm.D = .35;  % Not used right now in dynamics
 scm.IC.Dii = scm.D;
+% scm.drive_style = 'inhibitory';
 % scm.IC.Dii = ndgrid(linspace(.01, .4, 50), 1:50);
-scm.IC.Dee = scm.D/40;  % not used in Martinet formulation (always
+% scm.IC.Dee = scm.D/100;  % not used in Martinet formulation (always
 % updates to Dii/100)
-scm.out_vars = {'Qe', 'Qi', 'dVi', 'Vi', 'Dii', 'dVe'};
+scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'dVi', 'Dii', 'map', 'state'};
 % scm.IC.Qe = 18.47;
 % scm.IC.Qi = 32.68;
 % scm.IC.Ve = -57.71;
 % scm.IC.Vi = -58.01;
-scm.source_drive = 4;
-scm.IC.dVi = .1;
-scm.dx = 0.3;
+
+% scm.source_drive = 4;
+% scm.IC.dVi = .1;  % match martinet (0.1)
+scm.dx = 0.1;
 scm.dimsNP = [4 4];
 % scm.dt = 1e-4;
 scm.dt = 2e-4;
