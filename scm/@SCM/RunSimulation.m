@@ -36,7 +36,7 @@ for t0 = PM.t0_start:T_STEP:K-T_STEP  % For each step
 	params.t0 = t0;
 	
 	% ... show progress, 
-	fprintf('Running %d / %d .. ', t0+1, floor(K));  
+	fprintf('Running %d / %d .. ', t0, floor(K) - 1);  
 		
 	% ... run simulation for duration T_STEP,
 	[NP, EC, time, last, fig] = ...  
