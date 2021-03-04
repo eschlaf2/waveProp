@@ -139,54 +139,81 @@ classdef SCM < handle
                                 
                                 scm = SCM('steyn');  % no dynamics on external drives
                                 scm.grid_size = [50 50];
-                                scm.sim_num = 2;
-                                scm.save = true;
-                                scm.visualization_rate = 10;
-                                scm.padding = [2 10];
+                                scm.sim_num = 6;
+                            scm.save = true;
+                            scm.visualization_rate = 10;
+                                scm.depo_block = true;
+                                scm.padding = [5 10];
                                 scm.duration = 30;
-scm.expansion_rate = .5;  % This might end up being a little fast
-scm.excitability_map(scm.excitability_map > 0) = 1;
-scm.I_drive = 500;
-% scm.noise_sf = 4;  % (match SR)
+                                
+                                scm.dx = 0.1;
+                                scm.dimsNP = [4 4];
+                                % scm.dt = 1e-4;
+                                scm.dt = 2e-4;
+                                
+                                
+                                % Save and visualize some extra fields for testing
+                                scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi', 'K', 'Dii'};
+                                scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'GABA', 'Dii', 'map', 'state'};
 
-                                scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi'};
+                                % Design the IW
+                                scm.expansion_rate = 0.25;  % 0.25
+scm.excitability_map(scm.excitability_map > 0) = 2;
+scm.I_drive = 0;
+% scm.Nii_b = 100;
+
+
+% Add a fixed source
+[xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
+source = false(scm.grid_size);
+source(abs(xx - scm.stim_center(1)) <= 1 & ...
+    abs(yy - scm.stim_center(2)) <=1) = true;
+scm.source = source;
+scm.source_drive = 3;
+
+
+% Add Martinet Potassium dynamics
+% % scm.IC.K = .3;
+% scm.tau_dVe = 250;  
+% scm.tau_dVi = 250;
+% scm.tau_dD = 200;  
+
+% Adjust Dii(potassium) sigmoids
+scm.kD_center = 0.45;
+scm.kD_width = 0.15;
+                              
 
 scm.t0_start = 0;
-scm.stim_center = [40 30];
+scm.stim_center = [20 30];
 
 scm.dVe = [-Inf, 5];
-scm.depo_block = true;
-% scm.IC.dVe = 1.4;
-scm.Qi = [0 Inf];
-
-
+scm.D = .35;  
+scm.IC.dVi = 0;
+dVe = 1.4;
 scm.IC.dVe = zeros(scm.grid_size);
-scm.IC.dVe(scm.excitability_map > 0) = 1.4;
+scm.IC.dVe(scm.excitability_map > 0) = dVe;
+scm.post_ictal_source_drive = dVe;
 
-% scm.source = scm.excitability_map > 0;
-% scm.IC.dVe(scm.stim_center) = 2;
-scm.dVi = [-Inf .1];
-scm.Dii = [0.2 Inf];
+% scm.Nii_b = 0;  
+% scm.Nie_b = 00;
+
+
+% scm.Dii = [0.2 Inf];
               
 % scm.dVi = [.1 .1];
-scm.D = .35;  % Not used right now in dynamics
+
 scm.IC.Dii = scm.D;
 scm.drive_style = 'inhibitory';
 % scm.IC.Dii = ndgrid(linspace(.01, .4, 50), 1:50);
 % scm.IC.Dee = scm.D/100;  % not used in Martinet formulation (always
 % updates to Dii/100)
-scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'dVi', 'Dii', 'map', 'state'};
+
 % scm.IC.Qe = 18.47;
 % scm.IC.Qi = 32.68;
 % scm.IC.Ve = -57.71;
 % scm.IC.Vi = -58.01;
 
-% scm.source_drive = 4;
-% scm.IC.dVi = .1;  % match martinet (0.1)
-scm.dx = 0.1;
-scm.dimsNP = [4 4];
-% scm.dt = 1e-4;
-scm.dt = 2e-4;
+
                                 
                                 
                             otherwise
@@ -251,7 +278,7 @@ scm.dt = 2e-4;
 		visualization_rate = 0  % Show this many frames per second
 		t_step = 1  % Simulate <t_step> second intervals
 		t0_start  % Allows continue from previous sim (IC will use last from file number t0_start-1)
-		duration (1,1) double {mustBePositive} = 60
+		duration (1,1) double {mustBeNonnegative} = 60
 		padding (1,2) = [10 10]  % Padding before and after seizure
 		source_drive (1, 1) double = 2.5
 		post_ictal_source_drive (1,1) double = 1.5
@@ -479,9 +506,10 @@ scm.dt = 2e-4;
 		
 		Dee (1,2) double = [-Inf Inf]  % i <--> i gap-junction diffusive-coupling strength (cm^2)
 		Dii (1,2) double = [.009 Inf]  % The inhibitory gap junctions cannot pass below a minimum value of 0.009 / dx^2.
-		K (1,2) double = [-Inf 1]% extracellular potassium concentration (cm^2)
-		Qe (1,2) double = [-Inf Inf]  % Activity of excitatory population.
-		Qi (1,2) double = [-Inf Inf]  % Activity of inhibitory population.
+		K (1,2) double = [-Inf 1] % extracellular potassium concentration (cm^2)
+        GABA (1, 2) double = [-Inf Inf]  % GABA
+		Qe (1,2) double = [0 Inf]  % Activity of excitatory population.
+		Qi (1,2) double = [0 Inf]  % Activity of inhibitory population.
 		Ve (1,2) double = [-Inf Inf]  % Voltage  of excitatory population.
 		Vi (1,2) double = [-Inf Inf]  % Voltage of inhibitory population.
 		dVe (1,2) double = [-Inf 1.5]  % Excitatory resting potential offset (mV)
@@ -571,7 +599,7 @@ scm.dt = 2e-4;
 			names = ["Dee", "Dii", "K", "Qe", "Qi", "Ve", "Vi", "dVe", ...
                 "dVi", "Phi_ee", "Phi_ei", "Phi_ie", "Phi_ii", ...
                 "phi2_ee", "phi2_ei", "phi_ee", "phi_ei", "F_ee", ...
-                "F_ei", "F_ie", "F_ii"];
+                "F_ei", "F_ie", "F_ii", "GABA"];
 			bounds = P.substruct(names);
 		end
 		function noise = get.noise(P)

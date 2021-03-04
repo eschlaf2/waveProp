@@ -101,7 +101,12 @@ new = last;  % initialize
 %% Simulation
 % new = last;
 for ii = 1:Nsteps
+    
 	
+    % Set the "source" locations' excitatory population resting voltage and
+	% expand the wavefront
+    update_drive
+    
 	% Update equations (update <new> values)
 	update_wave_equations;
 	update_synaptic_flux_eq;
@@ -110,13 +115,6 @@ for ii = 1:Nsteps
 	update_extracellular_ion;
 	update_gap_resting;
 	
-	% Correct out-of-bounds values
-	correct_OOB_values;
-	
-	% Set the "source" locations' excitatory population resting voltage and
-	% expand the wavefront
-    update_drive
-
 	% sanity check!
 	if any(any(isnan(last.Qe)))
 		error('Sigmoid generated NaNs!! (Either increase dx or reduce dt)');
@@ -124,9 +122,13 @@ for ii = 1:Nsteps
 	
 	% UPDATE the dynamic variables (pass <new> values to <last>).
 	last = new;
+    
+    % Correct out-of-bounds values
+	correct_OOB_values;
+    
 	get_electrode_values;
-      
 	visualize;
+    
 end
 
 % Return requested variables.
@@ -206,7 +208,7 @@ EC = rmfield(EC, no_return);
 			+ dt * SS.gamma_i.^2 * ( ...
 				- 2 / SS.gamma_i * last.F_ie ...
 				- last.Phi_ie ...
-				+ SS.Nie_b * last.Qi ...     %short range
+				+ SS.Nie_b .* last.Qi ...     %short range
 			);
 		
 		new.Phi_ie = last.Phi_ie + dt * new.F_ie;
@@ -216,7 +218,7 @@ EC = rmfield(EC, no_return);
 			+ dt * SS.gamma_i.^2 * ( ...
 				- 2 / SS.gamma_i * last.F_ii ...
 				- last.Phi_ii ...
-				+ SS.Nii_b * last.Qi ...  %short range
+				+ SS.Nii_b .* last.Qi ...  %short range
 			);
 		new.Phi_ii = last.Phi_ii + dt * new.F_ii;
 
@@ -227,7 +229,7 @@ EC = rmfield(EC, no_return);
 		new.Ve = last.Ve ...
 			+ dt / SS.tau_e * ( ...
 				(SS.Ve_rest - last.Ve) ...
-				+ last.dVe ...
+				+ last.dVe + 0*double(new.map * (time(ii) >=0)) .* params.source_drive + ...
 				+ SS.rho_e * Psi_ee(last.Ve) .* last.Phi_ee ...      %E-to-E
                 + SS.rho_i * Psi_ie(last.Ve) .* last.Phi_ie ...      %I-to-E
 				+ last.Dee/dx^2 .* del2_(last.Ve) ...
@@ -235,7 +237,7 @@ EC = rmfield(EC, no_return);
 		new.Vi = last.Vi ...
 			+ dt / SS.tau_i * ( ...
 				(SS.Vi_rest - last.Vi) ...
-				+ last.dVi ...
+				+ last.dVi + double(new.map * (time(ii) >=0)) .* params.I_drive + ...
 				+ SS.rho_e * Psi_ei(last.Vi) .* last.Phi_ei ...      %E-to-I
 				+ SS.rho_i * Psi_ii(last.Vi) .* last.Phi_ii ...      %I-to-I
 				+ last.Dii/dx^2 .* del2_(last.Vi) ...
@@ -250,7 +252,7 @@ EC = rmfield(EC, no_return);
 				1 ./ ( 1 + ...
 					exp(-pi / ( sqrt(3) * SS.sigma_e ) .* ( last.Ve - SS.theta_e )) ...
 				) ...
-			); % No depo block on excitatory cells ...     %The E voltage must be big enough,
+			) + 0 * max((last.Ve + 50) * .1, 0); % No depo block on excitatory cells ...     %The E voltage must be big enough,
 % 			- SS.depo_block * SS.Qe_max * ( ...
 % 				1 ./ ( 1 + ...
 % 					exp(-pi / ( sqrt(3) * SS.sigma_e ) .* ( last.Ve - ( SS.theta_e + 30 ) )) ...
@@ -265,7 +267,7 @@ EC = rmfield(EC, no_return);
             ) ...     %The I voltage must be big enough,
             - SS.depo_block * SS.Qi_max * ( ...
                 1 ./ ( 1 + ...
-                    exp(-pi / ( sqrt(3) * 7 ) .* ( last.Vi - ( SS.theta_i + 25 ) )) ...
+                    exp(-pi / ( sqrt(3) * 3 ) .* ( last.Vi - ( SS.theta_i + 10 ) )) ...
                 ) ...
             );   %... but not too big.
 
@@ -283,7 +285,22 @@ EC = rmfield(EC, no_return);
 					FR ./ ( 1 + exp( -FR + 15) ) ...
                 + PK.kD ./ dx^2 * del2_(last.K) ...  % diffusion term.
 			);
-% 			+ dt * PK.kD./dx^2 * del2_(last.K);  % diffusion term.
+        
+%         new.GABA = ...  % chloride?
+% 			last.GABA ...
+% 			+ dt / .1 .* ( ...
+% 				- 1 .* last.GABA ...  % decay term.
+% 				+ 1.5 .* ...              % reaction term.
+% 					last.Qi ./ ( 1 + exp( -last.Qi ) ) ...
+%                 + .1 ./ dx^2 * del2_(last.GABA) ...  % diffusion term.
+% 			);
+        
+        new.GABA = new.GABA + dt * ( ...
+            100 * new.map ...  
+            - .1 * new.GABA ...
+            + .25/dx^2 * del2_(new.GABA));
+    
+        new.GABA = min(new.GABA, 1);
 			
 	end
 
@@ -296,11 +313,18 @@ EC = rmfield(EC, no_return);
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* wdVe(last.K) - last.dVe);
             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
            
-        elseif 1  % original Martinet formulation
+        elseif 0  % original Martinet formulation
             new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
             new.Dee = new.Dii/100; 
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* last.K );
             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* last.K );
+            
+        elseif 1  % Dii ~ sigmoid(K); contant voltage offsets
+            new.Dii = params.D * (1 - wD(last.K));
+            new.Dee = new.Dii / 100;
+            new.dVe = last.dVe;
+            new.dVi = last.dVi;
+            
         else  % messing with high inhibition ring
             new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
             new.Dee = new.Dii/100; 
@@ -317,7 +341,7 @@ EC = rmfield(EC, no_return);
 		for f = fieldnames(last)'
 			f = f{:}; %#ok<FXSET>
 			if ismember(f, {'map', 'state'}) || all(isinf(MX.(f))), continue, end
-			new.(f) = min(max(new.(f), MX.(f)(1)), MX.(f)(2));
+			last.(f) = min(max(last.(f), MX.(f)(1)), MX.(f)(2));
 		end
 		
 	end
@@ -343,19 +367,29 @@ EC = rmfield(EC, no_return);
                 end
                 
             case 'inhibitory'
+                % The map for the IW updates here, but is applied directly
+                % to the voltage dynamics rather than by changing dVi. This
+                % makes it easier to modulate dVi with K+ if you want to do
+                % that. Fixed excitatory sources are applied here, however.
                 if time(ii) > 0 
                     [new.map, new.state] = update_map_smooth( ...
                         last.state, M.expansion_rate * dt / dx, ...
                         M.excitability_map, dt);
-                    if time(ii) <= PM.duration
+                    
+% Nie_affected = 2 < new.state & new.state < 5;
+% SS.Nie_b = double(~Nie_affected) * 500 + 100;
+% SS.Nii_b = double(~Nie_affected) * 500 + 100;
+Nie_affected = 2 < new.state & new.state < 4.5;
+SS.Vi_rev = double(~Nie_affected) * -15 + -55;
+                    
+                    if isempty(PM.source), return, end
+                    which_source = mod(floor(time(ii) / 2), size(PM.source, 3)) + 1;
                         
-                        new.dVi(new.map) = params.I_drive;
-                        if isempty(PM.source), return, end
-                        which_source = mod(floor(time(ii) / 2), size(PM.source, 3)) + 1;
-                        new.dVe(PM.source(:, :, which_source)) = PM.source_drive;
+                    if time(ii) <= PM.duration
+                        last.dVe(PM.source(:, :, which_source)) = PM.source_drive;
                     else
                         if isnan(PM.post_ictal_source_drive), return; end			
-                        new.dVe(new.map) = PM.post_ictal_source_drive;
+                        last.dVe(PM.source(:, :, which_source)) = PM.post_ictal_source_drive;
                     end
                 end
             case 'inhibitory_old'
@@ -417,6 +451,7 @@ EC = rmfield(EC, no_return);
 		if PM.visualization_rate > 0
 			if ~exist('fig', 'var') || isempty(fig)
 				fig = create_fig_(out_vars, M.grid_size, indsNP, indsEC);
+                ss = mkdir(sprintf('SCM/SCM/vids/SCM_%d/', PM.sim_num));
 			end
 			if diff(floor((time(ii) - [dt 0]) * PM.visualization_rate))
 				for sp = 1:numel(fig.ih)
@@ -426,6 +461,9 @@ EC = rmfield(EC, no_return);
 
 				set(fig.ah, 'string', sprintf('T = %0.3f', time(ii)));
 				drawnow;
+                im = frame2im(getframe(fig.fig));
+                imwrite(im, sprintf('SCM/SCM/vids/SCM_%d/%0.4f.png', PM.sim_num, time(ii)));
+                
 			end
 		end
 	end
@@ -444,22 +482,22 @@ EC = rmfield(EC, no_return);
 
 % e-to-e reversal-potential weighting function
 	function weight = Psi_ee(V)
-		weight = (SS.Ve_rev - V)./(SS.Ve_rev - SS.Ve_rest);
+		weight = (SS.Ve_rev - V)./abs(SS.Ve_rev - SS.Ve_rest);
 	end
 
 % e-to-i reversal-potential weighting function
 	function weight = Psi_ei(V)
-		weight = (SS.Ve_rev - V)./(SS.Ve_rev - SS.Vi_rest);
+		weight = (SS.Ve_rev - V)./abs(SS.Ve_rev - SS.Vi_rest);
 	end
 
 % i-to-e reversal-potential weighting function
 	function weight = Psi_ie(V)
-		weight = (SS.Vi_rev - V)./(SS.Vi_rev - SS.Ve_rest);
+		weight = -(SS.Vi_rev - V)./abs(SS.Vi_rev - SS.Ve_rest);
 	end
 
 % i-to-i reversal potential weighting function
 	function weight = Psi_ii(V)
-		weight = (SS.Vi_rev - V)./(SS.Vi_rev - SS.Vi_rest);
+		weight = -(SS.Vi_rev - V)./abs(SS.Vi_rev - SS.Vi_rest);
 	end
 
 end

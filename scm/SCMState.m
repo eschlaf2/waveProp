@@ -44,6 +44,7 @@ classdef SCMState
 			Dee = 0.008;  % e <--> e gap-junction diffusive-coupling strength (electrodes)
 			Dii = 0.8;  % i <--> i gap-junction diffusive-coupling strength in all space (electrodes)
 			K = 0;  % extracellular potassium concentration (cm^2)
+            GABA = 0;  % extracellular GABA
 			Qe = 0;  % Activity of excitatory population.
 			Qi = 0;  % Activity of inhibitory population.
 			Ve = -64 % Voltage  of excitatory population.
