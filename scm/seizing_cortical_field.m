@@ -295,9 +295,9 @@ EC = rmfield(EC, no_return);
 %                 + .1 ./ dx^2 * del2_(last.GABA) ...  % diffusion term.
 % 			);
         
-        new.GABA = new.GABA + dt * ( ...
-            100 * new.map ...  
-            - .1 * new.GABA ...
+        new.GABA = new.GABA + dt/2 * ( ...
+            1.5 * new.map ...  
+            - 1 * new.GABA ...
             + .25/dx^2 * del2_(new.GABA));
     
         new.GABA = min(new.GABA, 1);
@@ -379,8 +379,9 @@ EC = rmfield(EC, no_return);
 % Nie_affected = 2 < new.state & new.state < 5;
 % SS.Nie_b = double(~Nie_affected) * 500 + 100;
 % SS.Nii_b = double(~Nie_affected) * 500 + 100;
-Nie_affected = 2 < new.state & new.state < 4.5;
-SS.Vi_rev = double(~Nie_affected) * -15 + -55;
+% Nie_affected = 2 < new.state & new.state < 4.5;
+% SS.Vi_rev = double(~Nie_affected) * -15 + -55;
+SS.Vi_rev = rescale(new.GABA, -70, -55, 'InputMin', 0, 'inputmax', 1);
                     
                     if isempty(PM.source), return, end
                     which_source = mod(floor(time(ii) / 2), size(PM.source, 3)) + 1;
@@ -492,12 +493,12 @@ SS.Vi_rev = double(~Nie_affected) * -15 + -55;
 
 % i-to-e reversal-potential weighting function
 	function weight = Psi_ie(V)
-		weight = -(SS.Vi_rev - V)./abs(SS.Vi_rev - SS.Ve_rest);
+		weight = -(SS.Vi_rev - V)./max(abs(SS.Vi_rev - SS.Ve_rest), 1);
 	end
 
 % i-to-i reversal potential weighting function
 	function weight = Psi_ii(V)
-		weight = -(SS.Vi_rev - V)./abs(SS.Vi_rev - SS.Vi_rest);
+		weight = -(SS.Vi_rev - V)./max(abs(SS.Vi_rev - SS.Vi_rest), 1);
 	end
 
 end
