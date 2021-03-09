@@ -295,12 +295,16 @@ EC = rmfield(EC, no_return);
 %                 + .1 ./ dx^2 * del2_(last.GABA) ...  % diffusion term.
 % 			);
         
-        new.GABA = new.GABA + dt/2 * ( ...
-            1.5 * new.map ...  
-            - 1 * new.GABA ...
-            + .25/dx^2 * del2_(new.GABA));
-    
-        new.GABA = min(new.GABA, 1);
+%         new.GABA = new.GABA + dt/2 * ( ...
+%             1.5 * new.map ...  
+%             - 1 * new.GABA ...
+%             + .25/dx^2 * del2_(new.GABA));
+%     
+%         new.GABA = min(new.GABA, 1);
+        
+        if all(size(SS.Nie_b) == params.grid_size)
+            new.GABA = SS.Nie_b;
+        end
 			
 	end
 
@@ -313,13 +317,13 @@ EC = rmfield(EC, no_return);
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* wdVe(last.K) - last.dVe);
             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
            
-        elseif 0  % original Martinet formulation
+        elseif 1  % original Martinet formulation
             new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
             new.Dee = new.Dii/100; 
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* last.K );
             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* last.K );
             
-        elseif 1  % Dii ~ sigmoid(K); contant voltage offsets
+        elseif 0  % Dii ~ sigmoid(K); contant voltage offsets
             new.Dii = params.D * (1 - wD(last.K));
             new.Dee = new.Dii / 100;
             new.dVe = last.dVe;
@@ -379,9 +383,11 @@ EC = rmfield(EC, no_return);
 % Nie_affected = 2 < new.state & new.state < 5;
 % SS.Nie_b = double(~Nie_affected) * 500 + 100;
 % SS.Nii_b = double(~Nie_affected) * 500 + 100;
+SS.Nie_b = Nia_fun(new.state - 1);
+SS.Nii_b = SS.Nie_b;
 % Nie_affected = 2 < new.state & new.state < 4.5;
 % SS.Vi_rev = double(~Nie_affected) * -15 + -55;
-SS.Vi_rev = rescale(new.GABA, -70, -55, 'InputMin', 0, 'inputmax', 1);
+% SS.Vi_rev = rescale(new.GABA, -70, -55, 'InputMin', 0, 'inputmax', 1);
                     
                     if isempty(PM.source), return, end
                     which_source = mod(floor(time(ii) / 2), size(PM.source, 3)) + 1;

@@ -139,7 +139,8 @@ classdef SCM < handle
                                 
                                 scm = SCM('steyn');  % no dynamics on external drives
                                 scm.grid_size = [50 50];
-                                scm.sim_num = 6;
+scm.sim_num = 7;
+scm.t0_start = 0;
                             scm.save = true;
                             scm.visualization_rate = 10;
                                 scm.depo_block = true;
@@ -157,34 +158,33 @@ classdef SCM < handle
                                 scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'GABA', 'Dii', 'map', 'state'};
 
                                 % Design the IW
-                                scm.expansion_rate = 0.25;  % 0.25
-scm.excitability_map(scm.excitability_map > 0) = 2;
-scm.I_drive = 0;
+                                scm.expansion_rate = 0.1;  % 0.25
+scm.excitability_map(scm.excitability_map > 0) = 1;
+scm.I_drive = 10;
 % scm.Nii_b = 100;
 
 
 % Add a fixed source
 [xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
 source = false(scm.grid_size);
-source(abs(xx - scm.stim_center(1)) <= 1 & ...
-    abs(yy - scm.stim_center(2)) <=1) = true;
+source(abs(xx - scm.stim_center(1)) <= 2 & ...
+    abs(yy - scm.stim_center(2)) <= 2) = true;
 scm.source = source;
-scm.source_drive = 3;
+scm.source_drive = 2;
 
 
 % Add Martinet Potassium dynamics
 % % scm.IC.K = .3;
-% scm.tau_dVe = 250;  
-% scm.tau_dVi = 250;
-% scm.tau_dD = 200;  
+scm.tau_dVe = 250;  
+scm.tau_dVi = 250;
+scm.tau_dD = 200 * 2;  
 
 % Adjust Dii(potassium) sigmoids
 scm.kD_center = 0.45;
 scm.kD_width = 0.15;
                               
 
-scm.t0_start = 0;
-scm.stim_center = [20 30];
+scm.stim_center = [20 35];  % 46 is edge
 
 scm.dVe = [-Inf, 5];
 scm.D = .35;  
