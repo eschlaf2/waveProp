@@ -159,7 +159,7 @@ scm.t0_start = 0;
 
                                 % Design the IW
                                 scm.expansion_rate = 0.1;  % 0.25
-scm.excitability_map(scm.excitability_map > 0) = 1;
+scm.excitability_map(scm.excitability_map > 0) = 2;
 scm.I_drive = 10;
 % scm.Nii_b = 100;
 
@@ -177,7 +177,7 @@ scm.source_drive = 2;
 % % scm.IC.K = .3;
 scm.tau_dVe = 250;  
 scm.tau_dVi = 250;
-scm.tau_dD = 200 * 2;  
+scm.tau_dD = 200 * 50;  % * 10 looked pretty decent...
 
 % Adjust Dii(potassium) sigmoids
 scm.kD_center = 0.45;
