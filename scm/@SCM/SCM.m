@@ -144,8 +144,8 @@ scm.t0_start = 0;
                             scm.save = true;
                             scm.visualization_rate = 10;
                                 scm.depo_block = true;
-                                scm.padding = [5 10];
-                                scm.duration = 30;
+                                scm.padding = [5 60];
+scm.duration = 60;
                                 
                                 scm.dx = 0.1;
                                 scm.dimsNP = [4 4];
@@ -155,11 +155,11 @@ scm.t0_start = 0;
                                 
                                 % Save and visualize some extra fields for testing
                                 scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi', 'K', 'Dii'};
-                                scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'GABA', 'Dii', 'map', 'state'};
+                                scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'dVi', 'Dii', 'map', 'state', 'GABA'};
 
                                 % Design the IW
                                 scm.expansion_rate = 0.1;  % 0.25
-scm.excitability_map(scm.excitability_map > 0) = 2;
+scm.excitability_map(scm.excitability_map > 0) = 1;
 scm.I_drive = 10;
 % scm.Nii_b = 100;
 
@@ -170,23 +170,28 @@ source = false(scm.grid_size);
 source(abs(xx - scm.stim_center(1)) <= 2 & ...
     abs(yy - scm.stim_center(2)) <= 2) = true;
 scm.source = source;
-scm.source_drive = 2;
+scm.source_drive = 2.2;
 
 
 % Add Martinet Potassium dynamics
 % % scm.IC.K = .3;
 scm.tau_dVe = 250;  
-scm.tau_dVi = 250;
-scm.tau_dD = 200 * 50;  % * 10 looked pretty decent...
+scm.tau_dVi = 250 * .8;  % Speed up Vi reaction
+scm.tau_dD = 200 * 50;  % slow down the changes
 
 % Adjust Dii(potassium) sigmoids
-scm.kD_center = 0.45;
-scm.kD_width = 0.15;
+% scm.kD_center = 0.45;
+% scm.kD_width = 0.15;
+
+scm.Nee_sc = 10;
+scm.Nei_sc = 10;
                               
 
-scm.stim_center = [20 35];  % 46 is edge
+scm.stim_center = [20 46];  % 46 is edge
 
-scm.dVe = [-Inf, 5];
+scm.dVe = [-Inf, 1.5];
+% scm.dVi = [-Inf, .5];
+
 scm.D = .35;  
 scm.IC.dVi = 0;
 dVe = 1.4;
