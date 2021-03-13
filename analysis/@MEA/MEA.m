@@ -481,9 +481,9 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			end
 		end
 		function EI = get.event_inds(mea)
-% 			EI = mea.event_inds;
-% 			
-% 			if isempty(EI)
+			EI = mea.event_inds;
+			
+			if isempty(EI)
 				data = mea.baseline_zscore(mea.mua, mea.AllTime);
 				intervalM = mea.SRO / 1e3 * mea.params.min_dist;  % samples per MIN_DIST
 
@@ -502,11 +502,11 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 				end
 				EI = sparse(events);
 				mea.event_inds = EI;
-% 			elseif ~issparse(EI)
-% 				sz = size(mea.Raw);
-% 				[i, j] = ind2sub(sz, EI);
-% 				EI = sparse(i, j, true, sz(1), sz(2));
-% 			end
+			elseif ~issparse(EI)
+				sz = size(mea.Raw);
+				[i, j] = ind2sub(sz, EI);
+				EI = sparse(i, j, true, sz(1), sz(2));
+			end
 			
 
 		end

@@ -139,8 +139,11 @@ classdef SCM < handle
                                 
                                 scm = SCM('steyn');  % no dynamics on external drives
                                 scm.grid_size = [50 50];
-scm.sim_num = 7;
-scm.t0_start = 0;
+scm.sim_num = 9;
+scm.t0_start = -2;
+scm.IC.dVi = 0;
+dVe = 1;
+scm.D = .3;  
                             scm.save = true;
                             scm.visualization_rate = 10;
                                 scm.depo_block = true;
@@ -159,42 +162,49 @@ scm.duration = 60;
 
                                 % Design the IW
                                 scm.expansion_rate = 0.1;  % 0.25
-scm.excitability_map(scm.excitability_map > 0) = 1;
-scm.I_drive = 10;
+scm.excitability_map(scm.excitability_map > 0) = 3;
+scm.I_drive = .5;
 % scm.Nii_b = 100;
 
 
 % Add a fixed source
+center = [22 22];
 [xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
 source = false(scm.grid_size);
-source(abs(xx - scm.stim_center(1)) <= 2 & ...
-    abs(yy - scm.stim_center(2)) <= 2) = true;
+source(abs(xx - center(1)) <= 2 & ...
+    abs(yy - center(2)) <= 2) = true;
 scm.source = source;
-scm.source_drive = 2.2;
+scm.source_drive = 2;
+
+
+% scm.source = scm.excitability_map > 0;  % full field source
+% scm.source_drive = 1.5;
+
+% Move the electrodes off the center
+scm.centerNP = [35 35];
 
 
 % Add Martinet Potassium dynamics
 % % scm.IC.K = .3;
-scm.tau_dVe = 250;  
-scm.tau_dVi = 250 * .8;  % Speed up Vi reaction
+scm.tau_dVe = 250 * 0.8;  % slow down changes to Ve  
+scm.tau_dVi = 250 * 0.8;  % Speed up Vi reaction (with 0.8)
 scm.tau_dD = 200 * 50;  % slow down the changes
 
 % Adjust Dii(potassium) sigmoids
 % scm.kD_center = 0.45;
 % scm.kD_width = 0.15;
 
-scm.Nee_sc = 10;
-scm.Nei_sc = 10;
+scm.Nee_sc = 50;
+scm.Nei_sc = 50;
                               
 
-scm.stim_center = [20 46];  % 46 is edge
+scm.stim_center = [20 35];  % 46 is edge
 
-scm.dVe = [-Inf, 1.5];
+scm.dVe = [-Inf, 2];
 % scm.dVi = [-Inf, .5];
 
-scm.D = .35;  
-scm.IC.dVi = 0;
-dVe = 1.4;
+
+
 scm.IC.dVe = zeros(scm.grid_size);
 scm.IC.dVe(scm.excitability_map > 0) = dVe;
 scm.post_ictal_source_drive = dVe;
@@ -496,12 +506,16 @@ scm.drive_style = 'inhibitory';
 	
 	methods  % electrodes
 		function center = get.centerNP(P)
-			P.centerNP = P.get_center(P.centerNP, P.dimsNP, P.grid_size);
-			center = P.centerNP;
+            if isempty(P.centerNP)
+				P.centerNP = round(P.grid_size / 2); 
+            end
+            center = P.centerNP;
 		end
 		function center = get.centerEC(P)
-			P.centerNP = P.get_center(P.centerEC, P.dimsNP, P.grid_size);
-			center = P.centerNP;
+            if isempty(P.centerEC)
+                P.centerEC = round(P.grid_size / 2);
+            end
+            center = P.centerEC;
 		end
 		
 	end
