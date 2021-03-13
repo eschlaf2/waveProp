@@ -201,7 +201,7 @@ scm.Nei_sc = 50;
 scm.stim_center = [20 35];  % 46 is edge
 
 scm.dVe = [-Inf, 2];
-% scm.dVi = [-Inf, .5];
+scm.dVi = [-Inf, .7];
 
 
 
