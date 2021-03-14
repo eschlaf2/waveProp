@@ -116,7 +116,7 @@ for ii = 1:Nsteps
 	update_gap_resting;
 	
 	% sanity check!
-	if any(any(isnan(last.Qe)))
+	if any(any(isnan(new.Vi)))
 		error('Sigmoid generated NaNs!! (Either increase dx or reduce dt)');
 	end
 	

@@ -138,22 +138,26 @@ classdef SCM < handle
                                 % generates diffuse TW
                                 
                                 scm = SCM('steyn');  % no dynamics on external drives
-                                scm.grid_size = [50 50];
+                                scm.dx = 0.1;
+                                scm.dt = 2e-4;
+                                scm.grid_size = round( [5 5] / scm.dx);
 scm.sim_num = 9;
 scm.t0_start = -2;
 scm.IC.dVi = 0;
+scm.Ve_rest = randn(scm.grid_size) * .1;
+scm.Ve_rest = -64 + conv2(scm.Ve_rest, gausswin(5) * gausswin(5)', 'same');
 dVe = 1;
 scm.D = .3;  
                             scm.save = true;
                             scm.visualization_rate = 10;
                                 scm.depo_block = true;
-                                scm.padding = [5 60];
+                                scm.padding = [5 10];
 scm.duration = 60;
                                 
-                                scm.dx = 0.1;
+                                
 % scm.dimsNP = [4 4];
                                 % scm.dt = 1e-4;
-                                scm.dt = 2e-4;
+                                
                                 
                                 
                                 % Save and visualize some extra fields for testing
@@ -168,28 +172,26 @@ scm.I_drive = .5;
 
 
 % Add a fixed source
-center = [22 22];
+center = round( [2.2 2.2] / scm.dx );
+source_dims = round( [.2 .2] / scm.dx );
+
 [xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
 source = false(scm.grid_size);
-source(abs(xx - center(1)) <= 2 & ...
-    abs(yy - center(2)) <= 2) = true;
+source(abs(xx - center(1)) <= source_dims(1) & ...
+    abs(yy - center(2)) <= source_dims(2)) = true;
 scm.source = zeros(scm.grid_size);
 scm.source(scm.excitability_map > 0) = dVe;
 scm.source(source) = dVe + 1;
-% scm.source_drive = 2;
 
-
-% scm.source = scm.excitability_map > 0;  % full field source
-% scm.source_drive = 1.5;
 
 % Move the electrodes off the center
-scm.centerNP = [35 35];
+scm.centerNP = round( [3.5 3.5] / scm.dx );
 
 
 % Add Martinet Potassium dynamics
 % % scm.IC.K = .3;
-scm.tau_dVe = 250 * 0.8;  % slow down changes to Ve  
-scm.tau_dVi = 250 * 0.8;  % Speed up Vi reaction (with 0.8)
+scm.tau_dVe = 250 * 1;  % Speed up Ve reaction (with 0.8)
+scm.tau_dVi = 250 * 1;  % Speed up Vi reaction (with 0.8)
 scm.tau_dD = 200 * 50;  % slow down the changes
 
 % Adjust Dii(potassium) sigmoids
@@ -200,7 +202,7 @@ scm.Nee_sc = 50;
 scm.Nei_sc = 50;
                               
 
-scm.stim_center = [20 35];  % 46 is edge
+scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
 
 scm.dVe = [-Inf, 1];
 scm.dVi = [-Inf, .7];
@@ -211,14 +213,9 @@ scm.IC.dVe = zeros(scm.grid_size);
 % scm.IC.dVe(scm.excitability_map > 0) = dVe;
 scm.post_ictal_source_drive = nan;
 
-% scm.Nii_b = 0;  
-% scm.Nie_b = 00;
 
 
 % scm.Dii = [0.2 Inf];
-              
-% scm.dVi = [.1 .1];
-
 scm.IC.Dii = scm.D;
 scm.drive_style = 'inhibitory';
 % scm.IC.Dii = ndgrid(linspace(.01, .4, 50), 1:50);
