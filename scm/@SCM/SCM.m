@@ -151,7 +151,7 @@ scm.D = .3;
 scm.duration = 60;
                                 
                                 scm.dx = 0.1;
-                                scm.dimsNP = [4 4];
+% scm.dimsNP = [4 4];
                                 % scm.dt = 1e-4;
                                 scm.dt = 2e-4;
                                 
@@ -202,7 +202,7 @@ scm.Nei_sc = 50;
 
 scm.stim_center = [20 35];  % 46 is edge
 
-scm.dVe = [-Inf, 2];
+scm.dVe = [-Inf, 1];
 scm.dVi = [-Inf, .7];
 
 
