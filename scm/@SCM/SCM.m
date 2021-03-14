@@ -142,16 +142,16 @@ classdef SCM < handle
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
 scm.sim_num = 9;
-scm.t0_start = -2;
+% scm.t0_start = -2;
 scm.IC.dVi = 0;
-scm.Ve_rest = randn(scm.grid_size) * .1;
-scm.Ve_rest = -64 + conv2(scm.Ve_rest, gausswin(5) * gausswin(5)', 'same');
+scm.IC.dVe = randn(scm.grid_size) * .1;
+scm.IC.dVe = conv2(scm.IC.dVe, gausswin(10) * gausswin(10)', 'same');
 dVe = 1;
 scm.D = .3;  
                             scm.save = true;
                             scm.visualization_rate = 10;
                                 scm.depo_block = true;
-                                scm.padding = [5 10];
+                                scm.padding = [2 10];
 scm.duration = 60;
                                 
                                 
@@ -209,7 +209,7 @@ scm.dVi = [-Inf, .7];
 
 
 
-scm.IC.dVe = zeros(scm.grid_size);
+% scm.IC.dVe = zeros(scm.grid_size);
 % scm.IC.dVe(scm.excitability_map > 0) = dVe;
 scm.post_ictal_source_drive = nan;
 
