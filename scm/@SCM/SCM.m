@@ -173,8 +173,10 @@ center = [22 22];
 source = false(scm.grid_size);
 source(abs(xx - center(1)) <= 2 & ...
     abs(yy - center(2)) <= 2) = true;
-scm.source = source;
-scm.source_drive = 2;
+scm.source = zeros(scm.grid_size);
+scm.source(scm.excitability_map > 0) = dVe;
+scm.source(source) = dVe + 1;
+% scm.source_drive = 2;
 
 
 % scm.source = scm.excitability_map > 0;  % full field source
@@ -206,8 +208,8 @@ scm.dVi = [-Inf, .7];
 
 
 scm.IC.dVe = zeros(scm.grid_size);
-scm.IC.dVe(scm.excitability_map > 0) = dVe;
-scm.post_ictal_source_drive = dVe;
+% scm.IC.dVe(scm.excitability_map > 0) = dVe;
+scm.post_ictal_source_drive = nan;
 
 % scm.Nii_b = 0;  
 % scm.Nie_b = 00;
