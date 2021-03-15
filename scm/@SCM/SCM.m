@@ -142,10 +142,11 @@ classdef SCM < handle
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
 scm.sim_num = 9;
-% scm.t0_start = -2;
+scm.t0_start = 28;
 scm.IC.dVi = 0;
-scm.IC.dVe = randn(scm.grid_size) * .1;
-scm.IC.dVe = conv2(scm.IC.dVe, gausswin(10) * gausswin(10)', 'same');
+scm.IC.dVe = 0;
+% scm.IC.dVe = randn(scm.grid_size) * .05;
+% scm.IC.dVe = conv2(scm.IC.dVe, gausswin(10) * gausswin(10)', 'same');
 dVe = 1;
 scm.D = .3;  
                             scm.save = true;
@@ -167,7 +168,7 @@ scm.duration = 60;
                                 % Design the IW
                                 scm.expansion_rate = 0.1;  % 0.25
 scm.excitability_map(scm.excitability_map > 0) = 3;
-scm.I_drive = .5;
+scm.I_drive = .2;
 % scm.Nii_b = 100;
 
 
@@ -205,7 +206,7 @@ scm.Nei_sc = 50;
 scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
 
 scm.dVe = [-Inf, 1];
-scm.dVi = [-Inf, .7];
+scm.dVi = [-Inf, .3];
 
 
 
