@@ -288,14 +288,15 @@ EC = rmfield(EC, no_return);
                 + PK.kD ./ dx^2 * del2_(last.K) ...  % diffusion term.
 			);
         
-%         new.GABA = ...  % chloride?
-% 			last.GABA ...
-% 			+ dt / .1 .* ( ...
-% 				- 1 .* last.GABA ...  % decay term.
-% 				+ 1.5 .* ...              % reaction term.
-% 					last.Qi ./ ( 1 + exp( -last.Qi ) ) ...
-%                 + .1 ./ dx^2 * del2_(last.GABA) ...  % diffusion term.
-% 			);
+        new.GABA = ...  % chloride?
+			last.GABA ...
+			+ dt / .1 .* ( ...
+				- 1 .* last.GABA ...  % decay term.
+				+ 1.5 .* ...              % reaction term.
+					last.Qi ./ ( 1 + exp( -last.Qi ) ) ...
+                + 1.5 * new.map ...
+                + .25 ./ dx^2 * del2_(last.GABA) ...  % diffusion term.
+			);
         
 %         new.GABA = new.GABA + dt/2 * ( ...
 %             1.5 * new.map ...  
@@ -304,9 +305,9 @@ EC = rmfield(EC, no_return);
 %     
 %         new.GABA = min(new.GABA, 1);
         
-        if all(size(SS.Nie_b) == params.grid_size)
-            new.GABA = SS.Nie_b;
-        end
+%         if all(size(SS.Nie_b) == params.grid_size)
+%             new.GABA = SS.Nie_b;
+%         end
 			
 	end
 

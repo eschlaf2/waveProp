@@ -142,7 +142,7 @@ classdef SCM < handle
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
 scm.sim_num = 9;
-scm.t0_start = 28;
+scm.t0_start = 0;
 scm.IC.dVi = 0;
 scm.IC.dVe = 0;
 % scm.IC.dVe = randn(scm.grid_size) * .05;
@@ -168,7 +168,7 @@ scm.duration = 60;
                                 % Design the IW
                                 scm.expansion_rate = 0.1;  % 0.25
 scm.excitability_map(scm.excitability_map > 0) = 3;
-scm.I_drive = .2;
+scm.I_drive = .1;
 % scm.Nii_b = 100;
 
 
