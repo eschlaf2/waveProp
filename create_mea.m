@@ -17,6 +17,7 @@ p('Position', []);
 p('BadChannels', []);
 p('Map', []);
 p('Name', 'MEA data');
+p('firing_rate', []);
 
 parse(P, Data, varargin{:})
 
@@ -72,6 +73,9 @@ end
 
 mea.Data = int16(rescale(mea.Data, -2^15, 2^15));
 
+if ndims(mea.firing_rate) == 3
+    mea.firing_rate = reshape_data(mea.firing_rate);
+end
 end
 
 function mea = check_position(mea, tol)
