@@ -283,7 +283,7 @@ scm.drive_style = 'inhibitory';
     properties (Access = private)
         Qe_movie
         Ve_movie
-
+        K_movie
     end
 	
 	properties  % meta

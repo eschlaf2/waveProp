@@ -585,7 +585,7 @@ function fig = create_fig_(out_vars, grid_size, addyNP, addyEC)
 		h(ii) = subplot(nr,nc,ii);
 		ih(ii) = imagesc(zeros(grid_size));
 		th(ii) = title(titles{ii});
-		colormap bone; axis equal; axis tight; axis ij; colorbar;
+		colormap(h(ii), 1-gray); axis equal; axis tight; axis ij; colorbar;
 	end
 
 	% Indicate electrode positions.
