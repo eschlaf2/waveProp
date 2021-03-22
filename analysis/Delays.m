@@ -51,7 +51,7 @@ classdef Delays < WaveProp
     end
     
 	properties
-		HalfWin = .5
+		HalfWin = 5
 		FBand = [1 13]
 		MinFreq = []
 		Reference = 'center'
