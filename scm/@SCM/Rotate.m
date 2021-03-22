@@ -1,20 +1,20 @@
-function rotate(P, theta)
-    center = P.centerNP;
+function Rotate(scm, theta)
+    center = scm.grid_size/2;
     rot =@(xy) round( ...
             (xy - center) ...  % translate to center
             * [cos(theta), -sin(theta); sin(theta), cos(theta)] ...  % rotate
         ) + center;  % translate back
 
-    P.stim_center = rot(P.stim_center);
+    scm.stim_center = rot(scm.stim_center);
 
-    for ii = 1:size(P.source, 3)
-        mat = P.source(:, :, ii);
-        rot_mat = false(size(mat));
-        [xx, yy] = ind2sub(size(mat), find(mat));
-        xnew = rot([xx, yy]);
-        inds = sub2ind(P.grid_size, xnew(:, 1), xnew(:, 2));
-        rot_mat(inds) = true;
-        P.source(:, :, ii) = rot_mat;
+    for ii = 1:size(scm.source, 3)
+        mat = scm.source(:, :, ii);
+        
+        [Y, X] = find(true(size(mat)));
+        xnew = rot([X, Y]);
+        F = scatteredInterpolant(X, Y, mat(:), 'linear', 'nearest');
+        rot_mat = reshape(F(xnew(:, 1), xnew(:, 2)), scm.grid_size);
+        scm.source(:, :, ii) = rot_mat;
     end
 
 

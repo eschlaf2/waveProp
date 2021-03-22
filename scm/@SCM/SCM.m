@@ -40,7 +40,7 @@ classdef SCM < handle
                     if nargin == 1
                         mdl = validatestring(varargin{1}, ...
                             {'steyn-ross', 'martinet', 'wip', ...
-                            'draft_Idriven'});
+                            'draft_Idriven', 'FS'});
                         switch mdl
                             case 'steyn-ross'
                                 scm = scm.init();
@@ -87,6 +87,8 @@ classdef SCM < handle
                                 % [10, 10] padding and a duration of 60
                                 
                                 scm = SCM('steyn');  % no dynamics on external drives
+                                scm.label = 'FS';
+                                scm.basename = 'SCM/FS/FS';
                                 scm.dx = 0.1;
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
@@ -118,7 +120,7 @@ classdef SCM < handle
 
 
                                 % Add a fixed source
-                                center = round( [2.2 2.2] / scm.dx );
+                                center = round( [1.5 1.5] / scm.dx );
                                 source_dims = round( [.2 .2] / scm.dx );
 
                                 [xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
@@ -130,8 +132,10 @@ classdef SCM < handle
                                 scm.source(source) = dVe + 1;
 
 
-                                % Move the electrodes off the center
-                                scm.centerNP = round( [3.5 3.5] / scm.dx );
+                                % Keep the electrodes in the center so that
+                                % it's easy to rotate the source when
+                                % generating sims for method comparison
+                                scm.centerNP = round( scm.grid_size ./ 2 );
 
 
                                 % Add Martinet Potassium dynamics
@@ -141,7 +145,7 @@ classdef SCM < handle
                                 scm.tau_dD = 200 * 50;  % slow down the changes
             
                                 % Add an IW source
-                                scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
+                                scm.stim_center = round( [1.5 3.5] / scm.dx );  % 4.6 is edge
 
                                 % Bound dVe/dVi
                                 scm.dVe = [-Inf, 1];
@@ -285,6 +289,37 @@ scm.drive_style = 'inhibitory';
 
         
         function rotate(self, theta), self.Rotate(theta); end  % legacy
+        function inds = NPinds(scm)
+
+            x_offset = ( (1:scm.dimsNP(1)) - floor(scm.dimsNP(1)/2) );
+            y_offset = ( (1:scm.dimsNP(2)) - floor(scm.dimsNP(2)/2) );
+            [xx, yy] = ndgrid(x_offset, y_offset);
+
+            inds = sub2ind(scm.grid_size, ...
+                scm.centerNP(1) + xx(:), ...
+                scm.centerNP(2) + yy(:));
+        end
+        function inds = ECinds(scm)
+            % Never used this... might need help
+            x_offset = ( (1:scm.dimsNP(1)) - floor(scm.dimsNP(1)/2) ) * scm.scaleEC;
+            y_offset = ( (1:scm.dimsNP(2)) - floor(scm.dimsNP(2)/2) ) * scm.scaleEC;
+            [xx, yy] = ndgrid(x_offset, y_offset);
+
+            inds = sub2ind(scm.grid_size, ...
+                scm.centerNP(1) + xx(:), ...
+                scm.centerNP(2) + yy(:));
+        end
+        function show_layout(scm)
+            X = zeros(scm.grid_size);
+            X(scm.source == max(scm.source, [], 'all')) = 1;
+            X(scm.stim_center(1), scm.stim_center(2)) = 2;
+            X(scm.NPinds) = 3;
+            X(~scm.excitability_map) = -1;
+            figure; imagesc(X);
+            cb = colorbar;
+            set(cb, 'ticks', 0:3, 'limits', [-1 3], ...
+                'ticklabels', {'EZ', 'FS', 'IWs', 'MEA'})
+        end
         function Run(self)
             self.CreateDirectory;
             self.RunSimulation;
