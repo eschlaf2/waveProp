@@ -1,7 +1,7 @@
-function ConvertToMea(PM)
-    if ~PM.save, return, end
-	if ~isfield(PM, 'label'), PM.label = 'SCM'; end
-	files = dir(sprintf('%s_%d_*mat', PM.basename, PM.sim_num));
+function ConvertToMea(scm)
+    if ~scm.save, return, end
+	if ~ismember('label', fieldnames(scm)) || isempty(scm.label), scm.label = 'SCM'; end
+	files = dir(sprintf('%s_%d_*mat', scm.basename, scm.sim_num));
 	addpath(files(1).folder);
 	load(files(1).name, 'last');
 	cmap = 1-gray;
@@ -52,7 +52,7 @@ function ConvertToMea(PM)
     assignin('base', 'dii_mat', dii_mat);
 
 	time = cat(1, tt{:});
-	sample_rate = min(round(1/mean(diff(time))/1e3)*1e3, PM.subsample);
+	sample_rate = min(round(1/mean(diff(time))/1e3)*1e3, scm.subsample);
 	dt = 1 / sample_rate;
 	nt = size(qe_mat, 1);
 	inds = interp1(time, 1:nt, time(1):dt:time(end), 'nearest');
@@ -65,11 +65,11 @@ function ConvertToMea(PM)
 		-qe_mat, ... 
         'firing_rate', qe_mat, ...
 		'SamplingRate', sample_rate, ... 
-		'Padding', PM.padding, ...
-		'Name', [PM.label ' Seizure ' num2str(PM.sim_num)], ...
+		'Padding', scm.padding, ...
+		'Name', [scm.label ' Seizure ' num2str(scm.sim_num)], ...
 		'Time', time, ... 
 		'Path', sprintf('%s/%s/%s_Seizure%d_Neuroport_%d_%d.mat', ...
-			pwd, PM.label, PM.label, PM.sim_num, PM.padding) ...	 
+			pwd, scm.label, scm.label, scm.sim_num, scm.padding) ...	 
 		);
 	
 %   mea = add_noise_(mea, 2);  % Add 3D brownian noise with snr=2; the spectra after this transformation looked similar to recorded seizures - could also use (much) higher snr pink noise
@@ -80,7 +80,7 @@ function ConvertToMea(PM)
 	mea.params = init_mea_params();
 	fprintf('Saving %s ... ', mea.Path);
 	save(mea.Path, '-struct', 'mea');
-	m = matfile(sprintf('%s_%d_info', PM.basename, PM.sim_num), 'Writable', true);
+	m = matfile(sprintf('%s_%d_info', scm.basename, scm.sim_num), 'Writable', true);
 	m.Qe_movie = movQ;
 	m.Ve_movie = movV;
     m.K_movie = movK;
