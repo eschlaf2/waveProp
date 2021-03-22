@@ -157,6 +157,15 @@ classdef SCM < handle
 
                                 scm.IC.Dii = scm.D;
                                 scm.drive_style = 'inhibitory';
+                                
+                                
+                                % Only simulate FS portion (i.e. update the
+                                % IC to look like after IW passage)
+                                scm.IC.Dii = .2;
+                                scm.IC.dVe = .6;
+                                scm.IC.dVi = .3;
+                                scm.IC.K = .6;
+                                scm.expansion_rate = 0;
 
 
                             case 'wip'
