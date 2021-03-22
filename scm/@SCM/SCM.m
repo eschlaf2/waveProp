@@ -82,57 +82,79 @@ classdef SCM < handle
                                 
                                 scm.noise_sf = 2;
                                 scm.noise_sc = .2;
+                            case 'FS'
+                                % Generates a sim with a fixed source. Uses
+                                % [10, 10] padding and a duration of 60
                                 
-                            case 'draft_Idriven'
-                                % Looks reasonable so far but
+                                scm = SCM('steyn');  % no dynamics on external drives
+                                scm.dx = 0.1;
+                                scm.dt = 2e-4;
+                                scm.grid_size = round( [5 5] / scm.dx);
+
+                                scm.IC.dVi = 0;
+                                scm.IC.dVe = 0;
+
+                                dVe = 1;
+                                scm.D = .3;  
+                            
+                                scm.save = true;
+                                scm.visualization_rate = 0;
+                                scm.depo_block = false;
+                                scm.padding = [10 10];
+                                scm.duration = 60;
                                 
-                                scm = SCM('steyn');  % Kill all potassium dynamics (manually control dVe and Dii)
-                                scm.sim_num = 1;
-                                scm.save = false;
-                                scm.visualization_rate = 10;
-                                scm.out_vars = {'Qe', 'Ve', 'Qi', 'Vi', 'map', 'state'};
-%                                 scm.noise_sf = 1;
-                                scm.source_drive = 3;
+                                
+                                scm.dimsNP = [4 4];
+                                
+                                
+                                % Save and visualize some extra fields for testing
+                                scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi', 'K', 'Dii'};
+                                scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'dVi', 'Dii', 'map', 'state', 'GABA'};
+
+                                % Design the IW
+                                scm.expansion_rate = 0.1;  % 0.25
+                                scm.excitability_map(scm.excitability_map > 0) = 3;
+                                scm.I_drive = .3;
+
+
+                                % Add a fixed source
+                                center = round( [2.2 2.2] / scm.dx );
+                                source_dims = round( [.2 .2] / scm.dx );
+
+                                [xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
+                                source = false(scm.grid_size);
+                                source(abs(xx - center(1)) <= source_dims(1) & ...
+                                    abs(yy - center(2)) <= source_dims(2)) = true;
+                                scm.source = zeros(scm.grid_size);
+                                scm.source(scm.excitability_map > 0) = dVe;
+                                scm.source(source) = dVe + 1;
+
+
+                                % Move the electrodes off the center
+                                scm.centerNP = round( [3.5 3.5] / scm.dx );
+
+
+                                % Add Martinet Potassium dynamics
+                                % % scm.IC.K = .3;
+                                scm.tau_dVe = 250 * 1;  % Speed up Ve reaction (with 0.8)
+                                scm.tau_dVi = 250 * 1;  % Speed up Vi reaction (with 0.8)
+                                scm.tau_dD = 200 * 50;  % slow down the changes
+            
+                                % Add an IW source
+                                scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
+
+                                % Bound dVe/dVi
+                                scm.dVe = [-Inf, 1];
+                                scm.dVi = [-Inf, .3];
+
+                                % No post ictal drive
                                 scm.post_ictal_source_drive = nan;
-                                
-                                % Increase Ve_rest at a point (this
-                                % generates spirals which perpetuate the
-                                % seizure after IW passage/FS offset;
-                                % desirable for slow movement?)
-                                x = 20; y = 10;
-                                scm.stim_center = [x y+30];
-                                scm.source = false(scm.grid_size);
-                                scm.source(x, y) = true;
-                                scm.Ve_rest = scm.Ve_rest * ones(scm.grid_size);
-                                scm.Ve_rest(x, y) = scm.Ve_rest(x, y) + .25;
-                                
-                                
-                                scm.IC.dVe = zeros(scm.grid_size);
-                                scm.IC.dVe(scm.excitability_map > 0) = 1.4;
-                                scm.padding = [2 60];
-                                scm.duration = 10;
-                                scm.D = 0.35;
+
+
                                 scm.IC.Dii = scm.D;
-                                scm.v = 180;
-                                
-                                scm.dVe = [-Inf 5];
-                                scm.source_drive = 5;  % raise dVe when source is on (3 works here when there is a slight increase in Ve_rest [0.25] at this spot; setting at 3 with increase in Ve_rest generates spirals at the end)
-                                scm.post_ictal_source_drive = 1.5;  % ... put it back to 1.5 when it's off
-                                
-                                scm.I_drive = .7;
-                                scm.post_ictal_I_drive = 0;
                                 scm.drive_style = 'inhibitory';
-                                scm.out_vars = ...
-                                    {'Qe', 'Ve', 'Qi', 'state', 'Dii', 'dVe'};
-                                
-                                
-                                scm.expansion_rate = 2;  % put this down 
-                                    % lower when you're ready - high just
-                                    % to double check implementation looks
-                                    % right
-                                    
-%                                 scm.dx = .04;
-%                                 scm.dt = 1e-5;
+
+
                             case 'wip'
                                 % Looking for a dVe/dVi pair that
                                 % generates diffuse TW
@@ -142,17 +164,17 @@ classdef SCM < handle
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
 scm.sim_num = 9;
-% scm.t0_start = 0;
+scm.t0_start = -2;
 scm.IC.dVi = 0;
 scm.IC.dVe = 0;
 % scm.IC.dVe = randn(scm.grid_size) * .05;
 % scm.IC.dVe = conv2(scm.IC.dVe, gausswin(10) * gausswin(10)', 'same');
 dVe = 1;
 scm.D = .3;  
-                            scm.save = true;
+                            scm.save = false;
                             scm.visualization_rate = 10;
                                 scm.depo_block = true;
-                                scm.padding = [2 10];
+                                scm.padding = [10 10];
 scm.duration = 60;
                                 
                                 
@@ -257,7 +279,7 @@ scm.drive_style = 'inhibitory';
 			if all(P.stim_center)
 				P.IC.map = false(P.grid_size);  % Source of ictal activity (on/off)
 				P.IC.map(P.stim_center(1), P.stim_center(2)) = 1;
-				P.IC.state = double(P.IC.map);  % Seizure state (ictal/non-ictal)
+				P.IC.state = double(P.IC.map) - 1;  % Seizure state (ictal/non-ictal)
 			end
         end
 

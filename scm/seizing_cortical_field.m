@@ -377,12 +377,13 @@ EC = rmfield(EC, no_return);
                 % The map for the IW updates here, but is applied directly
                 % to the voltage dynamics rather than by changing dVi. This
                 % makes it easier to modulate dVi with K+ if you want to do
-                % that. Fixed excitatory sources are applied here, however.
+                % that. Inhibitory collapse is applied here, however.
                 if time(ii) > 0 
                     [new.map, new.state] = update_map_smooth( ...
                         last.state, M.expansion_rate * dt / dx, ...
                         M.excitability_map, dt);
                     
+                    % Inhibitory collapse
 affected = 4 < new.state & new.state < 5;
 % SS.Nie_b = double(~Nie_affected) * 500 + 100;
 % SS.Nii_b = double(~Nie_affected) * 500 + 100;
@@ -393,16 +394,6 @@ SS.Qi_max = double(~affected) * 60 + double(affected) * 20;
 % SS.Vi_rev = double(~Nie_affected) * -15 + -55;
 % SS.Vi_rev = rescale(new.GABA, -70, -55, 'InputMin', 0, 'inputmax', 1);
                     
-%                     if isempty(PM.source), return, end
-%                     which_source = mod(floor(time(ii) / 2), size(PM.source, 3)) + 1;
-%                         
-                    if time(ii) <= PM.duration
-%                         last.dVe(PM.source(:, :, which_source)) = PM.source_drive;
-%                         last.dVe(new.map) = -params.I_drive;
-%                     else
-%                         if isnan(PM.post_ictal_source_drive), return; end			
-% %                         last.dVe(PM.source(:, :, which_source)) = PM.post_ictal_source_drive;
-                    end
                 end
             case 'inhibitory_old'
                 if time(ii) >= 0 && ~mod(time(ii), .1)

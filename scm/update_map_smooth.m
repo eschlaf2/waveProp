@@ -30,13 +30,13 @@ p_wavefront = 2^(expansion_rate) - 1;  % area is recruited at this rate
 boundary = boundary .* excitability_map;
 
 dice = rand(size(state));
-wavefront = (dice < p_wavefront) & boundary & (state == 0);
+wavefront = (dice < p_wavefront) & boundary & (state < 0);
 
-recruited = state >= 1;
+recruited = state >= 0;
 state(recruited) = state(recruited) + dt;
 
-state(wavefront) = 1;
-map = state >= 1 & state <= 1 + excitability_map;
+state(wavefront) = 0;
+map = state >= 0 & state <= 0 + excitability_map;
 
 
 end
