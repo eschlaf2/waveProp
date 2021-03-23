@@ -302,16 +302,12 @@ scm.centerNP = round( [3.5 3.5] / scm.dx );
 % scm.tau_dVi = 250 * 1;  % Speed up Vi reaction (with 0.8)
 % scm.tau_dD = 200 * 50;  % slow down the changes
 
-
-
-scm.Nee_sc = 50;
-scm.Nei_sc = 50;
                               
 
 scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
 
-scm.dVe = [-Inf, .7];
-scm.dVi = [-Inf, .3];
+% scm.dVe = [-Inf, .7];  % built into sigmoids
+% scm.dVi = [-Inf, .3];
 
 
 
