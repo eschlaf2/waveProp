@@ -454,7 +454,7 @@ SS.Qi_max = double(~affected) * 60 + double(affected) * 20;
 		if PM.visualization_rate > 0
 			if ~exist('fig', 'var') || isempty(fig)
 				fig = create_fig_(out_vars, M.grid_size, indsNP, indsEC);
-                ss = mkdir(sprintf('SCM/SCM/vids/SCM_%d/', PM.sim_num));
+                ss = mkdir(sprintf('SCM/%s/vids/%s_%d/', params.label, params.label, PM.sim_num));
 			end
 			if diff(floor((time(ii) - [dt 0]) * PM.visualization_rate))
 				for sp = 1:numel(fig.ih)
@@ -465,7 +465,7 @@ SS.Qi_max = double(~affected) * 60 + double(affected) * 20;
 				set(fig.ah, 'string', sprintf('T = %0.3f', time(ii)));
 				drawnow;
                 im = frame2im(getframe(fig.fig));
-                imwrite(im, sprintf('SCM/SCM/vids/SCM_%d/%0.4f.png', PM.sim_num, time(ii)));
+                imwrite(im, sprintf('SCM/%s/vids/%s_%d/%0.4f.png', params.label, params.label, PM.sim_num, time(ii)));
                 
 			end
 		end
