@@ -40,7 +40,7 @@ classdef SCM < handle
                     if nargin == 1
                         mdl = validatestring(varargin{1}, ...
                             {'steyn-ross', 'martinet', 'wip', ...
-                            'draft_Idriven', 'FS'});
+                            'draft_Idriven', 'FS', 'IW'});
                         switch mdl
                             case 'steyn-ross'
                                 scm = scm.init();
@@ -167,6 +167,103 @@ classdef SCM < handle
                                 scm.IC.K = .6;
                                 scm.expansion_rate = 0;
 
+
+                            case 'IW'
+                                % Looking for a dVe/dVi pair that
+                                % generates diffuse TW
+                                
+                                scm = SCM('steyn');  % no dynamics on external drives
+                                scm.label = 'IW';
+                                scm.basename = 'SCM/IW/IW';
+                                scm.dx = 0.1;
+                                scm.dt = 2e-4;
+                                scm.grid_size = round( [5 5] / scm.dx);
+scm.sim_num = 9;
+scm.t0_start = -2;
+scm.IC.dVi = 0;
+scm.IC.dVe = 0;
+% scm.IC.dVe = randn(scm.grid_size) * .05;
+% scm.IC.dVe = conv2(scm.IC.dVe, gausswin(10) * gausswin(10)', 'same');
+dVe = 1;
+scm.D = .3;  
+                            scm.save = false;
+                            scm.visualization_rate = 10;
+                                scm.depo_block = true;
+                                scm.padding = [10 10];
+scm.duration = 60;
+                                
+                                
+scm.dimsNP = [4 4];
+                                % scm.dt = 1e-4;
+                                
+                                
+                                
+                                % Save and visualize some extra fields for testing
+                                scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi', 'K', 'Dii'};
+                                scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'dVi', 'Dii', 'map', 'state', 'GABA'};
+
+                                % Design the IW
+                                scm.expansion_rate = 0.1;  % 0.25
+scm.excitability_map(scm.excitability_map > 0) = 3;
+scm.I_drive = .3;
+% scm.Nii_b = 100;
+
+
+% Add a fixed source
+center = round( [2.2 2.2] / scm.dx );
+source_dims = round( [.2 .2] / scm.dx );
+
+[xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
+source = false(scm.grid_size);
+source(abs(xx - center(1)) <= source_dims(1) & ...
+    abs(yy - center(2)) <= source_dims(2)) = true;
+scm.source = zeros(scm.grid_size);
+scm.source(scm.excitability_map > 0) = dVe;
+scm.source(source) = dVe + 1;
+
+
+% Move the electrodes off the center
+scm.centerNP = round( [3.5 3.5] / scm.dx );
+
+
+% Add Martinet Potassium dynamics
+% % scm.IC.K = .3;
+scm.tau_dVe = 250 * 1;  % Speed up Ve reaction (with 0.8)
+scm.tau_dVi = 250 * 1;  % Speed up Vi reaction (with 0.8)
+scm.tau_dD = 200 * 50;  % slow down the changes
+
+% Adjust Dii(potassium) sigmoids
+% scm.kD_center = 0.45;
+% scm.kD_width = 0.15;
+
+scm.Nee_sc = 50;
+scm.Nei_sc = 50;
+                              
+
+scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
+
+scm.dVe = [-Inf, 1];
+scm.dVi = [-Inf, .3];
+
+
+
+% scm.IC.dVe = zeros(scm.grid_size);
+% scm.IC.dVe(scm.excitability_map > 0) = dVe;
+scm.post_ictal_source_drive = nan;
+
+
+
+% scm.Dii = [0.2 Inf];
+scm.IC.Dii = scm.D;
+scm.drive_style = 'inhibitory';
+% scm.IC.Dii = ndgrid(linspace(.01, .4, 50), 1:50);
+% scm.IC.Dee = scm.D/100;  % not used in Martinet formulation (always
+% updates to Dii/100)
+
+% scm.IC.Qe = 18.47;
+% scm.IC.Qi = 32.68;
+% scm.IC.Ve = -57.71;
+% scm.IC.Vi = -58.01;
 
                             case 'wip'
                                 % Looking for a dVe/dVi pair that
