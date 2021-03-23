@@ -49,7 +49,7 @@ PT = params.time_constants;
 PN = params.noise;
 SS = params.SS;
 MX = params.bounds;
-PS = params.sigmoids;
+
 % OF = params.offsets;  % Consider moving dVe here here...
 
 %% A few convenience variables
@@ -60,7 +60,7 @@ dx = M.dx;
 dt = M.dt;
 
 % initialize random number generator (from input argument)
-rand_state = 1e3*PM.sim_num + round(params.t0);
+rand_state = abs(1e3*PM.sim_num + round(params.t0));
 rng(rand_state, 'v5normal');
 
 % number of time-steps for simulation
@@ -314,23 +314,18 @@ EC = rmfield(EC, no_return);
 % 6. Update inhibitory gap junction strength, and resting voltages.  
    
 	function update_gap_resting
-        if 0  % From when I was looking at updating this mechanism
-            new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* wD(last.K) - (last.Dii - SS.Dii)); %#ok<UNRCH>
-            new.Dee = last.Dii/100;                %See definition in [Steyn-Ross et al PRX 2013, Table I].
-            new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* wdVe(last.K) - last.dVe);
-            new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* wdVe(last.K) - last.dVi);
-           
-        elseif 1  % original Martinet formulation
+       
+        if 0  % original Martinet formulation
             new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
             new.Dee = new.Dii/100; 
             new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* last.K );
             new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* last.K );
             
-        elseif 0  % Dii ~ sigmoid(K); contant voltage offsets
-            new.Dii = params.D * (1 - wD(last.K));
+        elseif 1  % Dii ~ sigmoid(K); contant voltage offsets
+            new.Dii = sigmoid_(last.K, params.sigmoid_kD);
             new.Dee = new.Dii / 100;
-            new.dVe = last.dVe;
-            new.dVi = last.dVi;
+            new.dVe = sigmoid_(last.K, params.sigmoid_kdVe);
+            new.dVi = sigmoid_(last.K, params.sigmoid_kdVi);
             
         else  % messing with high inhibition ring
             new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
@@ -395,34 +390,6 @@ SS.Qi_max = double(~affected) * 60 + double(affected) * 20;
 % SS.Vi_rev = rescale(new.GABA, -70, -55, 'InputMin', 0, 'inputmax', 1);
                     
                 end
-            case 'inhibitory_old'
-                if time(ii) >= 0 && ~mod(time(ii), .1)
-%                     [new.map, new.state] = update_map( ...  % This uses a contagion style update
-%                         last.state, M.expansion_rate * dt / dx, ...
-%                         M.excitability_map);
-                    new.map = expanding_ring(params, time(ii));
-                    new.map(params.excitability_map == 0) = false;
-                    new.state = last.state;
-                    new.state(new.map) = 1;
-                    recruited = last.state == 1 & new.map == false;
-                    new.state(recruited) = 2;
-                    
-                    new.Dii(new.map) = params.I_drive;  % jump to I_drive value
-%                     new.Dii(~new.map) = params.D;  % return to steady state value
-                    new.Dii(new.state == 2) = params.post_ictal_I_drive;  % return to steady state value
-                    if time(ii) <= PM.duration
-                        
-                        if ~isempty(PM.source)
-                            new.dVe(PM.source) = PM.source_drive;
-                        end
-                    else
-
-                        if ~isempty(PM.source)
-                            new.dVe(PM.source) = PM.post_ictal_source_drive;
-                        end
-                    end
-                    new.Dee = new.Dii / 100;
-                end
             otherwise
                 error('Drive style ''%s'' not recognized');
         end
@@ -473,14 +440,18 @@ SS.Qi_max = double(~affected) * 60 + double(affected) * 20;
 
 %% Nested weighting functions
 
+    function y = sigmoid_(x, p)
+        y = p(2) ./ (1 + exp(-p(3) * (x - p(1))));
+    end
+
 % Excitability (voltage offset) as a function of potassium
 	function y = wdVe(K)
-		y = 2 ./ ( 1 + exp( -( 2/PS.kdVe_width * (K - PS.kdVe_center) ) ) ) - 1;
+		y = 1 ./ ( 1 + exp( -( 2/PS.kdVe_width * (K - PS.kdVe_center) ) ) );
 	end
 	
 % Gapjunction functionality as a function of potassium
 	function y = wD(K)
-		y = 1 ./ (1 + exp( -( 2/PS.kD_width * (K - PS.kD_center) ) ));
+		y = 1 - 1 ./ (1 + exp( -( 2/PS.kD_width * (K - PS.kD_center) ) ));
 	end
 
 % e-to-e reversal-potential weighting function

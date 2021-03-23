@@ -138,11 +138,9 @@ classdef SCM < handle
                                 scm.centerNP = round( scm.grid_size ./ 2 );
 
 
-                                % Add Martinet Potassium dynamics
-                                % % scm.IC.K = .3;
-                                scm.tau_dVe = 250 * 1;  % Speed up Ve reaction (with 0.8)
-                                scm.tau_dVi = 250 * 1;  % Speed up Vi reaction (with 0.8)
-                                scm.tau_dD = 200 * 50;  % slow down the changes
+                                % Use Martinet dynamic potassium, but
+                                % {dV*,Dii} follow sigmoid response
+                                
             
                                 % Add an IW source
                                 scm.stim_center = round( [1.5 3.5] / scm.dx );  % 4.6 is edge
@@ -161,6 +159,12 @@ classdef SCM < handle
                                 
                                 % Only simulate FS portion (i.e. update the
                                 % IC to look like after IW passage)
+                                % This was pretty interesting when running
+                                % with dV*,Dii dynamic functions. Didn't do
+                                % what I expected. (early waves had limited
+                                % distance; sim cut off after 30(?)
+                                % seconds; analyses did not detect TW after
+                                % about 10 seconds)
 %                                 scm.IC.Dii = .2;
 %                                 scm.IC.dVe = .6;
 %                                 scm.IC.dVi = .3;
@@ -169,8 +173,8 @@ classdef SCM < handle
 
 
                             case 'IW'
-                                % Looking for a dVe/dVi pair that
-                                % generates diffuse TW
+                                % This is the sim that shows up in the last
+                                % figure
                                 
                                 scm = SCM('steyn');  % no dynamics on external drives
                                 scm.label = 'IW';
@@ -178,14 +182,79 @@ classdef SCM < handle
                                 scm.dx = 0.1;
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
-scm.sim_num = 9;
+scm.sim_num = 0;
 % scm.t0_start = -2;
+scm.IC.dVi = 0;
+scm.IC.dVe = 0;
+dVe = 1;
+                            scm.save = true;
+                            scm.visualization_rate = 0;
+                                scm.depo_block = true;
+                                scm.padding = [10 10];
+scm.duration = 60;
+                                
+                                
+scm.dimsNP = [4 4];
+                                % scm.dt = 1e-4;
+                                
+                                
+                                
+                                % Save and visualize some extra fields for testing
+                                scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi', 'K', 'Dii'};
+                                scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'dVi', 'Dii', 'map', 'state', 'GABA'};
+
+                                % Design the IW
+                                scm.expansion_rate = 0.1;  % 0.25
+scm.excitability_map(scm.excitability_map > 0) = 3;
+scm.I_drive = .3;
+% scm.Nii_b = 100;
+
+
+% Add a fixed source
+center = round( [2.2 2.2] / scm.dx );
+source_dims = round( [.2 .2] / scm.dx );
+
+[xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
+source = false(scm.grid_size);
+source(abs(xx - center(1)) <= source_dims(1) & ...
+    abs(yy - center(2)) <= source_dims(2)) = true;
+scm.source = zeros(scm.grid_size);
+scm.source(scm.excitability_map > 0) = dVe;
+scm.source(source) = dVe + 1;
+
+
+% Move the electrodes off the center
+scm.centerNP = round( [3.5 3.5] / scm.dx );
+
+
+% Potassium is dynamic but dV*, Dii have sigmoid response functions            
+
+scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
+
+scm.dVe = [-Inf, Inf]; % limits are naturally imposed with sigmoid functions
+scm.dVi = [-Inf, Inf];
+
+scm.post_ictal_source_drive = nan;
+
+scm.drive_style = 'inhibitory';
+
+
+                            case 'wip'
+                                % Looking for a dVe/dVi pair that
+                                % generates diffuse TW
+                                
+                                scm = SCM('steyn');  % no dynamics on external drives
+                                scm.dx = 0.1;
+                                scm.dt = 2e-4;
+                                scm.grid_size = round( [5 5] / scm.dx);
+scm.sim_num = 9;
+scm.t0_start = -2;
 scm.IC.dVi = 0;
 scm.IC.dVe = 0;
 % scm.IC.dVe = randn(scm.grid_size) * .05;
 % scm.IC.dVe = conv2(scm.IC.dVe, gausswin(10) * gausswin(10)', 'same');
 dVe = 1;
-scm.D = .3;  
+scm.D = .35;  
                             scm.save = true;
                             scm.visualization_rate = 10;
                                 scm.depo_block = true;
@@ -226,15 +295,14 @@ scm.source(source) = dVe + 1;
 scm.centerNP = round( [3.5 3.5] / scm.dx );
 
 
-% Add Martinet Potassium dynamics
+% Add Martinet Potassium dynamics (commented out because testing sigmoid
+% responses instead)
 % % scm.IC.K = .3;
-scm.tau_dVe = 250 * 1;  % Speed up Ve reaction (with 0.8)
-scm.tau_dVi = 250 * 1;  % Speed up Vi reaction (with 0.8)
-scm.tau_dD = 200 * 50;  % slow down the changes
+% scm.tau_dVe = 250 * 1;  % Speed up Ve reaction (with 0.8)
+% scm.tau_dVi = 250 * 1;  % Speed up Vi reaction (with 0.8)
+% scm.tau_dD = 200 * 50;  % slow down the changes
 
-% Adjust Dii(potassium) sigmoids
-% scm.kD_center = 0.45;
-% scm.kD_width = 0.15;
+
 
 scm.Nee_sc = 50;
 scm.Nei_sc = 50;
@@ -242,7 +310,7 @@ scm.Nei_sc = 50;
 
 scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
 
-scm.dVe = [-Inf, 1];
+scm.dVe = [-Inf, .7];
 scm.dVi = [-Inf, .3];
 
 
@@ -254,95 +322,7 @@ scm.post_ictal_source_drive = nan;
 
 
 % scm.Dii = [0.2 Inf];
-scm.IC.Dii = scm.D;
-scm.drive_style = 'inhibitory';
-
-
-                            case 'wip'
-                                % Looking for a dVe/dVi pair that
-                                % generates diffuse TW
-                                
-                                scm = SCM('steyn');  % no dynamics on external drives
-                                scm.dx = 0.1;
-                                scm.dt = 2e-4;
-                                scm.grid_size = round( [5 5] / scm.dx);
-scm.sim_num = 9;
-scm.t0_start = -2;
-scm.IC.dVi = 0;
-scm.IC.dVe = 0;
-% scm.IC.dVe = randn(scm.grid_size) * .05;
-% scm.IC.dVe = conv2(scm.IC.dVe, gausswin(10) * gausswin(10)', 'same');
-dVe = 1;
-scm.D = .3;  
-                            scm.save = false;
-                            scm.visualization_rate = 10;
-                                scm.depo_block = true;
-                                scm.padding = [10 10];
-scm.duration = 60;
-                                
-                                
-scm.dimsNP = [4 4];
-                                % scm.dt = 1e-4;
-                                
-                                
-                                
-                                % Save and visualize some extra fields for testing
-                                scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi', 'K', 'Dii'};
-                                scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'dVi', 'Dii', 'map', 'state', 'GABA'};
-
-                                % Design the IW
-                                scm.expansion_rate = 0.1;  % 0.25
-scm.excitability_map(scm.excitability_map > 0) = 3;
-scm.I_drive = .3;
-% scm.Nii_b = 100;
-
-
-% Add a fixed source
-center = round( [2.2 2.2] / scm.dx );
-source_dims = round( [.2 .2] / scm.dx );
-
-[xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
-source = false(scm.grid_size);
-source(abs(xx - center(1)) <= source_dims(1) & ...
-    abs(yy - center(2)) <= source_dims(2)) = true;
-scm.source = zeros(scm.grid_size);
-scm.source(scm.excitability_map > 0) = dVe;
-scm.source(source) = dVe + 1;
-
-
-% Move the electrodes off the center
-scm.centerNP = round( [3.5 3.5] / scm.dx );
-
-
-% Add Martinet Potassium dynamics
-% % scm.IC.K = .3;
-scm.tau_dVe = 250 * 1;  % Speed up Ve reaction (with 0.8)
-scm.tau_dVi = 250 * 1;  % Speed up Vi reaction (with 0.8)
-scm.tau_dD = 200 * 50;  % slow down the changes
-
-% Adjust Dii(potassium) sigmoids
-% scm.kD_center = 0.45;
-% scm.kD_width = 0.15;
-
-scm.Nee_sc = 50;
-scm.Nei_sc = 50;
-                              
-
-scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
-
-scm.dVe = [-Inf, 1];
-scm.dVi = [-Inf, .3];
-
-
-
-% scm.IC.dVe = zeros(scm.grid_size);
-% scm.IC.dVe(scm.excitability_map > 0) = dVe;
-scm.post_ictal_source_drive = nan;
-
-
-
-% scm.Dii = [0.2 Inf];
-scm.IC.Dii = scm.D;
+scm.IC.Dii = scm.D;  % not currently dynamic... function of K
 scm.drive_style = 'inhibitory';
 % scm.IC.Dii = ndgrid(linspace(.01, .4, 50), 1:50);
 % scm.IC.Dee = scm.D/100;  % not used in Martinet formulation (always
@@ -431,7 +411,7 @@ scm.drive_style = 'inhibitory';
         function phi = theta_IW(scm)
             dy = scm.centerNP(2) - scm.stim_center(2);
             dx_ = scm.centerNP(1) - scm.stim_center(2);
-            phi(ii) = atan2(dy, dx_);
+            phi = atan2(dy, dx_);
         end
         function Run(self)
             self.CreateDirectory;
@@ -726,10 +706,17 @@ scm.drive_style = 'inhibitory';
 	
 	
 	properties  % sigmoids
-		kdVe_center = 0.8  % center of K-->dVe sigmoid  [Martinet = 0.8]
-		kdVe_width = .1  % ... and width  [Martinet = 0.8]
-		kD_center = 3e-4  % center of K-->Dii sigmoid [Martinet = .06 / .85]
-		kD_width =  5e-4  % ... and width [Martinet = .01 / .06]
+        % Don't use this style anymore. Use sigmoid_xxx instead
+        % i.e. sigmoid_xxx = [xxx_center params.xxx(2) xxx_width*4]
+        
+% 		kdVe_center = 0.8  % center of K-->dVe sigmoid  [Martinet = 0.8]
+% 		kdVe_width = .1  % ... and width  [Martinet = 0.8]
+% 		kD_center = 3e-4  % center of K-->Dii sigmoid [Martinet = .06 / .85]
+% 		kD_width =  5e-4  % ... and width [Martinet = .01 / .06]
+        
+        sigmoid_kdVe = [0.5 .7 .7/.3*4]  % [mid max slope] (slope is ~max/width*4 if you prefer to think of it that way)
+        sigmoid_kdVi = [.35 .3 .3/.1*4]
+        sigmoid_kD = [1 .3 -4]
 	end
 	
 	
@@ -795,10 +782,7 @@ scm.drive_style = 'inhibitory';
 			names = ["noise_sf", "noise_sc"];
 			noise = P.substruct(names);
 		end
-		function sigmoids = get.sigmoids(P)
-			names = ["kdVe_center", "kdVe_width", "kD_center", "kD_width"];
-			sigmoids = P.substruct(names);
-		end
+		
 		function SS = get.SS(P)
 			names = ["tau_e", "tau_i", "Ve_rev", "Vi_rev", "Ve_rest", ...
                 "Vi_rest", "rho_e", "rho_i", "gamma_e", "gamma_i", "D", ...
