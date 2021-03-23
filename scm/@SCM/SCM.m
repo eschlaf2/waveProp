@@ -84,7 +84,7 @@ classdef SCM < handle
                                 scm.noise_sc = .2;
                             case 'FS'
                                 % Generates a sim with a fixed source. Uses
-                                % [10, 10] padding and a duration of 60
+                                % [10, 10] padding and a duration of 80
                                 
                                 scm = SCM('steyn');  % no dynamics on external drives
                                 scm.label = 'FS';
@@ -179,14 +179,14 @@ classdef SCM < handle
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
 scm.sim_num = 9;
-scm.t0_start = -2;
+% scm.t0_start = -2;
 scm.IC.dVi = 0;
 scm.IC.dVe = 0;
 % scm.IC.dVe = randn(scm.grid_size) * .05;
 % scm.IC.dVe = conv2(scm.IC.dVe, gausswin(10) * gausswin(10)', 'same');
 dVe = 1;
 scm.D = .3;  
-                            scm.save = false;
+                            scm.save = true;
                             scm.visualization_rate = 10;
                                 scm.depo_block = true;
                                 scm.padding = [10 10];
