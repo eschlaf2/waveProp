@@ -103,7 +103,7 @@ classdef SCM < handle
                                 scm.visualization_rate = 0;
                                 scm.depo_block = false;
                                 scm.padding = [10 10];
-                                scm.duration = 60;
+                                scm.duration = 80;
                                 
                                 
                                 scm.dimsNP = [4 4];
@@ -161,11 +161,11 @@ classdef SCM < handle
                                 
                                 % Only simulate FS portion (i.e. update the
                                 % IC to look like after IW passage)
-                                scm.IC.Dii = .2;
-                                scm.IC.dVe = .6;
-                                scm.IC.dVi = .3;
-                                scm.IC.K = .6;
-                                scm.expansion_rate = 0;
+%                                 scm.IC.Dii = .2;
+%                                 scm.IC.dVe = .6;
+%                                 scm.IC.dVi = .3;
+%                                 scm.IC.K = .6;
+%                                 scm.expansion_rate = 0;
 
 
                             case 'IW'
@@ -256,14 +256,7 @@ scm.post_ictal_source_drive = nan;
 % scm.Dii = [0.2 Inf];
 scm.IC.Dii = scm.D;
 scm.drive_style = 'inhibitory';
-% scm.IC.Dii = ndgrid(linspace(.01, .4, 50), 1:50);
-% scm.IC.Dee = scm.D/100;  % not used in Martinet formulation (always
-% updates to Dii/100)
 
-% scm.IC.Qe = 18.47;
-% scm.IC.Qi = 32.68;
-% scm.IC.Ve = -57.71;
-% scm.IC.Vi = -58.01;
 
                             case 'wip'
                                 % Looking for a dVe/dVi pair that
@@ -425,6 +418,20 @@ scm.drive_style = 'inhibitory';
             cb = colorbar;
             set(cb, 'ticks', 0:3, 'limits', [-1 3], ...
                 'ticklabels', {'EZ', 'FS', 'IWs', 'MEA'})
+        end
+        function phi = theta_FS(scm)
+            phi = nan(size(scm.source, 3), 1);
+            for ii = 1:numel(phi)
+                [xx, yy] = find(scm.source(:, :, ii) == max(scm.source(:, :, ii), [], 'all'));
+                dy = scm.centerNP(2) - mean(yy);
+                dx_ = scm.centerNP(1) - mean(xx);
+                phi(ii) = atan2(dy, dx_);
+            end
+        end
+        function phi = theta_IW(scm)
+            dy = scm.centerNP(2) - scm.stim_center(2);
+            dx_ = scm.centerNP(1) - scm.stim_center(2);
+            phi(ii) = atan2(dy, dx_);
         end
         function Run(self)
             self.CreateDirectory;
