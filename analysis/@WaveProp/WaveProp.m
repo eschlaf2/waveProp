@@ -706,9 +706,10 @@ classdef WaveProp
 		function [reduced_data, T] = use_largest_cluster(data, position)
 			% Use the largest cluster of data points for lfp methods
 			warning('off', 'stats:clusterdata:MissingDataRemoved');
-			T = clusterdata([data(:) position], ...
-				'distance', 'seuclidean', ... % standardized euclidean distance
-				'cutoff', 1, 'criterion', 'distance');  % Separate large gaps (this distance is somewhat arbitrary right now...)
+			T = clusterdata(data(:), ...
+				'distance', 'euclidean', ... % standardized euclidean distance
+                'linkage', 'average', ...
+				'cutoff', .04, 'criterion', 'distance');  % Separate large gaps (this distance is somewhat arbitrary right now...)
 			[~, largest] = max(histcounts(T, max(T)));
 			mask = T == largest;
 			reduced_data = data;
