@@ -20,7 +20,7 @@ end
 
 %% Update
 
-if expansion_rate <= 0, map = logical(state); return; end
+if expansion_rate <= 0, map = logical(state >= 0); return; end
 
 % boundary = zeros(size(state));
 boundary = conv2(state > 0, [0 1 0; 1 -4 1; 0 1 0], 'same') > 0;
