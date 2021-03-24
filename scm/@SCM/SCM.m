@@ -20,7 +20,7 @@ classdef SCM < handle
 							switch ff
 								case "IC"
 									continue
-								case {"noise" "sigmoids" "electrodes" "bounds" "time_constants"} 
+                                case {"noise" "sigmoids" "electrodes" "bounds" "time_constants"} 
 									scm.extract(model.(ff));
 								case "K"
 									scm.potassium = model.K;
@@ -372,6 +372,9 @@ scm.excitability_map = 3 * ones(scm.grid_size);
         end
 
         
+        function clean(scm)
+            delete(sprintf('%s_%d_*.mat', scm.basename, scm.sim_num));
+        end
         function map_ = generate_map(scm)
             % Generates a linear radial distance from source map with some
             % 2D gaussian noise
@@ -622,7 +625,80 @@ scm.excitability_map = 3 * ones(scm.grid_size);
 
 	end
 
-	methods  % getters for meta
+	
+	properties (Dependent = true)
+        
+        % default subcortical fluxes
+        % %% ORIGINAL FORMULATION %%
+        % [Nee_sc,Nei_sc]= deal(50, 50)  % subcortical  
+		% phi_ee_sc = Nee_sc * Qe_max  % original [1500]
+		% phi_ei_sc = Nei_sc * Qe_max  % original [1500]
+
+        % %% EDS %%
+		phi_ee_sc
+		phi_ei_sc
+        
+		% d/dV derivatives of psi_ij weighting functions
+		d_psi_ee 
+		d_psi_ei 
+		d_psi_ie 
+		d_psi_ii 
+		
+		% Nee and Nie totals for cortico-cortical plus intracortical
+		Nee_ab
+		Nei_ab
+        
+        
+        
+        % These are here to match old parameter structures, but I think
+        % I've stopped keeping up with legacy so probably pointless
+        meta
+		model
+		electrodes
+		time_constants
+		potassium
+		noise
+		sigmoids
+		bounds
+		SS
+
+
+    end
+    
+    
+    
+	methods  % model parameter getters
+        function phi_ee_sc = get.phi_ee_sc(self)
+            phi_ee_sc = self.Nee_sc * self.Qe_max;
+        end
+        function phi_ei_sc = get.phi_ei_sc(self)
+            phi_ei_sc = self.Nei_sc * self.Qe_max;
+        end
+
+		function d_psi_ee = get.d_psi_ee(S)
+			d_psi_ee = -1./(S.Ve_rev - S.Ve_rest);
+		end
+		function d_psi_ei = get.d_psi_ei(S)
+			d_psi_ei = -1./(S.Ve_rev - S.Vi_rest);
+		end
+		function d_psi_ie = get.d_psi_ie(S)
+			d_psi_ie = -1./(S.Vi_rev - S.Ve_rest);
+		end
+		function d_psi_ii = get.d_psi_ii(S)
+			d_psi_ii = -1./(S.Vi_rev - S.Vi_rest);
+		end
+		
+		% Nee and Nie totals for cortico-cortical plus intracortical
+		function N = get.Nee_ab(S)
+            N = S.Nee_a + S.Nee_b;
+		end
+		function N = get.Nei_ab(S)
+            N = S.Nei_a + S.Nei_b;
+		end
+
+    end
+
+    methods  % getters for meta
 		
         function t0s = get.t0_start(p)
             if isempty(p.t0_start), p.t0_start = -p.padding(1); end
@@ -668,79 +744,6 @@ scm.excitability_map = 3 * ones(scm.grid_size);
 		
 	end
 	
-	
-	
-	properties (Dependent = true)
-        
-        % default subcortical fluxes
-        % %% ORIGINAL FORMULATION %%
-        % [Nee_sc,Nei_sc]= deal(50, 50)  % subcortical  
-		% phi_ee_sc = Nee_sc * Qe_max  % original [1500]
-		% phi_ei_sc = Nei_sc * Qe_max  % original [1500]
-
-        % %% EDS %%
-		phi_ee_sc
-		phi_ei_sc
-        
-		% d/dV derivatives of psi_ij weighting functions
-		d_psi_ee 
-		d_psi_ei 
-		d_psi_ie 
-		d_psi_ii 
-		
-		% Nee and Nie totals for cortico-cortical plus intracortical
-		Nee_ab
-		Nei_ab
-        
-        
-        
-        % These are here to match old parameter structures, but I think
-        % I've stopped keeping up with legacy so probably pointless
-        meta
-		model
-		electrodes
-		time_constants
-		potassium
-		noise
-		sigmoids
-		bounds
-		SS
-
-
-	end
-	methods
-        function phi_ee_sc = get.phi_ee_sc(self)
-            phi_ee_sc = self.Nee_sc * self.Qe_max;
-        end
-        function phi_ei_sc = get.phi_ei_sc(self)
-            phi_ei_sc = self.Nei_sc * self.Qe_max;
-        end
-
-		function d_psi_ee = get.d_psi_ee(S)
-			d_psi_ee = -1./(S.Ve_rev - S.Ve_rest);
-		end
-		function d_psi_ei = get.d_psi_ei(S)
-			d_psi_ei = -1./(S.Ve_rev - S.Vi_rest);
-		end
-		function d_psi_ie = get.d_psi_ie(S)
-			d_psi_ie = -1./(S.Vi_rev - S.Ve_rest);
-		end
-		function d_psi_ii = get.d_psi_ii(S)
-			d_psi_ii = -1./(S.Vi_rev - S.Vi_rest);
-		end
-		
-		% Nee and Nie totals for cortico-cortical plus intracortical
-		function N = get.Nee_ab(S)
-            N = S.Nee_a + S.Nee_b;
-		end
-		function N = get.Nei_ab(S)
-            N = S.Nei_a + S.Nei_b;
-		end
-
-	end
-
-
-	
 
 	methods  % electrodes
 		function center = get.centerNP(P)
@@ -757,7 +760,6 @@ scm.excitability_map = 3 * ones(scm.grid_size);
 		end
 		
 	end
-	
 	
 	
 	methods  % dependent getters
