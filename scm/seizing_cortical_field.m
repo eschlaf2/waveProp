@@ -374,9 +374,16 @@ EC = rmfield(EC, no_return);
                 % makes it easier to modulate dVi with K+ if you want to do
                 % that. Inhibitory collapse is applied here, however.
                 if time(ii) > 0 
-                    [new.map, new.state] = update_map_smooth( ...
-                        last.state, M.expansion_rate * dt / dx, ...
-                        M.excitability_map, dt);
+                    if isempty(params.map)
+                        [new.map, new.state] = update_map_smooth( ...
+                            last.state, M.expansion_rate * dt / dx, ...
+                            M.excitability_map, dt);
+                    else
+                        new.map = ...
+                            params.map > time(ii) - params.excitability_map & ...
+                            params.map <= time(ii);
+                        new.state = time(ii) - params.map;
+                    end
                     
                     % Inhibitory collapse
 % affected = 4 < new.state & new.state < 5;

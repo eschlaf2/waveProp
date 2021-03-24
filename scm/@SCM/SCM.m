@@ -153,6 +153,7 @@ classdef SCM < handle
 
                                 scm.IC.Dii = scm.D;
                                 scm.drive_style = 'inhibitory';
+                                scm.map = scm.generate_map;
                                 
                                 
                                 % Only simulate FS portion (i.e. update the
@@ -180,16 +181,15 @@ classdef SCM < handle
                                 scm.dx = 0.1;
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
-scm.sim_num = 0;
-% scm.t0_start = -2;
-scm.IC.dVi = 0;
-scm.IC.dVe = 0;
-dVe = 1;
-                            scm.save = true;
-                            scm.visualization_rate = 0;
+                                scm.sim_num = 0;
+                                scm.IC.dVi = 0;
+                                scm.IC.dVe = 0;
+                                dVe = 1;
+                                scm.save = true;
+                                scm.visualization_rate = 0;
                                 scm.depo_block = true;
                                 scm.padding = [10 10];
-scm.duration = 60;
+                                scm.duration = 60;
                                 
                                 
                                 % scm.dt = 1e-4;
@@ -202,38 +202,39 @@ scm.duration = 60;
 
                                 % Design the IW
                                 scm.expansion_rate = 0.1;  % 0.25
-scm.excitability_map(scm.excitability_map > 0) = 3;
-scm.I_drive = .3;
-% scm.Nii_b = 100;
+                                scm.excitability_map(scm.excitability_map > 0) = 3;
+                                scm.I_drive = .3;
+                                % scm.Nii_b = 100;
 
 
-% Add a fixed source
-center = round( [2.2 2.2] / scm.dx );
-source_dims = round( [.2 .2] / scm.dx );
+                                % Add a fixed source
+                                center = round( [2.2 2.2] / scm.dx );
+                                source_dims = round( [.2 .2] / scm.dx );
 
-[xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
-source = false(scm.grid_size);
-source(abs(xx - center(1)) <= source_dims(1) & ...
-    abs(yy - center(2)) <= source_dims(2)) = true;
-scm.source = zeros(scm.grid_size);
-scm.source(scm.excitability_map > 0) = dVe;
-scm.source(source) = dVe + 1;
-
-
-% Move the electrodes off the center
-scm.centerNP = round( [3.5 3.5] / scm.dx );
+                                [xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
+                                source = false(scm.grid_size);
+                                source(abs(xx - center(1)) <= source_dims(1) & ...
+                                    abs(yy - center(2)) <= source_dims(2)) = true;
+                                scm.source = zeros(scm.grid_size);
+                                scm.source(scm.excitability_map > 0) = dVe;
+                                scm.source(source) = dVe + 1;
 
 
-% Potassium is dynamic but dV*, Dii have sigmoid response functions            
+                                % Move the electrodes off the center
+                                scm.centerNP = round( [3.5 3.5] / scm.dx );
 
-scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
 
-scm.dVe = [-Inf, Inf]; % limits are naturally imposed with sigmoid functions
-scm.dVi = [-Inf, Inf];
+                                % Potassium is dynamic but dV*, Dii have sigmoid response functions            
 
-scm.post_ictal_source_drive = nan;
+                                scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
 
-scm.drive_style = 'inhibitory';
+                                scm.dVe = [-Inf, Inf]; % limits are naturally imposed with sigmoid functions
+                                scm.dVi = [-Inf, Inf];
+
+                                scm.post_ictal_source_drive = nan;
+
+                                scm.drive_style = 'inhibitory';
+                                scm.map = scm.generate_map;
 
 
                             case 'wip'
@@ -327,6 +328,8 @@ scm.drive_style = 'inhibitory';
 % scm.IC.Vi = -58.01;
 
 
+scm.map = scm.generate_map;
+
                                 
                                 
                             otherwise
@@ -352,16 +355,41 @@ scm.drive_style = 'inhibitory';
 %             end
             if isempty(P.IC), P.IC = []; end  % set default IC
 			P.IC = P.IC.resize(P.grid_size);
-			if all(P.stim_center)
+			if all(P.stim_center) && isempty(P.map)
 				P.IC.map = false(P.grid_size);  % Source of ictal activity (on/off)
                 if all(P.stim_center > 0)
                     P.IC.map(P.stim_center(1), P.stim_center(2)) = 1;
                 end
                 P.IC.state = double(P.IC.map) - 1;  % Seizure state (ictal/non-ictal)
-			end
+            elseif ~isempty(P.map)
+                P.IC.map = ...
+                    P.map > P.t0_start - P.excitability_map ...
+                    & P.map <= P.t0_start;
+                P.IC.state = P.t0_start - P.map;
+            end
+            
         end
 
         
+        function map_ = generate_map(scm)
+            % Generates a linear radial distance from source map with some
+            % 2D gaussian noise
+            [xx, yy] = find(ones(scm.grid_size));
+            xx = xx - scm.stim_center(1);
+            yy = yy - scm.stim_center(2);
+
+            T = reshape( ...
+                scm.expansion_rate / scm.dx * sqrt(xx.^2 + yy.^2), ...
+                scm.grid_size);
+
+            noise_ = randn(size(T)) * 2;
+            f_smooth = round(.5/scm.dx);
+            win = gausswin(f_smooth) * gausswin(f_smooth)';
+            map_ = T + conv2(noise_, win./sum(win, 'all'), 'same');
+            map_(map_ < 0) = 0;
+%             map_(~scm.excitability_map) = Inf;
+
+        end
         function rotate(self, theta), self.Rotate(theta); end  % legacy
         function inds = NPinds(scm)
 
@@ -413,6 +441,7 @@ scm.drive_style = 'inhibitory';
             self.RunSimulation;
             self.ConvertToMea;
         end
+        
 
 		Rotate(self, theta)
         CreateDirectory(self)
@@ -431,7 +460,12 @@ scm.drive_style = 'inhibitory';
         K_movie
     end
 	
-	properties  % meta
+	properties  
+        
+        
+        map  % a predetermined map. Generate this if the IW is independent of the rest of the sim
+        
+        % meta
 		basename
 		sim_num
 		save = true  % Save output
@@ -452,32 +486,8 @@ scm.drive_style = 'inhibitory';
 		label (1,:) char = 'SCM'
 		t0  % used to keep track of progress in sims 
         drive_style (1,:) char = 'excitatory'  % Allow inhibitory driving (EDS, 1/26/21)
-	end
-
-	methods  % getters for meta
-		
-        function t0s = get.t0_start(p)
-            if isempty(p.t0_start), p.t0_start = -p.padding(1); end
-            t0s = p.t0_start;
-        end
-		
-		
-		
-		function num = get.sim_num(P)
-			s = 1;
-			while isempty(P.sim_num)
-				if isempty(dir([P.basename '_' num2str(s) '*.mat']))
-					P.sim_num = s; 
-				end
-				s = s+1;
-			end
-			num = P.sim_num;
-		end
-		
-	end
-	
-	
-	properties  % model
+        
+        % model
 		stim_center (1,2) = [20 20]
 		grid_size (1,2) {mustBePositive} = [50 50] % size of grid to simulate (must be even)
 		dt = 2e-4
@@ -485,34 +495,9 @@ scm.drive_style = 'inhibitory';
 		expansion_rate (1,1) double {mustBeNonnegative} = .625  % in cm^2/s; set to 0 for fixed source
 		excitability_map  % boundary to IW spread
 		IC SCMState 
-
-	end
-	methods  % model
-
-		function dt = get.dt(P)
-			if P.dt > 2e-4 && (any(P.IC.Dii(:) >= 0.87) || P.SS.v(:) > 140)
-				P.dt = 2e-4;
-				warning('High Dii or SS.v; setting dt to 2e-4.');
-			end
-			dt = P.dt;
-
-		end
-		function grid_size = get.grid_size(p)
-			if any(mod(p.grid_size, 2)), p.grid_size = p.grid_size + mod(p.grid_size, 2); end
-			grid_size = p.grid_size;
-		end
-		function map = get.excitability_map(P)
-			if isempty(P.excitability_map)
-				P.excitability_map = P.DefaultExcitabilityMap; 
-			end
-            map = P.excitability_map;
-
-			assert(all(size(map) == P.grid_size))
-		end
-	end
-	
-	
-	properties  % steady states
+        
+        
+        % steady states
 		tau_e = 0.04  % excit neuron time-constant (/s) [original = 0.04 s, Martinet = 0.02 s]
 		tau_i = 0.04  % inhib neuron time-constant (/s) [original = 0.04 s, Martinet = 0.02 s]
 
@@ -557,8 +542,133 @@ scm.drive_style = 'inhibitory';
 		v = 280  % [original = 140 cm/s]
 
 		% inverse-length scale for connectivity (/cm)
-		Lambda = 4.0			
-	end 
+		Lambda = 4.0	
+        
+        
+        % time_constants
+		tau_dD = 200  %inhibitory gap junction time-constant (/s).
+		tau_dVe = 250  %excitatory population resting voltage time-constant (/s).
+		tau_dVi = 250  %inhibitory population resting voltage time-constant (/s).
+        
+        
+        % potassium
+		tau_K = 200    %time-constant (/s).
+		k_decay = 0.1  %decay rate (/s).
+		kD = 1       %diffusion coefficient (cm^2/s).
+		KtoVe = 10     %impact on excitatory population resting voltage.
+		KtoVi = 10     %impact on inhibitory population resting voltage.
+		KtoD = -50    %impact on inhibitory gap junction strength.
+		kR = 0.15   %scale reaction term. 
+
+		% Potassium excitability function
+		k_peak = .5  % K concentration at which voltage offset is greatest
+		k_width = .1  % Width of K concentration peak
+
+		
+        % electrodes
+		centerNP  % defaults to grid center
+		dimsNP = [10 10]
+
+		% Macroscale
+		centerEC  % defaults to grid center
+		scaleEC = 4
+		dimsEC = [3 3]
+        
+        
+        % bounds
+		Dee (1,2) double = [-Inf Inf]  % i <--> i gap-junction diffusive-coupling strength (cm^2)
+		Dii (1,2) double = [.009 Inf]  % The inhibitory gap junctions cannot pass below a minimum value of 0.009 / dx^2.
+		K (1,2) double = [-Inf 1] % extracellular potassium concentration (cm^2)
+        GABA (1, 2) double = [-Inf Inf]  % GABA
+		Qe (1,2) double = [0 Inf]  % Activity of excitatory population.
+		Qi (1,2) double = [0 Inf]  % Activity of inhibitory population.
+		Ve (1,2) double = [-Inf Inf]  % Voltage  of excitatory population.
+		Vi (1,2) double = [-Inf Inf]  % Voltage of inhibitory population.
+		dVe (1,2) double = [-Inf 1.5]  % Excitatory resting potential offset (mV)
+		dVi (1,2) double = [-Inf 0.8]  % Inhibitory resting potential offset (mV)
+		Phi_ee (1,2) double = [-Inf Inf]  % e <--> e synaptic flux
+		Phi_ei (1,2) double = [-Inf Inf]  % e <--> i synaptic flux
+		Phi_ie (1,2) double = [-Inf Inf] % i <--> e synaptic flux
+		Phi_ii (1,2) double = [-Inf Inf]  % i <--> i synaptic flux
+		phi2_ee (1,2) double = [-Inf Inf]  % Wave dynamics
+		phi2_ei (1,2) double = [-Inf Inf]
+		phi_ee (1,2) double = [-Inf Inf]
+		phi_ei (1,2) double = [-Inf Inf]
+		F_ee (1,2) double = [-Inf Inf]  % flux dynamics
+		F_ei (1,2) double = [-Inf Inf]
+		F_ie (1,2) double = [-Inf Inf]
+		F_ii (1,2) double = [-Inf Inf]
+
+        
+        
+        % noise
+		noise_sf (1,1) double {mustBeNonnegative} = 4  % [Martinet = 2]
+		noise_sc (1,1) double {mustBeNonnegative} = 0.2;
+        
+        
+        % sigmoids
+        % Don't use this style anymore. Use sigmoid_xxx instead
+        % i.e. sigmoid_xxx = [xxx_center params.xxx(2) xxx_width*4]
+        
+% 		kdVe_center = 0.8  % center of K-->dVe sigmoid  [Martinet = 0.8]
+% 		kdVe_width = .1  % ... and width  [Martinet = 0.8]
+% 		kD_center = 3e-4  % center of K-->Dii sigmoid [Martinet = .06 / .85]
+% 		kD_width =  5e-4  % ... and width [Martinet = .01 / .06]
+        
+        sigmoid_kdVe = [0.5 .7 .7/.3*4]  % [mid max slope] (slope is ~max/width*4 if you prefer to think of it that way)
+        sigmoid_kdVi = [.35 .3 .3/.1*4]
+        sigmoid_kD = [1 .3 -4]
+
+	end
+
+	methods  % getters for meta
+		
+        function t0s = get.t0_start(p)
+            if isempty(p.t0_start), p.t0_start = -p.padding(1); end
+            t0s = p.t0_start;
+        end
+		
+		
+		
+		function num = get.sim_num(P)
+			s = 1;
+			while isempty(P.sim_num)
+				if isempty(dir([P.basename '_' num2str(s) '*.mat']))
+					P.sim_num = s; 
+				end
+				s = s+1;
+			end
+			num = P.sim_num;
+        end
+        
+        
+        % model
+
+		function dt = get.dt(P)
+			if P.dt > 2e-4 && (any(P.IC.Dii(:) >= 0.87) || P.SS.v(:) > 140)
+				P.dt = 2e-4;
+				warning('High Dii or SS.v; setting dt to 2e-4.');
+			end
+			dt = P.dt;
+
+		end
+		function grid_size = get.grid_size(p)
+			if any(mod(p.grid_size, 2)), p.grid_size = p.grid_size + mod(p.grid_size, 2); end
+			grid_size = p.grid_size;
+		end
+		function map = get.excitability_map(P)
+			if isempty(P.excitability_map)
+				P.excitability_map = P.DefaultExcitabilityMap; 
+			end
+            map = P.excitability_map;
+
+			assert(all(size(map) == P.grid_size))
+		end
+		
+	end
+	
+	
+	
 	properties (Dependent = true)
         
         % default subcortical fluxes
@@ -580,6 +690,21 @@ scm.drive_style = 'inhibitory';
 		% Nee and Nie totals for cortico-cortical plus intracortical
 		Nee_ab
 		Nei_ab
+        
+        
+        
+        % These are here to match old parameter structures, but I think
+        % I've stopped keeping up with legacy so probably pointless
+        meta
+		model
+		electrodes
+		time_constants
+		potassium
+		noise
+		sigmoids
+		bounds
+		SS
+
 
 	end
 	methods
@@ -615,40 +740,7 @@ scm.drive_style = 'inhibitory';
 
 
 	
-	properties  % time_constants
-		tau_dD = 200  %inhibitory gap junction time-constant (/s).
-		tau_dVe = 250  %excitatory population resting voltage time-constant (/s).
-		tau_dVi = 250  %inhibitory population resting voltage time-constant (/s).
-	end
-	
-	
-	properties  % potassium
-		tau_K = 200    %time-constant (/s).
-		k_decay = 0.1  %decay rate (/s).
-		kD = 1       %diffusion coefficient (cm^2/s).
-		KtoVe = 10     %impact on excitatory population resting voltage.
-		KtoVi = 10     %impact on inhibitory population resting voltage.
-		KtoD = -50    %impact on inhibitory gap junction strength.
-		kR = 0.15   %scale reaction term. 
 
-		% Potassium excitability function
-		k_peak = .5  % K concentration at which voltage offset is greatest
-		k_width = .1  % Width of K concentration peak
-
-		
-	end
-	
-	
-	properties % electrodes
-		centerNP  % defaults to grid center
-		dimsNP = [10 10]
-
-		% Macroscale
-		centerEC  % defaults to grid center
-		scaleEC = 4
-		dimsEC = [3 3]
-	end
-	
 	methods  % electrodes
 		function center = get.centerNP(P)
             if isempty(P.centerNP)
@@ -665,54 +757,6 @@ scm.drive_style = 'inhibitory';
 		
 	end
 	
-	
-	properties % bounds
-		
-		Dee (1,2) double = [-Inf Inf]  % i <--> i gap-junction diffusive-coupling strength (cm^2)
-		Dii (1,2) double = [.009 Inf]  % The inhibitory gap junctions cannot pass below a minimum value of 0.009 / dx^2.
-		K (1,2) double = [-Inf 1] % extracellular potassium concentration (cm^2)
-        GABA (1, 2) double = [-Inf Inf]  % GABA
-		Qe (1,2) double = [0 Inf]  % Activity of excitatory population.
-		Qi (1,2) double = [0 Inf]  % Activity of inhibitory population.
-		Ve (1,2) double = [-Inf Inf]  % Voltage  of excitatory population.
-		Vi (1,2) double = [-Inf Inf]  % Voltage of inhibitory population.
-		dVe (1,2) double = [-Inf 1.5]  % Excitatory resting potential offset (mV)
-		dVi (1,2) double = [-Inf 0.8]  % Inhibitory resting potential offset (mV)
-		Phi_ee (1,2) double = [-Inf Inf]  % e <--> e synaptic flux
-		Phi_ei (1,2) double = [-Inf Inf]  % e <--> i synaptic flux
-		Phi_ie (1,2) double = [-Inf Inf] % i <--> e synaptic flux
-		Phi_ii (1,2) double = [-Inf Inf]  % i <--> i synaptic flux
-		phi2_ee (1,2) double = [-Inf Inf]  % Wave dynamics
-		phi2_ei (1,2) double = [-Inf Inf]
-		phi_ee (1,2) double = [-Inf Inf]
-		phi_ei (1,2) double = [-Inf Inf]
-		F_ee (1,2) double = [-Inf Inf]  % flux dynamics
-		F_ei (1,2) double = [-Inf Inf]
-		F_ie (1,2) double = [-Inf Inf]
-		F_ii (1,2) double = [-Inf Inf]
-
-	end
-	
-	
-	properties % noise
-		noise_sf (1,1) double {mustBeNonnegative} = 4  % [Martinet = 2]
-		noise_sc (1,1) double {mustBeNonnegative} = 0.2;
-	end
-	
-	
-	properties  % sigmoids
-        % Don't use this style anymore. Use sigmoid_xxx instead
-        % i.e. sigmoid_xxx = [xxx_center params.xxx(2) xxx_width*4]
-        
-% 		kdVe_center = 0.8  % center of K-->dVe sigmoid  [Martinet = 0.8]
-% 		kdVe_width = .1  % ... and width  [Martinet = 0.8]
-% 		kD_center = 3e-4  % center of K-->Dii sigmoid [Martinet = .06 / .85]
-% 		kD_width =  5e-4  % ... and width [Martinet = .01 / .06]
-        
-        sigmoid_kdVe = [0.5 .7 .7/.3*4]  % [mid max slope] (slope is ~max/width*4 if you prefer to think of it that way)
-        sigmoid_kdVi = [.35 .3 .3/.1*4]
-        sigmoid_kD = [1 .3 -4]
-	end
 	
 	
 	methods  % dependent getters
@@ -791,19 +835,6 @@ scm.drive_style = 'inhibitory';
 		end
 	end
 	
-	properties (Dependent = true)
-
-		meta
-		model
-		electrodes
-		time_constants
-		potassium
-		noise
-		sigmoids
-		bounds
-		SS
-
-	end
 	
 	%% Static methods
 	methods (Static)
