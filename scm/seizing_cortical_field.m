@@ -392,7 +392,7 @@ EC = rmfield(EC, no_return);
 % SS.Nie_b = Nia_fun(new.state - 1);
 % SS.Nii_b = SS.Nie_b;
 % SS.Qi_max = double(~affected) * 60 + double(affected) * 20;
-SS.Qi_max = 60 - 40 * gaussian_(new.state, 4.5, .5);
+SS.Qi_max = 60 - 40 * gaussian_(new.state, 4, .5);
 % Nie_affected = 2 < new.state & new.state < 4.5;
 % SS.Vi_rev = double(~Nie_affected) * -15 + -55;
 % SS.Vi_rev = rescale(new.GABA, -70, -55, 'InputMin', 0, 'inputmax', 1);
@@ -453,7 +453,7 @@ SS.Qi_max = 60 - 40 * gaussian_(new.state, 4.5, .5);
     end
 
     function y = gaussian_(x, mu, sigma)
-        y = exp(-(x - mu).^2 / (2 * sigma.^2));
+        y = exp(-(x - mu).^2 ./ (2 .* sigma.^2));
     end
 
 % e-to-e reversal-potential weighting function
