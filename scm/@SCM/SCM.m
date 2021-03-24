@@ -106,8 +106,6 @@ classdef SCM < handle
                                 scm.duration = 80;
                                 
                                 
-                                scm.dimsNP = [4 4];
-                                
                                 
                                 % Save and visualize some extra fields for testing
                                 scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi', 'K', 'Dii'};
@@ -194,7 +192,6 @@ dVe = 1;
 scm.duration = 60;
                                 
                                 
-scm.dimsNP = [4 4];
                                 % scm.dt = 1e-4;
                                 
                                 
@@ -357,8 +354,10 @@ scm.drive_style = 'inhibitory';
 			P.IC = P.IC.resize(P.grid_size);
 			if all(P.stim_center)
 				P.IC.map = false(P.grid_size);  % Source of ictal activity (on/off)
-				P.IC.map(P.stim_center(1), P.stim_center(2)) = 1;
-				P.IC.state = double(P.IC.map) - 1;  % Seizure state (ictal/non-ictal)
+                if all(P.stim_center > 0)
+                    P.IC.map(P.stim_center(1), P.stim_center(2)) = 1;
+                end
+                P.IC.state = double(P.IC.map) - 1;  % Seizure state (ictal/non-ictal)
 			end
         end
 
