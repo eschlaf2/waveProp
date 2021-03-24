@@ -40,7 +40,7 @@ classdef SCM < handle
                     if nargin == 1
                         mdl = validatestring(varargin{1}, ...
                             {'steyn-ross', 'martinet', 'wip', ...
-                            'draft_Idriven', 'FS', 'IW'});
+                            'draft_Idriven', 'FS', 'SW', 'IW'});
                         switch mdl
                             case 'steyn-ross'
                                 scm = scm.init();
@@ -169,6 +169,12 @@ classdef SCM < handle
 %                                 scm.IC.dVi = .3;
 %                                 scm.IC.K = .6;
 %                                 scm.expansion_rate = 0;
+
+                            case 'SW'
+                                scm = SCM('FS');
+                                temp = scm.source;
+                                scm.rotate(pi/2);
+                                scm.source = cat(3, scm.source, temp);
 
 
                             case 'IW'
@@ -417,14 +423,18 @@ scm.excitability_map = 3 * ones(scm.grid_size);
         end
         function show_layout(scm)
             X = zeros(scm.grid_size);
-            X(scm.source == max(scm.source, [], 'all')) = 1;
-            X(scm.stim_center(1), scm.stim_center(2)) = 2;
-            X(scm.NPinds) = 3;
+            
+            X(scm.stim_center(1), scm.stim_center(2)) = 1;
+            X(scm.NPinds) = 2;
+            for ii = 1:size(scm.source, 3)
+                temp = scm.source(:, :, ii);
+                X(temp == max(temp, [], 'all')) = ii + 2;
+            end
             X(~scm.excitability_map) = -1;
             figure; imagesc(X);
             cb = colorbar;
-            set(cb, 'ticks', 0:3, 'limits', [-1 3], ...
-                'ticklabels', {'EZ', 'FS', 'IWs', 'MEA'})
+            set(cb, 'ticks', 0:3, 'limits', [-1 ii+2], ...
+                'ticklabels', {'EZ', 'IWs', 'MEA', 'FS'})
         end
         function phi = theta_FS(scm)
             phi = nan(size(scm.source, 3), 1);
