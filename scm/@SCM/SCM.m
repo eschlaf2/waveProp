@@ -271,7 +271,7 @@ scm.dimsNP = [4 4];
 
                                 % Design the IW
                                 scm.expansion_rate = 0.1;  % 0.25
-scm.excitability_map(scm.excitability_map > 0) = 3;
+% scm.excitability_map(scm.excitability_map > 0) = 3;
 scm.I_drive = .3;
 % scm.Nii_b = 100;
 
@@ -318,6 +318,7 @@ scm.post_ictal_source_drive = nan;
 % scm.Dii = [0.2 Inf];
 scm.IC.Dii = scm.D;  % not currently dynamic... function of K
 scm.drive_style = 'inhibitory';
+scm.excitability_map = 3 * ones(scm.grid_size);
 % scm.IC.Dii = ndgrid(linspace(.01, .4, 50), 1:50);
 % scm.IC.Dee = scm.D/100;  % not used in Martinet formulation (always
 % updates to Dii/100)
@@ -328,7 +329,7 @@ scm.drive_style = 'inhibitory';
 % scm.IC.Vi = -58.01;
 
 
-scm.map = scm.generate_map;
+% scm.map = scm.generate_map;
 
                                 
                                 
@@ -615,8 +616,8 @@ scm.map = scm.generate_map;
 % 		kD_center = 3e-4  % center of K-->Dii sigmoid [Martinet = .06 / .85]
 % 		kD_width =  5e-4  % ... and width [Martinet = .01 / .06]
         
-        sigmoid_kdVe = [0.5 .7 .7/.3*4]  % [mid max slope] (slope is ~max/width*4 if you prefer to think of it that way)
-        sigmoid_kdVi = [.35 .3 .3/.1*4]
+        sigmoid_kdVe = [0.5 .7 10]  % [mid max slope] (slope is ~max/width*4 if you prefer to think of it that way)
+        sigmoid_kdVi = [.5 .3 10]
         sigmoid_kD = [1 .3 -4]
 
 	end
