@@ -153,7 +153,6 @@ classdef SCM < handle
 
                                 scm.IC.Dii = scm.D;
                                 scm.drive_style = 'inhibitory';
-                                scm.map = scm.generate_map;
                                 
                                 
                                 % Only simulate FS portion (i.e. update the
@@ -242,7 +241,7 @@ classdef SCM < handle
                                 scm.post_ictal_source_drive = nan;
 
                                 scm.drive_style = 'inhibitory';
-                                scm.map = scm.generate_map;
+                                
 
 
                             case 'wip'
