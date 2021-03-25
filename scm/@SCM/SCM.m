@@ -172,6 +172,8 @@ classdef SCM < handle
 
                             case 'SW'
                                 scm = SCM('FS');
+                                scm.label = 'SW';
+                                scm.basename = 'SCM/SW/SW';
                                 temp = scm.source;
                                 scm.rotate(pi/2);
                                 scm.source = cat(3, scm.source, temp);
