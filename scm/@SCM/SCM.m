@@ -40,7 +40,7 @@ classdef SCM < handle
                     if nargin == 1
                         mdl = validatestring(varargin{1}, ...
                             {'steyn-ross', 'martinet', 'wip', ...
-                            'draft_Idriven', 'FS', 'SW', 'IW'});
+                            'FS', 'SW', 'IW'});
                         switch mdl
                             case 'steyn-ross'
                                 scm = scm.init();
@@ -162,7 +162,6 @@ classdef SCM < handle
 %                                 scm.IC.dVi = .3;
 %                                 scm.IC.K = .6;
 %                                 scm.expansion_rate = 0;
-
                             case 'SW'
                                 scm = SCM('FS');
                                 scm.label = 'SW';
@@ -170,7 +169,6 @@ classdef SCM < handle
                                 temp = scm.source;
                                 scm.rotate(pi/2);
                                 scm.source = cat(3, scm.source, temp);
-
 
                             case 'IW'
                                 % This is the sim that shows up in the last
@@ -228,7 +226,6 @@ classdef SCM < handle
                                 scm.post_ictal_source_drive = nan;
 
                                 scm.drive_style = 'inhibitory';
-                                
 
 
                             case 'wip'
@@ -298,13 +295,7 @@ scm.centerNP = round( [3.5 3.5] / scm.dx );
 
 scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
 
-% scm.dVe = [-Inf, .7];  % built into sigmoids
-% scm.dVi = [-Inf, .3];
 
-
-
-% scm.IC.dVe = zeros(scm.grid_size);
-% scm.IC.dVe(scm.excitability_map > 0) = dVe;
 scm.post_ictal_source_drive = nan;
 
 
@@ -475,9 +466,6 @@ scm.depo_block = false;
         Preview(self)
 	end
     
-    methods (Access = private)
-        map = DefaultExcitabilityMap(P)
-    end
     properties (Access = private)
         Qe_movie
         Ve_movie
@@ -529,6 +517,9 @@ scm.depo_block = false;
         sigmoid_kdVe = [0.5 .7 10]  % [mid max slope] (slope is ~max/width*4 if you prefer to think of it that way)
         sigmoid_kdVi = [.5 .3 10]
         sigmoid_kD = [1 .3 -4]
+        
+        
+        
         
     end
     
@@ -735,7 +726,23 @@ scm.depo_block = false;
                         state, em + scm.Qi_collapse(2), scm.Qi_collapse(3));
             end 
         end
+        function map = get.excitability_map(P)
+			if isempty(P.excitability_map)
+                [ix, iy] = ind2sub(P.grid_size, 1:prod(P.grid_size));
+                R = floor(P.grid_size / 2 - 3);
+                C = P.grid_size / 2;
+                map = zeros(P.grid_size);
+                ellipse = sum( ([ix' iy'] - C).^2 ./ R.^2, 2 ) < 1;
+                map(ellipse) = .5;
+                P.excitability_map = map;
+			end
+            map = P.excitability_map;
+
+			assert(all(size(map) == P.grid_size))
+		end
+
     end
+    
 	methods  % original model parameter getters
         function phi_ee_sc = get.phi_ee_sc(self)
             phi_ee_sc = self.Nee_sc * self.Qe_max;
@@ -766,15 +773,12 @@ scm.depo_block = false;
 		end
 
     end
-
-    methods  % getters for meta
+    methods  % getters for convenience/setup
 		
         function t0s = get.t0_start(p)
             if isempty(p.t0_start), p.t0_start = -p.padding(1); end
             t0s = p.t0_start;
-        end
-		
-		
+        end		
 		
 		function num = get.sim_num(P)
 			s = 1;
@@ -786,9 +790,6 @@ scm.depo_block = false;
 			end
 			num = P.sim_num;
         end
-        
-        
-        % model
 
 		function dt = get.dt(P)
 			if P.dt > 2e-4 && (any(P.IC.Dii(:) >= 0.87) || P.SS.v(:) > 140)
@@ -802,20 +803,7 @@ scm.depo_block = false;
 			if any(mod(p.grid_size, 2)), p.grid_size = p.grid_size + mod(p.grid_size, 2); end
 			grid_size = p.grid_size;
 		end
-		function map = get.excitability_map(P)
-			if isempty(P.excitability_map)
-				P.excitability_map = P.DefaultExcitabilityMap; 
-			end
-            map = P.excitability_map;
-
-			assert(all(size(map) == P.grid_size))
-		end
-		
-	end
-	
-
-	methods  % electrodes
-		function center = get.centerNP(P)
+        function center = get.centerNP(P)
             if isempty(P.centerNP)
 				P.centerNP = round(P.grid_size / 2); 
             end
@@ -829,6 +817,9 @@ scm.depo_block = false;
 		end
 		
 	end
+	
+
+	
 	
 	
 	methods  % dependent getters
