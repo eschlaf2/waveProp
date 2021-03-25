@@ -36,40 +36,29 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %---------------------------------------------------------------------
-function [NP, EC, time, last, fig] = seizing_cortical_field(~, time_end, IC, fig, params)
+function [NP, EC, time, last, fig] = seizing_cortical_field(~, time_end, IC, fig, scm)
 
 %% Preferences and parameters
-if ~exist('params', 'var') || isempty(params), params = SCMParams; end
-
-PM = params.meta;
-try PK = params.potassium; catch, PK = params.K; end
-M = params.model;
-PE = params.electrodes;
-PT = params.time_constants;
-PN = params.noise;
-SS = params.SS;
-MX = params.bounds;
-
-% OF = params.offsets;  % Consider moving dVe here here...
+if ~exist('scm', 'var') || isempty(scm), scm = SCM; end
 
 %% A few convenience variables
 
-Nx = M.grid_size(1);
-Ny = M.grid_size(2);
-dx = M.dx;
-dt = M.dt;
+Nx = scm.grid_size(1);
+Ny = scm.grid_size(2);
+dx = scm.dx;
+dt = scm.dt;
 
 % initialize random number generator (from input argument)
-rand_state = abs(1e3*PM.sim_num + round(params.t0));
+rand_state = abs(1e3*scm.sim_num + round(scm.t0));
 rng(rand_state, 'v5normal');
 
 % number of time-steps for simulation
 Nsteps = round(time_end / dt);
-time = ( 0 : Nsteps - 1 )' * dt + params.t0;
+time = ( 0 : Nsteps - 1 )' * dt + scm.t0;
 
 % noise-amplitude coefficients for subcortical flux (note 1/sqrt(dt) factor)
-B_ee = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ee_sc / dt);
-B_ei = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ei_sc / dt);
+B_ee = scm.noise_sf .* sqrt(scm.noise_sc .* scm.phi_ee_sc / dt);
+B_ei = scm.noise_sf .* sqrt(scm.noise_sc .* scm.phi_ei_sc / dt);
 
 % % wave equation coefficients (as implemented in original Steyn-Ross sim)
 % VLdt = SS.v * SS.Lambda * dt;
@@ -82,11 +71,11 @@ B_ei = PN.noise_sf .* sqrt(PN.noise_sc .* SS.phi_ei_sc / dt);
 
 % Some are visualized, some are returned.
 
-out_vars = PM.out_vars;
+out_vars = scm.out_vars;
 
 % Indices to capture from larger grid for NP and EC
-indsNP = get_inds_(M.grid_size, PE.centerNP, PE.dimsNP, 1);
-indsEC = get_inds_(M.grid_size, PE.centerEC, PE.dimsEC, PE.scaleEC);
+indsNP = get_inds_(scm.grid_size, scm.centerNP, scm.dimsNP, 1);
+indsEC = get_inds_(scm.grid_size, scm.centerEC, scm.dimsEC, scm.scaleEC);
 
 % Initialize electrode output variables (structs NP, EC)
 get_electrode_values;
@@ -132,7 +121,7 @@ for ii = 1:Nsteps
 end
 
 % Return requested variables.
-no_return = out_vars(~ismember(out_vars, PM.return_fields));
+no_return = out_vars(~ismember(out_vars, scm.return_fields));
 NP = rmfield(NP, no_return);
 EC = rmfield(EC, no_return);
 
@@ -145,19 +134,19 @@ EC = rmfield(EC, no_return);
         new.phi2_ee = ...
 			last.phi2_ee ...
 			+ dt * ( ...
-				-2 * SS.v .* SS.Lambda .* last.phi2_ee ...
-				- (SS.v .* SS.Lambda).^2 .* last.phi_ee ...
-				+ (SS.v .* SS.Lambda).^2 .* last.Qe...
+				-2 * scm.v .* scm.Lambda .* last.phi2_ee ...
+				- (scm.v .* scm.Lambda).^2 .* last.phi_ee ...
+				+ (scm.v .* scm.Lambda).^2 .* last.Qe...
 			) ...
-			+ dt * (SS.v / dx)^2 * del2_(last.phi_ee);
+			+ dt * (scm.v / dx)^2 * del2_(last.phi_ee);
 		 
 		new.phi2_ei = last.phi2_ei ...
 			+ dt * ( ...
-				- 2*SS.v .* SS.Lambda .* last.phi2_ei ...
-				- (SS.v .* SS.Lambda).^2 .* last.phi_ei ...
-				+ (SS.v .* SS.Lambda).^2 .* last.Qe...
+				- 2*scm.v .* scm.Lambda .* last.phi2_ei ...
+				- (scm.v .* scm.Lambda).^2 .* last.phi_ei ...
+				+ (scm.v .* scm.Lambda).^2 .* last.Qe...
 			) ...
-			+ dt * (SS.v / dx)^2 * del2_(last.phi_ei);
+			+ dt * (scm.v / dx)^2 * del2_(last.phi_ei);
 							 
 		new.phi_ee = last.phi_ee + dt * new.phi2_ee;
 		new.phi_ei = last.phi_ei + dt * new.phi2_ei;
@@ -179,12 +168,12 @@ EC = rmfield(EC, no_return);
 
 	%%%% E-to-E %%%%
 		new.F_ee = last.F_ee ...
-			+ dt * SS.gamma_e.^2 * ( ...
-				- 2 / SS.gamma_e * last.F_ee ...
+			+ dt * scm.gamma_e.^2 * ( ...
+				- 2 / scm.gamma_e * last.F_ee ...
 				- last.Phi_ee ...
-				+ SS.Nee_a * last.phi_ee ...  % long range
-				+ SS.Nee_b * last.Qe ...      % short range
-				+ PN.noise_sc .* SS.phi_ee_sc ... % subcortical (tonic)
+				+ scm.Nee_a * last.phi_ee ...  % long range
+				+ scm.Nee_b * last.Qe ...      % short range
+				+ scm.noise_sc .* scm.phi_ee_sc ... % subcortical (tonic)
 				+ B_ee .* randn(Nx, Ny) ...       % subcortical (random)
 			);
 		
@@ -192,12 +181,12 @@ EC = rmfield(EC, no_return);
 
 	%%%% E-to-I %%%%
 		new.F_ei = last.F_ei ...
-			+ dt * SS.gamma_e.^2 * ( ...
-				- 2 / SS.gamma_e * last.F_ei ...
+			+ dt * scm.gamma_e.^2 * ( ...
+				- 2 / scm.gamma_e * last.F_ei ...
 				- last.Phi_ei ...
-				+ SS.Nei_a * last.phi_ei ...    %long range
-				+ SS.Nei_b * last.Qe ...   %short range
-				+ PN.noise_sc .* SS.phi_ei_sc ...    %subcortical (tonic)
+				+ scm.Nei_a * last.phi_ei ...    %long range
+				+ scm.Nei_b * last.Qe ...   %short range
+				+ scm.noise_sc .* scm.phi_ei_sc ...    %subcortical (tonic)
 				+ B_ei .* randn(Nx, Ny)...   %subcortical (random)
 			);
 		
@@ -205,20 +194,20 @@ EC = rmfield(EC, no_return);
 
 	%%%% I-to-E %%%%
 		new.F_ie = last.F_ie ...
-			+ dt * SS.gamma_i.^2 * ( ...
-				- 2 / SS.gamma_i * last.F_ie ...
+			+ dt * scm.gamma_i.^2 * ( ...
+				- 2 / scm.gamma_i * last.F_ie ...
 				- last.Phi_ie ...
-				+ SS.Nie_b .* last.Qi ...     %short range
+				+ scm.Nie_b .* last.Qi ...     %short range
 			);
 		
 		new.Phi_ie = last.Phi_ie + dt * new.F_ie;
 
 	%%%% I-to-I %%%%
 		new.F_ii = last.F_ii ...
-			+ dt * SS.gamma_i.^2 * ( ...
-				- 2 / SS.gamma_i * last.F_ii ...
+			+ dt * scm.gamma_i.^2 * ( ...
+				- 2 / scm.gamma_i * last.F_ii ...
 				- last.Phi_ii ...
-				+ SS.Nii_b .* last.Qi ...  %short range
+				+ scm.Nii_b .* last.Qi ...  %short range
 			);
 		new.Phi_ii = last.Phi_ii + dt * new.F_ii;
 
@@ -226,23 +215,23 @@ EC = rmfield(EC, no_return);
 
 % 3. update the soma voltages
 	function update_soma_voltages
-        which_source = mod(floor(time(ii) / 2), size(PM.source, 3)) + 1;
+        which_source = mod(floor(time(ii) / 2), size(scm.source, 3)) + 1;
 		new.Ve = last.Ve ...
-			+ dt / SS.tau_e * ( ...
-				(SS.Ve_rest - last.Ve) ...
+			+ dt / scm.tau_e * ( ...
+				(scm.Ve_rest - last.Ve) ...
 				+ last.dVe ...
-                + double(PM.source(:, :, which_source) * (time(ii) >=0 & time(ii) < params.duration)) + ...
-                - double(new.map * (time(ii) >=0)) .* params.I_drive + ...
-				+ SS.rho_e * Psi_ee(last.Ve) .* last.Phi_ee ...      %E-to-E
-                + SS.rho_i * Psi_ie(last.Ve) .* last.Phi_ie ...      %I-to-E
+                + double(scm.source(:, :, which_source) * (time(ii) >=0 & time(ii) < scm.duration)) + ...
+                - double(new.map * (time(ii) >=0)) .* scm.I_drive + ...
+				+ scm.rho_e * Psi_ee(last.Ve) .* last.Phi_ee ...      %E-to-E
+                + scm.rho_i * Psi_ie(last.Ve) .* last.Phi_ie ...      %I-to-E
 				+ last.Dee/dx^2 .* del2_(last.Ve) ...
 			);
 		new.Vi = last.Vi ...
-			+ dt / SS.tau_i * ( ...
-				(SS.Vi_rest - last.Vi) ...
-				+ last.dVi + 0*double(new.map * (time(ii) >=0)) .* params.I_drive + ...
-				+ SS.rho_e * Psi_ei(last.Vi) .* last.Phi_ei ...      %E-to-I
-				+ SS.rho_i * Psi_ii(last.Vi) .* last.Phi_ii ...      %I-to-I
+			+ dt / scm.tau_i * ( ...
+				(scm.Vi_rest - last.Vi) ...
+				+ last.dVi + 0*double(new.map * (time(ii) >=0)) .* scm.I_drive + ...
+				+ scm.rho_e * Psi_ei(last.Vi) .* last.Phi_ei ...      %E-to-I
+				+ scm.rho_i * Psi_ii(last.Vi) .* last.Phi_ii ...      %I-to-I
 				+ last.Dii/dx^2 .* del2_(last.Vi) ...
 			);
 	end
@@ -251,26 +240,21 @@ EC = rmfield(EC, no_return);
 	function update_firing_rates
 		
 		new.Qe = ...
-			SS.Qe_max .* ( ...
+			scm.Qe_max .* ( ...
 				1 ./ ( 1 + ...
-					exp(-pi / ( sqrt(3) * SS.sigma_e ) .* ( last.Ve - SS.theta_e )) ...
+					exp(-pi / ( sqrt(3) * scm.sigma_e ) .* ( last.Ve - scm.theta_e )) ...
 				) ...
-			) + 0 * max((last.Ve + 50) * .1, 0); % No depo block on excitatory cells ...     %The E voltage must be big enough,
-% 			- SS.depo_block * SS.Qe_max * ( ...
-% 				1 ./ ( 1 + ...
-% 					exp(-pi / ( sqrt(3) * SS.sigma_e ) .* ( last.Ve - ( SS.theta_e + 30 ) )) ...
-% 				) ...
-% 			);   %... but not too big.
+			) ; % No depo block on excitatory cells 
 			
 		new.Qi = ...
-            SS.Qi_max .* ( ...
+            scm.Qi_max_fun(new.state) .* ( ...
                 1 ./ (1 + ...
-                    exp(-pi / ( sqrt(3) * SS.sigma_i ) .* ( last.Vi - SS.theta_i )) ...
+                    exp(-pi / ( sqrt(3) * scm.sigma_i ) .* ( last.Vi - scm.theta_i )) ...
                 ) ...
             ) ...     %The I voltage must be big enough,
-            - SS.depo_block * SS.Qi_max .* ( ...
+            - scm.depo_block * scm.Qi_max_fun(new.state) .* ( ...
                 1 ./ ( 1 + ...
-                    exp(-pi / ( sqrt(3) * 3 ) .* ( last.Vi - ( SS.theta_i + 10 ) )) ...
+                    exp(-pi / ( sqrt(3) * 3 ) .* ( last.Vi - ( scm.theta_i + 10 ) )) ...
                 ) ...
             );   %... but not too big.
 
@@ -282,11 +266,11 @@ EC = rmfield(EC, no_return);
         FR = last.Qe + last.Qi;
 		new.K = ...
 			last.K ...
-			+ dt / PK.tau_K .* ( ...
-				- PK.k_decay .* last.K ...  % decay term.
-				+ PK.kR .* ...              % reaction term.
+			+ dt / scm.tau_K .* ( ...
+				- scm.k_decay .* last.K ...  % decay term.
+				+ scm.kR .* ...              % reaction term.
 					FR ./ ( 1 + exp( -FR + 15) ) ...
-                + PK.kD ./ dx^2 * del2_(last.K) ...  % diffusion term.
+                + scm.kD ./ dx^2 * del2_(last.K) ...  % diffusion term.
 			);
         
         new.GABA = ...  % chloride?
@@ -316,25 +300,19 @@ EC = rmfield(EC, no_return);
    
 	function update_gap_resting
        
-        if 0  % original Martinet formulation
-            new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
-            new.Dee = new.Dii/100; 
-            new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* last.K );
-            new.dVi = last.dVi + dt / PT.tau_dVi .* ( PK.KtoVi .* last.K );
+        switch scm.gap_resting_update
+            case 'dynamic'
+                new.Dii = last.Dii + dt / scm.tau_dD * ( scm.KtoD .* last.K );
+                new.Dee = new.Dii/100; 
+                new.dVe = last.dVe + dt / scm.tau_dVe .* ( scm.KtoVe .* last.K );
+                new.dVi = last.dVi + dt / scm.tau_dVi .* ( scm.KtoVi .* last.K );
             
-        elseif 1  % Dii ~ sigmoid(K); contant voltage offsets
-            new.Dii = sigmoid_(last.K, params.sigmoid_kD);
-            new.Dee = new.Dii / 100;
-            new.dVe = sigmoid_(last.K, params.sigmoid_kdVe);
-            new.dVi = sigmoid_(last.K, params.sigmoid_kdVi);
+            case 'sigmoid' % Dii ~ sigmoid(K); contant voltage offsets
+                new.Dii = scm.sigmoid(last.K, scm.sigmoid_kD);
+                new.Dee = new.Dii / 100;
+                new.dVe = scm.sigmoid(last.K, scm.sigmoid_kdVe);
+                new.dVi = scm.sigmoid(last.K, scm.sigmoid_kdVi);
             
-        else  % messing with high inhibition ring
-            new.Dii = last.Dii + dt / PT.tau_dD * ( PK.KtoD .* last.K );
-            new.Dee = new.Dii/100; 
-%             new.Dee = last.Dee;
-            new.dVe = last.dVe + dt / PT.tau_dVe .* ( PK.KtoVe .* last.K );
-            [new.dVi, new.dVe] = dVi(time(ii), M.grid_size, new.dVe);
-%             new.dVe(params.excitability_map == 0) = 0;
         end
 	end
 
@@ -343,8 +321,8 @@ EC = rmfield(EC, no_return);
 		
 		for f = fieldnames(last)'
 			f = f{:}; %#ok<FXSET>
-			if ismember(f, {'map', 'state'}) || all(isinf(MX.(f))), continue, end
-			last.(f) = min(max(last.(f), MX.(f)(1)), MX.(f)(2));
+			if ismember(f, {'map', 'state'}) || all(isinf(scm.(f))), continue, end
+			last.(f) = min(max(last.(f), scm.(f)(1)), scm.(f)(2));
 		end
 		
 	end
@@ -352,20 +330,20 @@ EC = rmfield(EC, no_return);
 % Update source and expand wavefront
 	function update_drive
         
-        switch PM.drive_style
+        switch scm.drive_style
             case {'', 'excitatory'}
                 if time(ii) > 0 
                     [new.map, new.state] = update_map_smooth( ...
-                        last.state, M.expansion_rate * dt / dx, ...
-                        M.excitability_map, dt);
-                    if time(ii) <= PM.duration
-                        new.dVe(new.map) = PM.source_drive; 
-                        if isempty(PM.source), return, end
-                        which_source = mod(floor(time(ii) / 2), size(PM.source, 3)) + 1;
-                        new.dVe(PM.source(:, :, which_source)) = PM.source_drive;
+                        last.state, scm.expansion_rate * dt / dx, ...
+                        scm.excitability_map, dt);
+                    if time(ii) <= scm.duration
+                        new.dVe(new.map) = scm.source_drive; 
+                        if isempty(scm.source), return, end
+                        which_source = mod(floor(time(ii) / 2), size(scm.source, 3)) + 1;
+                        new.dVe(scm.source(:, :, which_source)) = scm.source_drive;
                     else
-                        if isnan(PM.post_ictal_source_drive), return; end			
-                        new.dVe(new.map) = PM.post_ictal_source_drive;
+                        if isnan(scm.post_ictal_source_drive), return; end			
+                        new.dVe(new.map) = scm.post_ictal_source_drive;
                     end
                 end
                 
@@ -375,28 +353,16 @@ EC = rmfield(EC, no_return);
                 % makes it easier to modulate dVi with K+ if you want to do
                 % that. Inhibitory collapse is applied here, however.
                 if time(ii) > 0 
-                    if isempty(params.map)
+                    if isempty(scm.map)
                         [new.map, new.state] = update_map_smooth( ...
-                            last.state, M.expansion_rate * dt / dx, ...
-                            M.excitability_map, dt);
+                            last.state, scm.expansion_rate * dt / dx, ...
+                            scm.excitability_map, dt);
                     else
                         new.map = ...
-                            params.map > time(ii) - params.excitability_map & ...
-                            params.map <= time(ii);
-                        new.state = time(ii) - params.map;
+                            scm.map > time(ii) - scm.excitability_map & ...
+                            scm.map <= time(ii);
+                        new.state = time(ii) - scm.map;
                     end
-                    
-                    % Inhibitory collapse
-% affected = 4 < new.state & new.state < 5;
-% SS.Nie_b = double(~Nie_affected) * 500 + 100;
-% SS.Nii_b = double(~Nie_affected) * 500 + 100;
-% SS.Nie_b = Nia_fun(new.state - 1);
-% SS.Nii_b = SS.Nie_b;
-% SS.Qi_max = double(~affected) * 60 + double(affected) * 20;
-SS.Qi_max = 60 - 40 * gaussian_(new.state, 4, .5);
-% Nie_affected = 2 < new.state & new.state < 4.5;
-% SS.Vi_rev = double(~Nie_affected) * -15 + -55;
-% SS.Vi_rev = rescale(new.GABA, -70, -55, 'InputMin', 0, 'inputmax', 1);
                     
                 end
             otherwise
@@ -411,28 +377,28 @@ SS.Qi_max = 60 - 40 * gaussian_(new.state, 4, .5);
 		
 		if ~exist('NP', 'var')  % Initialize
 			for v = union(out_vars, {'Qe', 'Ve'})
-				NP.(v{:}) = zeros([Nsteps, PE.dimsNP], 'single');  % Microscale
-				EC.(v{:}) = zeros([Nsteps, PE.dimsEC], 'single');  % Macroscale
+				NP.(v{:}) = zeros([Nsteps, scm.dimsNP], 'single');  % Microscale
+				EC.(v{:}) = zeros([Nsteps, scm.dimsEC], 'single');  % Macroscale
 			end
 		else  % ... or store
 			for v = union(out_vars, {'Qe', 'Ve'})
-				NP.(v{:})(ii, :, :) = reshape(last.(v{:})(indsNP), [1, PE.dimsNP]); 
+				NP.(v{:})(ii, :, :) = reshape(last.(v{:})(indsNP), [1, scm.dimsNP]); 
 				
 				% Take the local mean for ECOG electrodes
 				blurEC = conv2(last.(v{:}), ones(3) ./ 9, 'same');  
-				EC.(v{:})(ii, :, :) = reshape(blurEC(indsEC), [1, PE.dimsEC]);
+				EC.(v{:})(ii, :, :) = reshape(blurEC(indsEC), [1, scm.dimsEC]);
 			end
 		end
 	end
 
 % Visualize results
 	function visualize
-		if PM.visualization_rate > 0
+		if scm.visualization_rate > 0
 			if ~exist('fig', 'var') || isempty(fig)
-				fig = create_fig_(out_vars, M.grid_size, indsNP, indsEC);
-                ss = mkdir(sprintf('SCM/%s/vids/%s_%d/', params.label, params.label, PM.sim_num));
+				fig = create_fig_(out_vars, scm.grid_size, indsNP, indsEC);
+                ss = mkdir(sprintf('SCM/%s/vids/%s_%d/', scm.label, scm.label, scm.sim_num));
 			end
-			if diff(floor((time(ii) - [dt 0]) * PM.visualization_rate))
+			if diff(floor((time(ii) - [dt 0]) * scm.visualization_rate))
 				for sp = 1:numel(fig.ih)
 					set(fig.ih(sp), 'cdata', last.(out_vars{sp}))
 					colorbar
@@ -441,7 +407,7 @@ SS.Qi_max = 60 - 40 * gaussian_(new.state, 4, .5);
 				set(fig.ah, 'string', sprintf('T = %0.3f', time(ii)));
 				drawnow;
                 im = frame2im(getframe(fig.fig));
-                imwrite(im, sprintf('SCM/%s/vids/%s_%d/%0.4f.png', params.label, params.label, PM.sim_num, time(ii)));
+                imwrite(im, sprintf('SCM/%s/vids/%s_%d/%0.4f.png', scm.label, scm.label, scm.sim_num, time(ii)));
                 
 			end
 		end
@@ -449,32 +415,24 @@ SS.Qi_max = 60 - 40 * gaussian_(new.state, 4, .5);
 
 %% Nested weighting functions
 
-    function y = sigmoid_(x, p)
-        y = p(2) ./ (1 + exp(-p(3) * (x - p(1))));
-    end
-
-    function y = gaussian_(x, mu, sigma)
-        y = exp(-(x - mu).^2 ./ (2 .* sigma.^2));
-    end
-
 % e-to-e reversal-potential weighting function
 	function weight = Psi_ee(V)
-		weight = (SS.Ve_rev - V)./abs(SS.Ve_rev - SS.Ve_rest);
+		weight = (scm.Ve_rev - V)./abs(scm.Ve_rev - scm.Ve_rest);
 	end
 
 % e-to-i reversal-potential weighting function
 	function weight = Psi_ei(V)
-		weight = (SS.Ve_rev - V)./abs(SS.Ve_rev - SS.Vi_rest);
+		weight = (scm.Ve_rev - V)./abs(scm.Ve_rev - scm.Vi_rest);
 	end
 
 % i-to-e reversal-potential weighting function
 	function weight = Psi_ie(V)
-		weight = -(SS.Vi_rev - V)./max(abs(SS.Vi_rev - SS.Ve_rest), 1);
+		weight = -(scm.Vi_rev - V)./max(abs(scm.Vi_rev - scm.Ve_rest), 1);
 	end
 
 % i-to-i reversal potential weighting function
 	function weight = Psi_ii(V)
-		weight = -(SS.Vi_rev - V)./max(abs(SS.Vi_rev - SS.Vi_rest), 1);
+		weight = -(scm.Vi_rev - V)./max(abs(scm.Vi_rev - scm.Vi_rest), 1);
 	end
 
 end

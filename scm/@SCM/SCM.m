@@ -70,6 +70,7 @@ classdef SCM < handle
                                 scm.save = true;
                                 scm.dx = .3;
                                 scm.source_drive = 3;
+                                scm.gap_resting_update = 'dynamic';
                                 
                                 [xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
                                 source = false(scm.grid_size);
@@ -92,9 +93,6 @@ classdef SCM < handle
                                 scm.dx = 0.1;
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
-
-                                scm.IC.dVi = 0;
-                                scm.IC.dVe = 0;
 
                                 dVe = 1;
                                 scm.D = .3;  
@@ -143,10 +141,6 @@ classdef SCM < handle
                                 % Add an IW source
                                 scm.stim_center = round( [1.5 3.5] / scm.dx );  % 4.6 is edge
 
-                                % Bound dVe/dVi
-                                scm.dVe = [-Inf, 1];
-                                scm.dVi = [-Inf, .3];
-
                                 % No post ictal drive
                                 scm.post_ictal_source_drive = nan;
 
@@ -189,18 +183,12 @@ classdef SCM < handle
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
                                 scm.sim_num = 0;
-                                scm.IC.dVi = 0;
-                                scm.IC.dVe = 0;
                                 dVe = 1;
                                 scm.save = true;
                                 scm.visualization_rate = 0;
                                 scm.depo_block = true;
                                 scm.padding = [10 10];
-                                scm.duration = 60;
-                                
-                                
-                                % scm.dt = 1e-4;
-                                
+                                scm.duration = 60;                                
                                 
                                 
                                 % Save and visualize some extra fields for testing
@@ -211,7 +199,6 @@ classdef SCM < handle
                                 scm.expansion_rate = 0.1;  % 0.25
                                 scm.excitability_map(scm.excitability_map > 0) = 3;
                                 scm.I_drive = .3;
-                                % scm.Nii_b = 100;
 
 
                                 % Add a fixed source
@@ -254,8 +241,8 @@ classdef SCM < handle
                                 scm.grid_size = round( [5 5] / scm.dx);
 scm.sim_num = 9;
 scm.t0_start = -2;
-scm.IC.dVi = 0;
-scm.IC.dVe = 0;
+% scm.IC.dVi = 0; % doesn't have an effect with sigmoids
+% scm.IC.dVe = 0;
 % scm.IC.dVe = randn(scm.grid_size) * .05;
 % scm.IC.dVe = conv2(scm.IC.dVe, gausswin(10) * gausswin(10)', 'same');
 dVe = 1;
@@ -263,7 +250,7 @@ scm.D = .35;
                             scm.save = true;
                             scm.visualization_rate = 10;
                                 scm.depo_block = true;
-                                scm.padding = [10 10];
+                                scm.padding = [2 10];
 scm.duration = 60;
                                 
                                 
@@ -335,6 +322,18 @@ scm.excitability_map = 3 * ones(scm.grid_size);
 % scm.IC.Ve = -57.71;
 % scm.IC.Vi = -58.01;
 
+scm.dVe = [-Inf Inf];
+scm.dVi = [-inf inf];
+
+% Looking at relationship between dVe & dVi
+% scm.sigmoid_kdVe(2) = 5;
+% scm.sigmoid_kdVi(2) = 5;
+% scm.sigmoid_kD(2) = .3;
+% scm.plot_sigmoids
+% scm.IC.K = .36;
+
+scm.depo_block = false;
+
 
 % scm.map = scm.generate_map;
 
@@ -379,6 +378,16 @@ scm.excitability_map = 3 * ones(scm.grid_size);
         end
 
         
+        
+        function plot_sigmoids(scm, x)
+            if nargin < 2, x = linspace(0, 2, 100); end
+            figure; ax = axes(figure, 'nextplot', 'add');
+            for ff = {'sigmoid_kdVe', 'sigmoid_kdVi', 'sigmoid_kD'}
+                y = scm.sigmoid(x, scm.(ff{:}));
+                plot(ax, x, y, 'displayname', ff{1}(9:end))
+            end
+            legend(ax)
+        end
         function clean(scm)
             delete(sprintf('%s_%d_*.mat', scm.basename, scm.sim_num));
         end
@@ -475,11 +484,55 @@ scm.excitability_map = 3 * ones(scm.grid_size);
         K_movie
     end
 	
-	properties  
+	properties  % updates
         
         
-        map  % a predetermined map. Generate this if the IW is independent of the rest of the sim
+        % A predetermined IW map. Generate this if the IW is independent of
+        % the rest of the sim. It should be a grid of recruitment times. I
+        % tried using this with a t:=Cr function (with 2D gaussian noise;
+        % see <SCM.generate_map>) and the recruitment pattern looked pretty
+        % good, but the smoothness of it made it so no TW formed after the
+        % IW until the FS was inside the recruited region
+        map  
         
+        % Parameters for the inhibitory collapse portion of the IW. The
+        % model assumes an increase in inhibition (depression of dVe)
+        % followed by inhibitory collapse, modeled here as a drop in the
+        % max inhibitory firing rate. 
+        %     Used in: SCM.Qi_max_fun
+        %     Elements: 
+        %       drop: the amount by which the firing rate decreases
+        %       offset: time (s) of peak drop relative to duration of dVe depression
+        %       width: sd of gaussian used to model the drop 
+        % 
+        Qi_collapse = [40 1 .5]  % [drop, offset, width]
+        
+        
+        % SIGMOIDS
+        % Change dV* and Dii from dynamic functions of [K+]o to direction
+        % sigmoid response functions. The dynamic functions had no
+        % decrease so dV*/Dii were changing exponentially with K+. I like
+        % the idea of a direct (logistic function sigmoid) relationship
+        % better. I think the hypothesis is the K+ drives changes in
+        % voltage (and gap junction/ephaptic coupling) directly, rather
+        % than changing the rate of change of these functions? 
+        %
+        % Don't use xxx_center/xxx_width style anymore. Use sigmoid_xxx instead
+        % i.e. sigmoid_xxx = [xxx_center params.xxx(2) xxx_width*4]
+        
+% 		kdVe_center = 0.8  % center of K-->dVe sigmoid  [Martinet = 0.8]
+% 		kdVe_width = .1  % ... and width  [Martinet = 0.8]
+% 		kD_center = 3e-4  % center of K-->Dii sigmoid [Martinet = .06 / .85]
+% 		kD_width =  5e-4  % ... and width [Martinet = .01 / .06]
+        
+        gap_resting_update {mustBeMember(gap_resting_update,{'sigmoid','dynamic'})} = 'sigmoid'
+        sigmoid_kdVe = [0.5 .7 10]  % [mid max slope] (slope is ~max/width*4 if you prefer to think of it that way)
+        sigmoid_kdVi = [.5 .3 10]
+        sigmoid_kD = [1 .3 -4]
+        
+    end
+    
+    properties  % original-ish
         % meta
 		basename
 		sim_num
@@ -621,19 +674,7 @@ scm.excitability_map = 3 * ones(scm.grid_size);
 		noise_sc (1,1) double {mustBeNonnegative} = 0.2;
         
         
-        % sigmoids
-        % Don't use this style anymore. Use sigmoid_xxx instead
-        % i.e. sigmoid_xxx = [xxx_center params.xxx(2) xxx_width*4]
         
-% 		kdVe_center = 0.8  % center of K-->dVe sigmoid  [Martinet = 0.8]
-% 		kdVe_width = .1  % ... and width  [Martinet = 0.8]
-% 		kD_center = 3e-4  % center of K-->Dii sigmoid [Martinet = .06 / .85]
-% 		kD_width =  5e-4  % ... and width [Martinet = .01 / .06]
-        
-        sigmoid_kdVe = [0.5 .7 10]  % [mid max slope] (slope is ~max/width*4 if you prefer to think of it that way)
-        sigmoid_kdVi = [.5 .3 10]
-        sigmoid_kD = [1 .3 -4]
-
 	end
 
 	
@@ -677,8 +718,25 @@ scm.excitability_map = 3 * ones(scm.grid_size);
     end
     
     
-    
-	methods  % model parameter getters
+    methods  % Emily parameter functions
+        
+        function qm = Qi_max_fun(scm, state)
+            % Model of inhibitory collapse. Max inhibitory firing rate
+            % collapses following an inverse gaussian (this was chosen
+            % only because it gives a smooth drop and recovery; no proposed
+            % relation to mechanism). 
+            if nargin < 2  % if no state is given, return Qi_max
+                qm = scm.Qi_max;
+            else  % else update Qi_max relative to IW state
+                em = scm.excitability_map;
+                em(em <= 0) = -inf;
+                qm = scm.Qi_max ...
+                    - scm.Qi_collapse(1) * scm.gaussian( ...
+                        state, em + scm.Qi_collapse(2), scm.Qi_collapse(3));
+            end 
+        end
+    end
+	methods  % original model parameter getters
         function phi_ee_sc = get.phi_ee_sc(self)
             phi_ee_sc = self.Nee_sc * self.Qe_max;
         end
@@ -852,7 +910,13 @@ scm.excitability_map = 3 * ones(scm.grid_size);
 	
 	%% Static methods
 	methods (Static)
-		
+		function y = sigmoid(x, p)
+            y = p(2) ./ (1 + exp(-p(3) * (x - p(1))));
+        end
+
+        function y = gaussian(x, mu, sigma)
+            y = exp(-(x - mu).^2 ./ (2 .* sigma.^2));
+        end
 		function center = get_center(center, dims, grid_size)
 			% (Static) center = get_center(center, dims, grid_size) 
 			if isempty(center)
