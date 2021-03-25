@@ -215,21 +215,26 @@ EC = rmfield(EC, no_return);
 
 % 3. update the soma voltages
 	function update_soma_voltages
-        which_source = mod(floor(time(ii) / 2), size(scm.source, 3)) + 1;
+        
+        if strcmpi(scm.drive_style, 'inhibitory')
+            FS = scm.fixed_source(time(ii));
+            IW = -scm.I_drive .* double(new.map * (time(ii) >=0));
+        else  % excitatory drive style implements these in the dVe parameter
+            [FS, IW] = deal(0);
+        end
+
 		new.Ve = last.Ve ...
 			+ dt / scm.tau_e * ( ...
 				(scm.Ve_rest - last.Ve) ...
-				+ last.dVe ...
-                + double(scm.source(:, :, which_source) * (time(ii) >=0 & time(ii) < scm.duration)) + ...
-                - double(new.map * (time(ii) >=0)) .* scm.I_drive + ...
-				+ scm.rho_e * Psi_ee(last.Ve) .* last.Phi_ee ...      %E-to-E
+				+ last.dVe + FS + IW ...                              % offsets from K+, FS, and IW
+                + scm.rho_e * Psi_ee(last.Ve) .* last.Phi_ee ...      %E-to-E
                 + scm.rho_i * Psi_ie(last.Ve) .* last.Phi_ie ...      %I-to-E
 				+ last.Dee/dx^2 .* del2_(last.Ve) ...
 			);
 		new.Vi = last.Vi ...
 			+ dt / scm.tau_i * ( ...
 				(scm.Vi_rest - last.Vi) ...
-				+ last.dVi + 0*double(new.map * (time(ii) >=0)) .* scm.I_drive + ...
+				+ last.dVi + ...                                      % offset from K+
 				+ scm.rho_e * Psi_ei(last.Vi) .* last.Phi_ei ...      %E-to-I
 				+ scm.rho_i * Psi_ii(last.Vi) .* last.Phi_ii ...      %I-to-I
 				+ last.Dii/dx^2 .* del2_(last.Vi) ...
@@ -273,7 +278,10 @@ EC = rmfield(EC, no_return);
                 + scm.kD ./ dx^2 * del2_(last.K) ...  % diffusion term.
 			);
         
-        new.GABA = ...  % chloride?
+        
+        % This is not interacting with anything right now. Just thinking
+        % about adding another ingredient to the sauce.
+        new.GABA = ...  % chloride? 
 			last.GABA ...
 			+ dt / .1 .* ( ...
 				- 1 .* last.GABA ...  % decay term.
@@ -332,6 +340,9 @@ EC = rmfield(EC, no_return);
         
         switch scm.drive_style
             case {'', 'excitatory'}
+                % Make sure I_drive and Qi_collapse are set to 0, nan or
+                % else those will still show up in the voltage updates. 
+                % Works with the Martinet FS parameters.
                 if time(ii) > 0 
                     [new.map, new.state] = update_map_smooth( ...
                         last.state, scm.expansion_rate * dt / dx, ...
@@ -353,14 +364,14 @@ EC = rmfield(EC, no_return);
                 % makes it easier to modulate dVi with K+ if you want to do
                 % that. Inhibitory collapse is applied here, however.
                 if time(ii) > 0 
-                    if isempty(scm.map)
+                    if isempty(scm.map)  % if no pregenerated map, do an update
                         [new.map, new.state] = update_map_smooth( ...
                             last.state, scm.expansion_rate * dt / dx, ...
                             scm.excitability_map, dt);
                     else
                         new.map = ...
-                            scm.map > time(ii) - scm.excitability_map & ...
-                            scm.map <= time(ii);
+                            scm.map > time(ii) - scm.excitability_map ...
+                            & scm.map <= time(ii);
                         new.state = time(ii) - scm.map;
                     end
                     
@@ -442,6 +453,7 @@ end
 
 
 function [offset_i, offset_e] = dVi(t, gs, dVe)
+    % Hack-y circular ring type IW
     if t < 0, offset_i = zeros(gs); offset_e = dVe; return; end
     WIDTH = 1;  % I think WIDTH probably needs to be at least Lambda to prevent excitatory transmission from inner to outer
     RATE = 1;  % in dx/s (so if dx = .1 cm, this is in mm/s)

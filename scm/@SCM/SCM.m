@@ -65,6 +65,9 @@ classdef SCM < handle
                                 scm.sim_num = 1;
                                 scm.padding = [5 10];
                                 scm.out_vars = {'Qe', 'Ve', 'Qi', 'Vi', 'Dii', 'K'};
+                                scm.drive_style = 'excitatory';
+                                scm.I_drive = 0;
+                                scm.Qi_collapse = nan;
                                 
                                 scm.visualization_rate = 0;
                                 scm.save = true;
@@ -369,7 +372,21 @@ scm.depo_block = false;
         end
 
         
-        
+        function fs = fixed_source(scm, t)
+            % Get the voltage offset for the fixed source at time t
+            % If there are multiple fixed sources, rotate through them
+            % every W seconds.
+            W = 2;
+            which_source = mod(floor(t / W), size(scm.source, 3)) + 1;
+            if t >=0 && t < scm.duration
+                fs = scm.source(:, :, which_source);
+            else
+                fs = zeros(scm.grid_size);
+                if ~isnan(scm.post_ictal_source_drive)
+                    fs = fs + scm.post_ictal_source_drive;
+                end
+            end
+        end
         function plot_sigmoids(scm, x)
             if nargin < 2, x = linspace(0, 2, 100); end
             figure; ax = axes(figure, 'nextplot', 'add');
@@ -519,7 +536,25 @@ scm.depo_block = false;
         sigmoid_kD = [1 .3 -4]
         
         
+        % Defines the amount of time the IW spends on each electrode.
+        % Specifically, defines the length of time (in seconds) that there
+        % is a change to dVe during the IW. Additionally, the timing of the
+        % inhibitory collapse is based on this as well (with an additional
+        % offset parameter)
+        excitability_map  % boundary to IW spread
         
+        
+        % Create an inhibitory IW. 
+        drive_style (1,:) char = 'inhibitory'  % Allow inhibitory driving (EDS, 1/26/21)
+        I_drive (1, 1) double = .7  % Allow inhibitory driving (EDS, 1/26/21)
+        post_ictal_I_drive (1, 1) double = nan  % Allow inhibitory driving (EDS, 1/26/21)
+        
+        
+        % For simplicity, remove (for now) the depolarization block
+        % function that was added in Martinet. With this parameter set, the
+        % voltages never get high enough for it to take effect. Maybe look
+        % into this more later.
+        depo_block = 0  % apply depolarization block
         
     end
     
@@ -535,8 +570,6 @@ scm.depo_block = false;
 		padding (1,2) = [10 10]  % Padding before and after seizure
 		source_drive (1, 1) double = 2.5
 		post_ictal_source_drive (1,1) double = 1.5
-        I_drive (1, 1) double = .7  % Allow inhibitory driving (EDS, 1/26/21)
-        post_ictal_I_drive (1, 1) double = nan  % Allow inhibitory driving (EDS, 1/26/21)
 		subsample (1,1) double {mustBePositive} = Inf  % Allow downsampling when creating mea
 		return_fields (1,:) = {'Qe', 'Ve'}  % Qe required to make mea
 		out_vars (1,:) = {'Qe', 'Ve'}  % Define which variables you would like to visualize (can be any in IC)
@@ -544,7 +577,6 @@ scm.depo_block = false;
 % 		seed = rng  % Set seed for repeatability
 		label (1,:) char = 'SCM'
 		t0  % used to keep track of progress in sims 
-        drive_style (1,:) char = 'excitatory'  % Allow inhibitory driving (EDS, 1/26/21)
         
         % model
 		stim_center (1,2) = [20 20]
@@ -552,7 +584,6 @@ scm.depo_block = false;
 		dt = 2e-4
 		dx = .4  % (cm) 
 		expansion_rate (1,1) double {mustBeNonnegative} = .625  % in cm^2/s; set to 0 for fixed source
-		excitability_map  % boundary to IW spread
 		IC SCMState 
         
         
@@ -584,7 +615,6 @@ scm.depo_block = false;
 		theta_i = -58.5
 		sigma_e = 3.0	% sigmoid 'width' (mV)
 		sigma_i = 5.0
-        depo_block = 1  % apply depolarization block
 
 		% connectivities: j-->k convention (dimensionless)			
 		Nee_a = 2000  % cortico-cortical
@@ -618,10 +648,6 @@ scm.depo_block = false;
 		KtoVi = 10     %impact on inhibitory population resting voltage.
 		KtoD = -50    %impact on inhibitory gap junction strength.
 		kR = 0.15   %scale reaction term. 
-
-		% Potassium excitability function
-		k_peak = .5  % K concentration at which voltage offset is greatest
-		k_width = .1  % Width of K concentration peak
 
 		
         % electrodes
@@ -716,7 +742,7 @@ scm.depo_block = false;
             % collapses following an inverse gaussian (this was chosen
             % only because it gives a smooth drop and recovery; no proposed
             % relation to mechanism). 
-            if nargin < 2  % if no state is given, return Qi_max
+            if nargin < 2 || all(isnan(scm.Qi_collapse)) % if no state is given, return Qi_max
                 qm = scm.Qi_max;
             else  % else update Qi_max relative to IW state
                 em = scm.excitability_map;
