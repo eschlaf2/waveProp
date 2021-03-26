@@ -134,6 +134,7 @@ classdef SCM < handle
                                 % Keep the electrodes in the center so that
                                 % it's easy to rotate the source when
                                 % generating sims for method comparison
+                                scm.dimsNP = [4 4];
                                 scm.centerNP = round( scm.grid_size ./ 2 );
 
 
@@ -181,6 +182,7 @@ classdef SCM < handle
                                 scm.label = 'IW';
                                 scm.basename = 'SCM/IW/IW';
                                 scm.dx = 0.1;
+                                scm.dimsNP = [4 4];
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
                                 scm.sim_num = 0;
