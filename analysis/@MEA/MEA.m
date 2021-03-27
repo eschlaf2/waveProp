@@ -202,10 +202,10 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			thresh = 5e-2; 
 			MIN_RATIO_FINITE = 0.2;
 	
-			params.err = [1 thresh];
-			params.fpass = [1 50];
-			params.tapers = [3 T 1];
-			params.Fs = mea.SamplingRate;
+			params_.err = [1 thresh];
+			params_.fpass = [1 50];
+			params_.tapers = [3 T 1];
+			params_.Fs = mea.SamplingRate;
 			data = mea.Data;
 			ctr = mea.Coherent;
 			
@@ -235,7 +235,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 				confC = .8;  % arbitrary... think on this
 				
 			else
-				[C,phi,~,~,~,t,f,confC,~]=cohgramc(data1,data2,movingwin,params);
+				[C,phi,~,~,~,t,f,confC,~]=cohgramc(data1,data2,movingwin,params_);
 				 t = t - mea.Padding(1);
 			end
 			if NODELAYS
