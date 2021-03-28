@@ -68,6 +68,7 @@ classdef SCM < handle
                                 scm.drive_style = 'excitatory';
                                 scm.I_drive = 0;
                                 scm.Qi_collapse = nan;
+                                scm.K = [-Inf 1];
                                 
                                 scm.visualization_rate = 0;
                                 scm.save = true;
@@ -231,7 +232,7 @@ classdef SCM < handle
                                 scm.post_ictal_source_drive = nan;
 
                                 scm.drive_style = 'inhibitory';
-
+                                scm.excitability_map = 3 * ones(scm.grid_size);
 
                             case 'wip'
                                 % Looking for a dVe/dVi pair that
@@ -485,7 +486,7 @@ scm.depo_block = false;
         Preview(self)
 	end
     
-    properties (Access = private)
+    properties 
         Qe_movie
         Ve_movie
         K_movie
@@ -665,7 +666,7 @@ scm.depo_block = false;
         % bounds
 		Dee (1,2) double = [-Inf Inf]  % i <--> i gap-junction diffusive-coupling strength (cm^2)
 		Dii (1,2) double = [.009 Inf]  % The inhibitory gap junctions cannot pass below a minimum value of 0.009 / dx^2.
-		K (1,2) double = [-Inf 1] % extracellular potassium concentration (cm^2)
+		K (1,2) double = [-Inf Inf] % extracellular potassium concentration (cm^2)
         GABA (1, 2) double = [-Inf Inf]  % GABA
 		Qe (1,2) double = [0 Inf]  % Activity of excitatory population.
 		Qi (1,2) double = [0 Inf]  % Activity of inhibitory population.
