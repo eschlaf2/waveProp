@@ -25,7 +25,7 @@ function ConvertToMea(scm)
 		im = round(rescale(last.Qe) * (length(cmap) - 1)) + 1;
 		movQ(ii) = im2frame(im, cmap);
 		movV(ii) = im2frame(round(rescale(last.Ve) * (length(cmap) - 1)) + 1, cmap);
-        movK(ii) = im2frame(round(rescale(last.K, 0, 1, 'InputMin', 0, 'InputMax', 1) * (length(cmap) - 1)) + 1, cmap);
+        movK(ii) = im2frame(round(rescale(last.K, 0, 1, 'InputMin', 0, 'InputMax', 1.5) * (length(cmap) - 1)) + 1, cmap);
 		qe{ii} = NP.Qe;
 		ve{ii} = NP.Ve;
         k{ii} = NP.K;
