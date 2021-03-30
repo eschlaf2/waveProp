@@ -123,20 +123,38 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 %                 temp.Data = filtfilt(d, double(temp.Data));
             end
             
+            mea.Raw = temp.Data;
+            [mea.BadChannels, bad0] = mea.get_bad_channels();
+            U = union(bad0, mea.BadChannels);
+            I = intersect(bad0, mea.BadChannels);
+            C = U(~ismember(U, I));
+            fprintf('Original bad channels: %d', bad0);
+            fprintf('\nUsing as bad: %d', mea.BadChannels);
+            fprintf('\nComplement: %d', C);
+            fprintf('\n')
+            
+        end
+        
+        function [bad_ch, bad_ch0] = get_bad_channels(mea)
             % Remove bad channels. Detect channels that are outliers in PC
             % space (using 95% of variance explained). Outliers := > 3 MAD
             % from PC center of mass
             S = warning; warning('off');
+            bad_ch0 = mea.BadChannels;
             mea.BadChannels = [];
-            [coeff, ~, ~, ~, explained] = pca(single(temp.Data));
-            num_pc = find(cumsum(explained) >= 95, 1);
-            outs = isoutlier(vecnorm(coeff(:, 1:num_pc), 2, 2));
-            mea.BadChannels = find(outs);
-            warning(S);
+            sd = std(single(mea.Raw))';
+            outs = isoutlier(sd);  % remove outliers by std; (threshold = 3 MAD)
             
-            mea.Raw = temp.Data;
+            [coeff, ~, ~, ~, explained] = pca(single(mea.Raw(:, ~outs)));
+            num_pc = find(cumsum(explained) >= 95, 1);
+            outsPC = isoutlier(vecnorm(coeff(:, 1:num_pc), 2, 2));
+            
+            outsF = outs;
+            outsF(~outs) = outs(~outs) | outsPC;
+            bad_ch = find(outsF);
+            
+            warning(S);
         end
-        
         function whiten(self)
             % This cleans up CUCX5 well (removes clear peak in firing rate
             % from VNS. 
