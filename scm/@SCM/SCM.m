@@ -331,8 +331,9 @@ scm.dVi = [-inf inf];
 
 scm.depo_block = false;
 
-
-% scm.map = scm.generate_map;
+scm.Qi_collapse(1) = 20;
+% scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
+% (e.g. 10)
 
                                 
                                 
@@ -443,19 +444,19 @@ scm.depo_block = false;
                 scm.centerNP(2) + yy(:));
         end
         function show_layout(scm)
-            X = zeros(scm.grid_size);
             
-            X(scm.stim_center(1), scm.stim_center(2)) = 1;
-            X(scm.NPinds) = 2;
-            for ii = 1:size(scm.source, 3)
-                temp = scm.source(:, :, ii);
-                X(temp == max(temp, [], 'all')) = ii + 2;
-            end
-            X(~scm.excitability_map) = -1;
+%             X = zeros(scm.grid_size);
+            X = max(scm.source, [], 3);
+            base = max(X(:));
+            
+            X(scm.stim_center(1), scm.stim_center(2)) = base+1;  % IW
+            X(scm.NPinds) = base+2;  % mea
+            
+%             X(~scm.excitability_map) = -1;
             figure; imagesc(X);
             cb = colorbar;
-            set(cb, 'ticks', 0:3, 'limits', [-1 ii+2], ...
-                'ticklabels', {'EZ', 'IWs', 'MEA', 'FS'})
+            set(cb, 'ticks', 1:4, 'limits', [0 base+2], ...
+                'ticklabels', {'EZ', 'FS', 'IWs', 'MEA'})
         end
         function phi = theta_FS(scm)
             phi = nan(size(scm.source, 3), 1);
@@ -513,7 +514,7 @@ scm.depo_block = false;
         %       offset: time (s) of peak drop relative to duration of dVe depression
         %       width: sd of gaussian used to model the drop 
         % 
-        Qi_collapse = [40 1 .5]  % [drop, offset, width]
+        Qi_collapse = [20 1 .5]  % [drop, offset, width]
         
         
         % SIGMOIDS
