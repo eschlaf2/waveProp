@@ -243,13 +243,9 @@ classdef SCM < handle
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
 scm.sim_num = 9;
-scm.t0_start = -2;
-% scm.IC.dVi = 0; % doesn't have an effect with sigmoids
-% scm.IC.dVe = 0;
-% scm.IC.dVe = randn(scm.grid_size) * .05;
-% scm.IC.dVe = conv2(scm.IC.dVe, gausswin(10) * gausswin(10)', 'same');
-dVe = 1;
-scm.D = .35;  
+scm.t0_start = 0;
+dVe = 1.2;
+% scm.D = .35;  
                             scm.save = true;
                             scm.visualization_rate = 10;
                                 scm.depo_block = true;
@@ -275,15 +271,12 @@ scm.I_drive = .3;
 
 % Add a fixed source
 center = round( [2.2 2.2] / scm.dx );
-source_dims = round( [.2 .2] / scm.dx );
+radius = round( [.25 .25] / scm.dx );
+center = round( [1 1] / scm.dx );
 
-[xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
-source = false(scm.grid_size);
-source(abs(xx - center(1)) <= source_dims(1) & ...
-    abs(yy - center(2)) <= source_dims(2)) = true;
 scm.source = zeros(scm.grid_size);
-scm.source(scm.excitability_map > 0) = dVe;
-scm.source(source) = dVe + 1;
+scm.source(scm.ellipse()) = dVe;
+scm.source(scm.ellipse(center, radius)) = dVe + 1;
 
 
 % Move the electrodes off the center
@@ -300,8 +293,6 @@ scm.centerNP = round( [3.5 3.5] / scm.dx );
                               
 
 scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
-
-
 scm.post_ictal_source_drive = nan;
 
 
@@ -331,7 +322,15 @@ scm.dVi = [-inf inf];
 
 scm.depo_block = false;
 
+
 scm.Qi_collapse(1) = 20;
+% scm.sigmoid_kD(2) = .25;
+
+% % Add a fixed sink
+% center = round( [2.2 3] / scm.dx );
+% radius = [3, 3];
+% scm.source(scm.ellipse(center, radius)) = 0;
+
 % scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
 % (e.g. 10)
 
@@ -391,6 +390,7 @@ scm.Qi_collapse(1) = 20;
                 end
             end
         end
+        
         function plot_sigmoids(scm, x)
             if nargin < 2, x = linspace(0, 2, 100); end
             figure; ax = axes(figure, 'nextplot', 'add');
@@ -740,7 +740,6 @@ scm.Qi_collapse(1) = 20;
     
     
     methods  % Emily parameter functions
-        
         function qm = Qi_max_fun(scm, state)
             % Model of inhibitory collapse. Max inhibitory firing rate
             % collapses following an inverse gaussian (this was chosen
@@ -758,12 +757,8 @@ scm.Qi_collapse(1) = 20;
         end
         function map = get.excitability_map(P)
 			if isempty(P.excitability_map)
-                [ix, iy] = ind2sub(P.grid_size, 1:prod(P.grid_size));
-                R = floor(P.grid_size / 2 - 3);
-                C = P.grid_size / 2;
                 map = zeros(P.grid_size);
-                ellipse = sum( ([ix' iy'] - C).^2 ./ R.^2, 2 ) < 1;
-                map(ellipse) = .5;
+                map(P.ellipse) = .5;
                 P.excitability_map = map;
 			end
             map = P.excitability_map;
@@ -803,8 +798,22 @@ scm.Qi_collapse(1) = 20;
 		end
 
     end
-    methods  % getters for convenience/setup
-		
+    
+    
+    methods  % functions for convenience/setup
+        function map = ellipse(scm, C, R)
+            % map = scm.ellipse(center=grid_size/2, radius=grid_size/2-4)
+            % Returns a binary map matching scm.grid_size with an ellipse
+            % centered at C (1x2) with radius R (1x2)
+            
+            if nargin < 3, C = scm.grid_size ./ 2; end
+            if nargin < 2 || isempty(R); R = floor(scm.grid_size / 2 - 4); end
+            [ix, iy] = ind2sub(scm.grid_size, 1:prod(scm.grid_size));
+
+            map = false(scm.grid_size);
+            ellipse = sum( ([ix' iy'] - C).^2 ./ R.^2, 2 ) < 1;
+            map(ellipse) = true;
+        end
         function t0s = get.t0_start(p)
             if isempty(p.t0_start), p.t0_start = -p.padding(1); end
             t0s = p.t0_start;
@@ -846,12 +855,7 @@ scm.Qi_collapse(1) = 20;
             center = P.centerEC;
 		end
 		
-	end
-	
-
-	
-	
-	
+    end
 	methods  % dependent getters
 		function obj = substruct(P, names)
 			for ff = names
