@@ -146,7 +146,9 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
             bad_ch0 = mea.BadChannels;
             mea.BadChannels = [];
             sd = std(single(mea.Raw))';
-            outs = isoutlier(sd, 'ThresholdFactor', 8);  % remove outliers by std; (threshold = 3 MAD)
+            outs = isoutlier(sd, 'ThresholdFactor', 3);  % remove outliers by std; (threshold = 3 MAD)
+            fprintf('outs by sd: ')
+            fprintf('%d', find(outs));
             
             [coeff, ~, ~, ~, explained] = pca(single(mea.Raw(:, ~outs)));
             num_pc = find(cumsum(explained) >= 95, 1);
