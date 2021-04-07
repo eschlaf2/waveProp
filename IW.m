@@ -5,7 +5,6 @@ classdef IW < handle
         name
         fmax = 2
         wave = 1
-        locs
         MinPeakHeight = 2  % Defines the threshold for candidate IW crossing times in standard deviations
         MinPeakFr = 30
         W
@@ -25,6 +24,7 @@ classdef IW < handle
         all_durs
 
         mea
+        locs
         onsets
         durs
         outliers
@@ -170,9 +170,10 @@ classdef IW < handle
                     pos = self.position;
                     outliers = pos(:, 2)' > 4 | (pos(:, 2)' > 3 & pos(:, 1)' > 7);
                 else
-                    outliers = outliers_by_clust_(self.onsets, self.position);
-                    if sum(~outliers) < 10
-                        outliers = outliers_by_MAD_(self.onsets);
+%                     outliers = outliers_by_MAD_(self.onsets);
+                    outliers = IW.outliers_by_clust(self.onsets, self.position, self.fr_at_peak);
+                    if sum(~outliers) < 30
+                        outliers = IW.outliers_by_MAD(self.onsets);
                     end
                 end
                 self.outliers = outliers;
@@ -420,14 +421,17 @@ classdef IW < handle
             fr_mn = self.mean_fr;
             fit = fitdist(fr_mn(~self.outliers)', 'norm');
         end
-        function [V, p, v0] = regress(self, field)
+        function [V, p, v0, phi, speed] = regress(self, field)
             if nargin < 2 || isempty(field), field = 'onsets'; end
             y = self.(field)(~self.outliers)';
-            X = [ones(size(y)) self.position(~self.outliers, :)];
-            [b, ~, ~, ~, stats] = regress(y, X);
+            
+            X = [ones(size(y(:))) self.position(~self.outliers, :)];
+            [b, ~, ~, ~, stats] = regress(y(:), X);
             p = stats(3);
             v0 = b(1);
             V = pinv(b(2:3));
+            phi = atan2(V(2), V(1));
+            speed = norm(V);
             
         end
         function fit = wave_fit(self)
@@ -1129,9 +1133,53 @@ classdef IW < handle
     
     methods (Static)
         
+        function outliers = outliers_by_clust(onsets, pos, ~)
+        % outliers = outliers_by_clust(onsets, pos)
+        % Finds outliers using time and position. Aborts if the cluster size goes
+        % below 10. Clusters must be contiguous with neighboring onset times
+        % differing by no more that 1/2 sd of all times.
+        %
+        % Considered using fr_at_peak as another measure of distance, but figured
+        % best not for now so we don't wash out this information.
+
+            while sum(isfinite(onsets)) >= 10
+                X = [ ...
+                    pos, ...  
+                    normalize(onsets(:))]; %, ...
+        %             normalize(fr(:))];
+                mask = isfinite(onsets);
+                tt = clusterdata(X(mask, :), ...  
+                    'distance', 'euclidean', ...
+                    'criterion', 'distance', ...
+                    'linkage', 'single', ...  % Nearest neighbor
+                    'cutoff', sqrt(2 + .5));  % cluster must be connected and values differ by less that .5 sd
+                counts = histcounts(categorical(tt));
+                [N, g] = max(counts);
+                if numel(counts) == 1 || N < 10
+                    break
+                end
+                ons_temp = onsets(mask);
+                ons_temp(tt ~= g) = nan;
+                onsets(mask) = ons_temp;
+            end
+            outliers = isnan(onsets);
+        end
+        
+        function outliers = outliers_by_MAD(onsets)
+            mask = isoutlier(onsets);
+            while any(mask)  % remove outliers
+                onsets(mask) = nan;
+                mask = isoutlier(onsets);
+            end
+            onsets(mask) = nan;
+            outliers = isnan(onsets);  % find all outliers  
+        end
+
         function iw = loadobj(iw)
-            iw.wave = 1;
-            if contains(iw.name, 'MG49'), iw.wave = 2; end
+            
+            iw.locs = [];  % had this save, when should have been transient
+            iw.wave = IW.main_wave(iw.name);
+            
             iw.reset;
         end
         
@@ -1239,7 +1287,7 @@ classdef IW < handle
 %                     end
                     [stats, h] = iw.get_stats(PLOT);
                     stat_file.(fieldname) = stats;
-                    if ii == iw.main_wave; BVNY.create_iw_info(iw); end
+                    if ii == iw.main_wave(iw.name); BVNY.create_iw_info(iw); end
                     ss = mkdir([folder filesep fieldname]);
                     if ~isempty(h), savefig(h, [folder filesep fieldname]); end
                     for ih = 1:numel(h)  % print figs as PNGs
@@ -1254,7 +1302,6 @@ classdef IW < handle
 
             end
             
-%             if REMAKE_IW, BVNY.create_iw_info; end  % this creates iw_info.mat based on default wave number 
             stats = load(stat_file.Properties.Source);
             IW.stats2table(stats);
             if nargout > 0, T = readtable('iw_table'); end
@@ -1399,7 +1446,7 @@ classdef IW < handle
                 'BW09_Seizure2', 1, ...
                 'BW09_Seizure1', 1, ...
                 'CUCX4_Seizure2', 1, ...
-                'CUCX4_Seizure1', 1, ...
+                'CUCX4_Seizure1', 2, ...
                 'CUCX3_Seizure6', 1, ...
                 'CUCX3_Seizure5', 1, ...
                 'CUCX3_Seizure4', 1, ...
@@ -1425,43 +1472,12 @@ classdef IW < handle
     
 end
 
-%% Local fun
-
-function outliers = outliers_by_clust_(onsets, pos)
-% outliers = outliers_by_clust_(onsets, pos)
-% Finds outliers using time and position. Aborts if the cluster size goes
-% below 10.
-    while sum(isfinite(onsets)) >= 10
-        X = [pos onsets(:)];
-        mask = isfinite(onsets);
-        tt = clusterdata(X(mask, :), ...
-            'distance', 'seuclidean', ...
-            'criterion', 'distance', ...
-            'cutoff', 1.414); 
-        counts = histcounts(categorical(tt));
-        [N, g] = max(counts);
-        if numel(counts) == 1 || N < 10
-            break
-        end
-        ons_temp = onsets(mask);
-        ons_temp(tt ~= g) = nan;
-        onsets(mask) = ons_temp;
-    end
-    outliers = isnan(onsets);
-end
 
 
 
 
-function outliers = outliers_by_MAD_(onsets)
-    mask = isoutlier(onsets);
-    while any(mask)  % remove outliers
-        onsets(mask) = nan;
-        mask = isoutlier(onsets);
-    end
-    onsets(mask) = nan;
-    outliers = isnan(onsets);  % find all outliers  
-end
+
+
 
 
 %% Old

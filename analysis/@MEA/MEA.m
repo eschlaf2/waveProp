@@ -128,9 +128,12 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
             U = union(bad0, mea.BadChannels);
             I = intersect(bad0, mea.BadChannels);
             C = U(~ismember(U, I));
-            fprintf('Original bad channels: %d', bad0);
-            fprintf('\nUsing as bad: %d', mea.BadChannels);
-            fprintf('\nComplement: %d', C);
+            fprintf('Original bad channels: ');
+            fprintf('%d ', bad0);
+            fprintf('\nUsing as bad: ');
+            fprintf('%d ', mea.BadChannels);
+            fprintf('\nComplement: ');
+            fprintf('%d ', C);
             fprintf('\n')
             
         end
@@ -659,6 +662,10 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		end
 
 		function M = max_descent(mea, times, varargin)
+            if nargin < 2 || isempty(times) 
+                times = mea.Time(1):.01:mea.Time(end); 
+            end
+            S = warning; warning off;
 			N = numel(times);
 			M(N) = MaxDescent(varargin{:});
 % 			mea.MaxDescentData = zscore(mea.filter(mea.Data, mea.SamplingRate, M(N).FBand)); 
@@ -668,6 +675,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			end
 			M = WaveProp.resize_obj(M);
 			M.Name = mea.Name;
+            warning(S);
 		end
 		
 		function E = dir_events(mea, times, varargin)
@@ -773,7 +781,16 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
             end
             save(['cepstrograms/' mea.patient '_' mea.seizure], 'C', 'q', 't', 'ps', 'f');
         end
-		
+        function [S, t, f] = specgram(mea)
+            % mostly just here as a reminder of how to use mtspecgramc
+            params_.tapers = [3 5 1]; % [T W p]; ntapers = TW-p
+            params_.fpass = [0 100];
+            params_.Fs = mea.SamplingRate;
+            params_.trialave = 1;
+            win = 5;
+            winstep = 1;
+            [S, t, f] = mtspecgramc(mea.Data, [win winstep], params_);
+        end
 		function [S, fs] = pspectrum(mea, data, fs, range)
 			% [S, fs] = pspectrum(data=Data, fs=SamplingRate, range=[0 100])
 			if nargin < 4, range = [0 100]; end
