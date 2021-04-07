@@ -13,7 +13,8 @@ function Preview(sim)
     end
 
      h = figure('units', 'inches', ...
-        'position', [0    0.8472   10.6250   10.2083]); 
+        'position', [0    0.8472   10.6250   10.2083], ...
+        'name', 'K_movie'); 
     T = tiledlayout(h, 10, 10, 'tilespacing', 'compact');
     for ii = 1:min(numel(sim.Qe_movie), 100)
         nexttile(T, ii); 
@@ -24,7 +25,8 @@ function Preview(sim)
     end
     
     h = figure('units', 'inches', ...
-        'position', [0    0.8472   10.6250   10.2083]); 
+        'position', [0    0.8472   10.6250   10.2083], ...
+        'name', 'K_movie'); 
     T = tiledlayout(h, 10, 10, 'tilespacing', 'compact');
     for ii = 1:min(numel(sim.K_movie), 100)
         nexttile(T, ii); 

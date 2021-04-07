@@ -485,7 +485,7 @@ scm.Qi_collapse(1) = 20;
             X(scm.NPinds) = base+2;  % mea
             
 %             X(~scm.excitability_map) = -1;
-            figure; imagesc(X);
+            figure('name', 'layout'); imagesc(X);
             cb = colorbar;
             set(cb, 'ticks', 1:4, 'limits', [0 base+2], ...
                 'ticklabels', {'EZ', 'FS', 'IWs', 'MEA'})
