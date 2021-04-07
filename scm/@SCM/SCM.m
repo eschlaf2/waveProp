@@ -404,6 +404,8 @@ scm.Qi_collapse(1) = 20;
             scm.stim_center = [xx(iw_loc), yy(iw_loc)];  % get IW onset location
             scm.source(scm.ellipse([xx(fs_loc), yy(fs_loc)], .25)) = dVe_max;
             scm.centerNP = [xx(mea_loc) yy(mea_loc)];
+            
+            scm.init;
                                 
         end
         function fs = fixed_source(scm, t)
@@ -831,6 +833,10 @@ scm.Qi_collapse(1) = 20;
     
     
     methods  % functions for convenience/setup
+        function str = mea_path(scm)
+            str = sprintf('%s/%s/%s_Seizure%d_Neuroport_%d_%d.mat', ...
+                pwd, scm.label, scm.label, scm.sim_num, scm.padding);
+        end
         function map = ellipse(scm, C, R)
             % map = scm.ellipse(center=grid_size/2, radius=grid_size/2-4)
             % Returns a binary map matching scm.grid_size with an ellipse
