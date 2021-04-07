@@ -40,7 +40,7 @@ classdef SCM < handle
                     if nargin == 1
                         mdl = validatestring(varargin{1}, ...
                             {'steyn-ross', 'martinet', 'wip', ...
-                            'FS', 'SW', 'IW'});
+                            'FS', 'SW', 'IW', 'IWa'});
                         switch mdl
                             case 'steyn-ross'
                                 scm = scm.init();
@@ -187,9 +187,11 @@ classdef SCM < handle
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
                                 scm.sim_num = 0;
-                                dVe = 1;
+dVe = 1.2;
                                 scm.save = true;
-                                scm.visualization_rate = 0;
+scm.t0_start = 0;                                
+scm.visualization_rate = 10;
+scm.I_drive = 10;
                                 scm.depo_block = true;
                                 scm.padding = [10 10];
                                 scm.duration = 60;                                
@@ -201,21 +203,18 @@ classdef SCM < handle
 
                                 % Design the IW
                                 scm.expansion_rate = 0.1;  % 0.25
-                                scm.excitability_map(scm.excitability_map > 0) = 3;
-                                scm.I_drive = .3;
+%                                 scm.excitability_map(scm.excitability_map > 0) = 3;
+                                scm.excitability_map = 3*ones(scm.grid_size);
+
 
 
                                 % Add a fixed source
                                 center = round( [2.2 2.2] / scm.dx );
-                                source_dims = round( [.2 .2] / scm.dx );
+                                radius = round( [.25 .25] / scm.dx );
 
-                                [xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
-                                source = false(scm.grid_size);
-                                source(abs(xx - center(1)) <= source_dims(1) & ...
-                                    abs(yy - center(2)) <= source_dims(2)) = true;
                                 scm.source = zeros(scm.grid_size);
-                                scm.source(scm.excitability_map > 0) = dVe;
-                                scm.source(source) = dVe + 1;
+                                scm.source(scm.ellipse()) = dVe;
+                                scm.source(scm.ellipse(center, radius)) = dVe + 1;
 
 
                                 % Move the electrodes off the center
@@ -232,8 +231,13 @@ classdef SCM < handle
                                 scm.post_ictal_source_drive = nan;
 
                                 scm.drive_style = 'inhibitory';
-                                scm.excitability_map = 3 * ones(scm.grid_size);
 
+                            case 'IWa'
+                                scm = SCM('IW');
+                                scm.visualization_rate = 10;
+                                scm.t0_start = 0;
+                                scm.dVe = 1.1;
+                                
                             case 'wip'
                                 % Looking for a dVe/dVi pair that
                                 % generates diffuse TW
@@ -265,14 +269,14 @@ scm.dimsNP = [4 4];
                                 % Design the IW
                                 scm.expansion_rate = 0.1;  % 0.25
 % scm.excitability_map(scm.excitability_map > 0) = 3;
-scm.I_drive = .3;
+scm.I_drive = 3;
 % scm.Nii_b = 100;
 
 
 % Add a fixed source
 center = round( [2.2 2.2] / scm.dx );
 radius = round( [.25 .25] / scm.dx );
-center = round( [1 1] / scm.dx );
+% center = round( [1 1] / scm.dx );
 
 scm.source = zeros(scm.grid_size);
 scm.source(scm.ellipse()) = dVe;
