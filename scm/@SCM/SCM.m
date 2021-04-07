@@ -248,7 +248,7 @@ scm.I_drive = 10;
                                 scm.grid_size = round( [5 5] / scm.dx);
 scm.sim_num = 9;
 scm.t0_start = 0;
-dVe = 1.2;
+dVe = 1.0;
 % scm.D = .35;  
                             scm.save = true;
                             scm.visualization_rate = 10;
@@ -278,7 +278,7 @@ center = round( [2.2 2.2] / scm.dx );
 radius = round( [.25 .25] / scm.dx );
 % center = round( [1 1] / scm.dx );
 
-scm.source = zeros(scm.grid_size);
+scm.source = zeros(scm.grid_size) - 1;
 scm.source(scm.ellipse()) = dVe;
 scm.source(scm.ellipse(center, radius)) = dVe + 1;
 
@@ -330,12 +330,13 @@ scm.depo_block = false;
 scm.Qi_collapse(1) = 20;
 % scm.sigmoid_kD(2) = .25;
 
+
 % % Add a fixed sink
 % center = round( [2.2 3] / scm.dx );
 % radius = [3, 3];
 % scm.source(scm.ellipse(center, radius)) = 0;
 
-% scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
+scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
 % (e.g. 10)
 
                                 
