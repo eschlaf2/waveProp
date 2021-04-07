@@ -187,11 +187,11 @@ classdef SCM < handle
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
                                 scm.sim_num = 0;
-dVe = 1.2;
+                                dVe = 1.2;
                                 scm.save = true;
-scm.t0_start = 0;                                
-scm.visualization_rate = 10;
-scm.I_drive = 10;
+                                scm.t0_start = 0;                                
+                                scm.visualization_rate = 10;
+                                scm.I_drive = 5;
                                 scm.depo_block = true;
                                 scm.padding = [10 10];
                                 scm.duration = 60;                                
@@ -234,9 +234,13 @@ scm.I_drive = 10;
 
                             case 'IWa'
                                 scm = SCM('IW');
+                                scm.label = 'IW_rand';
+                                scm.basename = 'SCM/IW_rand/IW_rand';
+                                
+                                
+                                
                                 scm.visualization_rate = 10;
                                 scm.t0_start = 0;
-                                scm.dVe = 1.1;
                                 
                             case 'wip'
                                 % Looking for a dVe/dVi pair that
@@ -247,8 +251,8 @@ scm.I_drive = 10;
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
 scm.sim_num = 9;
-scm.t0_start = 0;
-dVe = 1.0;
+% scm.t0_start = 0;
+dVe = 1.2;
 % scm.D = .35;  
                             scm.save = true;
                             scm.visualization_rate = 10;
@@ -278,7 +282,7 @@ center = round( [2.2 2.2] / scm.dx );
 radius = round( [.25 .25] / scm.dx );
 % center = round( [1 1] / scm.dx );
 
-scm.source = zeros(scm.grid_size) - 1;
+scm.source = zeros(scm.grid_size);
 scm.source(scm.ellipse()) = dVe;
 scm.source(scm.ellipse(center, radius)) = dVe + 1;
 
@@ -296,7 +300,7 @@ scm.centerNP = round( [3.5 3.5] / scm.dx );
 
                               
 
-scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
+scm.stim_center = round( [4.0 3.5] / scm.dx );  % 4.6 is edge
 scm.post_ictal_source_drive = nan;
 
 
@@ -336,7 +340,7 @@ scm.Qi_collapse(1) = 20;
 % radius = [3, 3];
 % scm.source(scm.ellipse(center, radius)) = 0;
 
-scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
+% scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
 % (e.g. 10)
 
                                 
@@ -380,6 +384,28 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
         end
 
         
+        function set_random_layout(scm)
+            rng(scm.sim_num+500); % set the seed
+            rand(30);  % blow out some numbers
+            
+            dVe_base = mode(scm.source, 'all');
+            dVe_max = max(scm.source, [], 'all');
+
+            scm.source = double(scm.ellipse()) * dVe_base;
+            ez_inds = find(scm.ellipse());  % define the EZ
+            N = numel(ez_inds);
+            gs = scm.grid_size;
+            [xx, yy] = meshgrid(1:gs(1), 1:gs(2));
+
+            iw_loc = ez_inds(randi(N));
+            fs_loc = ez_inds(randi(N));
+            mea_loc = ez_inds(randi(N));
+
+            scm.stim_center = [xx(iw_loc), yy(iw_loc)];  % get IW onset location
+            scm.source(scm.ellipse([xx(fs_loc), yy(fs_loc)], .25)) = dVe_max;
+            scm.centerNP = [xx(mea_loc) yy(mea_loc)];
+                                
+        end
         function fs = fixed_source(scm, t)
             % Get the voltage offset for the fixed source at time t
             % If there are multiple fixed sources, rotate through them
@@ -395,7 +421,6 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
                 end
             end
         end
-        
         function plot_sigmoids(scm, x)
             if nargin < 2, x = linspace(0, 2, 100); end
             figure; ax = axes(figure, 'nextplot', 'add');
@@ -474,7 +499,7 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
         end
         function phi = theta_IW(scm)
             dy = scm.centerNP(2) - scm.stim_center(2);
-            dx_ = scm.centerNP(1) - scm.stim_center(2);
+            dx_ = scm.centerNP(1) - scm.stim_center(1);
             phi = atan2(dy, dx_);
         end
         function Run(self)
@@ -811,8 +836,9 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
             % Returns a binary map matching scm.grid_size with an ellipse
             % centered at C (1x2) with radius R (1x2)
             
-            if nargin < 3, C = scm.grid_size ./ 2; end
-            if nargin < 2 || isempty(R); R = floor(scm.grid_size / 2 - 4); end
+            if nargin < 2 || isempty(C),  C = scm.grid_size ./ 2; end
+            if nargin < 3 || isempty(R); R = floor(scm.grid_size / 2 - 4); end
+            if numel(R) == 1, R = [R R]; end
             [ix, iy] = ind2sub(scm.grid_size, 1:prod(scm.grid_size));
 
             map = false(scm.grid_size);
