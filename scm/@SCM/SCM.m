@@ -229,12 +229,19 @@ classdef SCM < handle
                                 scm.post_ictal_source_drive = nan;
 
                                 scm.drive_style = 'inhibitory';
+                                
+                            case 'no_IW'
+                                scm = SCM('IW');
+                                scm.label = 'no_IW';
+                                scm.basename = 'SCM/no_IW/no_IW';
+                                scm.map = inf(scm.grid_size);
+                        scm.visualization_rate = 10;
+                        scm.t0_start = 0;        
 
                             case 'IWa'
                                 scm = SCM('IW');
                                 scm.visualization_rate = 10;
                                 scm.t0_start = 0;
-                                scm.dVe = 1.1;
                                 
                             case 'wip'
                                 % Looking for a dVe/dVi pair that
@@ -246,7 +253,7 @@ classdef SCM < handle
                                 scm.grid_size = round( [5 5] / scm.dx);
 scm.sim_num = 9;
 scm.t0_start = 0;
-dVe = 1.2;
+dVe = 1.0;
 % scm.D = .35;  
                             scm.save = true;
                             scm.visualization_rate = 10;
