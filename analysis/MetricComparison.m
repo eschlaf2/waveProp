@@ -4,13 +4,20 @@ classdef MetricComparison < handle
            if nargin < 1
                sz = BVNY.load_seizures;
                N = height(sz);
-               fname = @(ii) sprintf('%s_Seizure%d_fits.mat', ...
+               fname = @(ii) sprintf('%s_Seizure%d', ...
                    sz.patient{ii}, sz.seizure(ii));
                MC = arrayfun(@(ii) MetricComparison(fname(ii)), 1:N);
                return
            end
            if nargin < 2, metrics = []; end
-           if ischar(WP), WP = WaveProp.load('files', dir(WP)); end
+           if ischar(WP)
+               if isempty(dir(WP))
+                   out = regexp(WP, '[A-Za-z0-9]*_Seizure[0-9]*', 'match');
+                   WP = WaveProp.load(out{1});
+               else
+                   WP = WaveProp.load('files', dir(WP)); 
+               end
+           end
            MC.Fit = WP;
            if ~isempty(metrics)
                MC.Metrics = metrics;
