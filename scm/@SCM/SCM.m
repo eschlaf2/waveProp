@@ -402,7 +402,7 @@ scm.Qi_collapse(1) = 20;
             mea_loc = ez_inds(randi(N));
 
             scm.stim_center = [xx(iw_loc), yy(iw_loc)];  % get IW onset location
-            scm.source(scm.ellipse([xx(fs_loc), yy(fs_loc)], .25)) = dVe_max;
+            scm.source(scm.ellipse([xx(fs_loc), yy(fs_loc)], 3)) = dVe_max;
             scm.centerNP = [xx(mea_loc) yy(mea_loc)];
             
             scm.init;
