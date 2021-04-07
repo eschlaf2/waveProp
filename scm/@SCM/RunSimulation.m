@@ -15,7 +15,7 @@ T0_START = PM.t0_start;
 if T0_START > -PADDING(1)
 	% If not starting a fresh sim, use previously saved <last>
     try
-        load(sprintf('%s_%d_%03d', BASENAME, SIM_NUM, T0_START - 1), 'last')
+        load(checkname(sprintf('%s_%d_%03d', BASENAME, SIM_NUM, T0_START - 1)), 'last')
     catch ME
         if ~(strcmpi('MATLAB:load:couldNotReadFile', ME.identifier))
             rethrow(ME);
