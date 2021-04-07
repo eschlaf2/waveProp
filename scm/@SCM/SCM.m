@@ -189,7 +189,7 @@ classdef SCM < handle
                                 scm.sim_num = 0;
                                 dVe = 1.2;
                                 scm.save = true;
-                                scm.t0_start = 0;                                
+                                                               
                                 scm.visualization_rate = 10;
                                 scm.I_drive = 5;
                                 scm.depo_block = true;
