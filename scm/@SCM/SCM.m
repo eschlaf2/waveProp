@@ -91,22 +91,19 @@ classdef SCM < handle
                                 % Generates a sim with a fixed source. Uses
                                 % [10, 10] padding and a duration of 80
                                 
-                                scm = SCM('steyn');  % no dynamics on external drives
+                                scm = SCM('IW');  % no dynamics on external drives
                                 scm.label = 'FS';
                                 scm.basename = 'SCM/FS/FS';
                                 scm.dx = 0.1;
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
 
-                                dVe = 1;
-                                scm.D = .3;  
-                            
+                                
                                 scm.save = true;
                                 scm.visualization_rate = 0;
                                 scm.depo_block = false;
                                 scm.padding = [10 10];
-                                scm.duration = 80;
-                                
+                                scm.duration = 30;
                                 
                                 
                                 % Save and visualize some extra fields for testing
@@ -114,22 +111,21 @@ classdef SCM < handle
                                 scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'dVi', 'Dii', 'map', 'state', 'GABA'};
 
                                 % Design the IW
-                                scm.expansion_rate = 0.1;  % 0.25
-                                scm.excitability_map(scm.excitability_map > 0) = 3;
-                                scm.I_drive = .3;
+%                                 scm.expansion_rate = 0.1;  % 0.25
+%                                 scm.excitability_map(scm.excitability_map > 0) = 3;
+%                                 scm.I_drive = .3;
+                                scm.expansion_rate = 0;
 
 
                                 % Add a fixed source
                                 center = round( [1.5 1.5] / scm.dx );
-                                source_dims = round( [.2 .2] / scm.dx );
+                                radius = round( [.25 .25] / scm.dx );
 
-                                [xx, yy] = ndgrid(1:scm.grid_size(1), 1:scm.grid_size(2));
-                                source = false(scm.grid_size);
-                                source(abs(xx - center(1)) <= source_dims(1) & ...
-                                    abs(yy - center(2)) <= source_dims(2)) = true;
+                                dVe = mode(scm.source, 'all');
+                                dVe_max = max(scm.source, [], 'all');
                                 scm.source = zeros(scm.grid_size);
-                                scm.source(scm.excitability_map > 0) = dVe;
-                                scm.source(source) = dVe + 1;
+                                scm.source(scm.ellipse()) = dVe;
+                                scm.source(scm.ellipse(center, radius)) = dVe_max;
 
 
                                 % Keep the electrodes in the center so that
@@ -139,18 +135,13 @@ classdef SCM < handle
                                 scm.centerNP = round( scm.grid_size ./ 2 );
 
 
-                                % Use Martinet dynamic potassium, but
-                                % {dV*,Dii} follow sigmoid response
-                                
-            
-                                % Add an IW source
-                                scm.stim_center = round( [1.5 3.5] / scm.dx );  % 4.6 is edge
+%                                 % Add an IW source
+%                                 scm.stim_center = round( [1.5 3.5] / scm.dx );  % 4.6 is edge
 
                                 % No post ictal drive
                                 scm.post_ictal_source_drive = nan;
 
-
-                                scm.IC.Dii = scm.D;
+                                
                                 scm.drive_style = 'inhibitory';
                                 
                                 
