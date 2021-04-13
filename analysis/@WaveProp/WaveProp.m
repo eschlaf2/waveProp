@@ -933,8 +933,9 @@ classdef WaveProp
             % Inputs:
             %    mea - can be (1) an MEA class object, (2) a character
             %          string name of a subfolder of WaveFits (i.e.
-            %          'MG49_Seizure43'), or (3) it can be empty in which
-            %          case fits from all seizures in SeizureInfo will load
+            %          'MG49_Seizure43'), (3) a cell list of files from the
+            %          WaveFits folder or (4) it can be empty in which case
+            %          fits from all seizures in SeizureInfo will load
             
             if nargin < 2, metrics = []; end
             if nargin < 1 || isempty(mea)
@@ -954,6 +955,12 @@ classdef WaveProp
             elseif ischar(mea)
                 fits = foldercontents2struct_(['WaveFits/' mea], metrics);
                 fits.Name = {mea};  % convert to cell to match previous version of load
+            elseif iscell(mea)
+                % Load a list of files in WaveFits folder
+                f0 = cellfun(@(s) WaveProp.load(s, metrics), mea);
+                for ff = fieldnames(f0)'
+                    fits.(ff{:}) = cat(1, f0.(ff{:}));
+                end
             elseif isa(mea, 'MEA')
                 fits = foldercontents2struct_(['WaveFits/' mea.Name], metrics);
                 fits.Name = {mea.Name};  % convert to cell to match previous version of load
