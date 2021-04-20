@@ -1,6 +1,9 @@
 function ConvertToMea(scm)
     if ~scm.save, return, end
 	if ~ismember('label', fieldnames(scm)) || isempty(scm.label), scm.label = 'SCM'; end
+    
+    TESTING = false;  % This assumes some extra fields are saved in NP
+    
 	files = dir(sprintf('%s_%d_*mat', scm.basename, scm.sim_num));
 	addpath(files(1).folder);
 	load(files(1).name, 'last');
@@ -26,31 +29,36 @@ function ConvertToMea(scm)
 		movQ(ii) = im2frame(im, cmap);
 		movV(ii) = im2frame(round(rescale(last.Ve) * (length(cmap) - 1)) + 1, cmap);
         movK(ii) = im2frame(round(rescale(last.K, 0, 1, 'InputMin', 0, 'InputMax', 1.5) * (length(cmap) - 1)) + 1, cmap);
+        tt{ii} = time;
 		qe{ii} = NP.Qe;
 		ve{ii} = NP.Ve;
-        k{ii} = NP.K;
-        qi{ii} = NP.Qi;  % Looking at depolarization block
-		tt{ii} = time;
-        dii{ii} = NP.Dii;
-        vi{ii} = NP.Vi;
+        if TESTING
+            k{ii} = NP.K;
+            qi{ii} = NP.Qi;
+
+            dii{ii} = NP.Dii;
+            vi{ii} = NP.Vi;
+        end
         ii = ii + 1;
 	end
 	
-	ve_mat = cat(1, ve{:});
-    qi_mat = cat(1, qi{:});  % Looking at depolarization block (dbstop here and then <assignin('base', 'vi_mat', vi_mat);>
-    k_mat = cat(1, k{:});
-	qe_mat = cat(1, qe{:});
-    dii_mat = cat(1, dii{:});
-    vi_mat = cat(1, vi{:});
-    
-    % Just for testing... remove these later
-    assignin('base', 've_mat', ve_mat);
-    assignin('base', 'qi_mat', qi_mat);
-    assignin('base', 'vi_mat', vi_mat);
-    assignin('base', 'k_mat', k_mat);
-    assignin('base', 'qe_mat', qe_mat);
-    assignin('base', 'dii_mat', dii_mat);
+	
+    qe_mat = cat(1, qe{:});
+    if TESTING
+        ve_mat = cat(1, ve{:});
+        qi_mat = cat(1, qi{:});  % Looking at depolarization block (dbstop here and then <assignin('base', 'vi_mat', vi_mat);>
+        k_mat = cat(1, k{:});
+        dii_mat = cat(1, dii{:});
+        vi_mat = cat(1, vi{:});
 
+        % Just for testing... remove these later
+        assignin('base', 've_mat', ve_mat);
+        assignin('base', 'qi_mat', qi_mat);
+        assignin('base', 'vi_mat', vi_mat);
+        assignin('base', 'k_mat', k_mat);
+        assignin('base', 'qe_mat', qe_mat);
+        assignin('base', 'dii_mat', dii_mat);
+    end
 	time = cat(1, tt{:});
 	sample_rate = min(round(1/mean(diff(time))/1e3)*1e3, scm.subsample);
 	dt = 1 / sample_rate;
@@ -72,7 +80,7 @@ function ConvertToMea(scm)
 		);
 	
 %   mea = add_noise_(mea, 2);  % Add 3D brownian noise with snr=2; the spectra after this transformation looked similar to recorded seizures - could also use (much) higher snr pink noise
-	qe_mat = rescale(single(qe_mat), 0, 25);  % range is based on experimentation
+% 	qe_mat = rescale(single(qe_mat), 0, 25);  % range is based on experimentation
 % 	mea.firing_rate = reshape(qe_mat, size(mea.Data));
 	mea.event_inds = rate2events_(mea);
 	mea.event_mat_size = size(mea.Data);
