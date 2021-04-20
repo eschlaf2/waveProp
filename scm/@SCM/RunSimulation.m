@@ -39,7 +39,7 @@ for t0 = PM.t0_start:T_STEP:K-T_STEP  % For each step
 	fprintf('Running %d / %d .. ', t0, floor(K) - 1);  
 		
 	% ... run simulation for duration T_STEP,
-	[NP, EC, time, last, fig] = ...  
+	[NP, time, last, fig] = ...  
 		seizing_cortical_field('legacy variable', ...
             min(T_STEP, K - t0), last, fig, params);
 	
@@ -47,7 +47,7 @@ for t0 = PM.t0_start:T_STEP:K-T_STEP  % For each step
 	if SAVE
 		fprintf('Saving .. ')
 		fname = checkname(sprintf('%s_%d_%03d', BASENAME, SIM_NUM, t0*T_STEP));
-		save(fname, 'NP','EC','time','last');
+		save(fname, 'NP','time','last');
 	end
 	toc
 	% ... update progress.
