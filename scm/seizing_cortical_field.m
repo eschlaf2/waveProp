@@ -36,7 +36,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %---------------------------------------------------------------------
-function [NP, EC, time, last, fig] = seizing_cortical_field(~, time_end, IC, fig, scm)
+function [NP, time, last, fig] = seizing_cortical_field(~, time_end, IC, fig, scm)
 
 %% Preferences and parameters
 if ~exist('scm', 'var') || isempty(scm), scm = SCM; end
@@ -74,11 +74,9 @@ B_ei = scm.noise_sf .* sqrt(scm.noise_sc .* scm.phi_ei_sc / dt);
 out_vars = scm.out_vars;
 
 % Indices to capture from larger grid for NP and EC
-indsNP = get_inds_(scm.grid_size, scm.centerNP, scm.dimsNP, 1);
-indsEC = get_inds_(scm.grid_size, scm.centerEC, scm.dimsEC, scm.scaleEC);
+[indsNP, xNP, yNP] = scm.NPinds;
+% indsEC = get_inds_(scm.grid_size, scm.centerEC, scm.dimsEC, scm.scaleEC);  % No more show EC
 
-% Initialize electrode output variables (structs NP, EC)
-get_electrode_values;
 
 %% Define dynamic variables
 %Use as initial conditions the "last" values of previous simulation.
@@ -113,7 +111,7 @@ for ii = 1:Nsteps
 	last = new;
     
     % Correct out-of-bounds values
-	correct_OOB_values;
+% 	correct_OOB_values;
     
 	get_electrode_values;
 	visualize;
@@ -123,7 +121,8 @@ end
 % Return requested variables.
 no_return = out_vars(~ismember(out_vars, scm.return_fields));
 NP = rmfield(NP, no_return);
-EC = rmfield(EC, no_return);
+% EC = rmfield(EC, no_return);  % 4/19/21; saving the whole field. Compute
+% this separately if you ever decide to use it
 
 % ------------------------------------------------------------------------
 %% Nested dynamics functions
@@ -218,6 +217,8 @@ EC = rmfield(EC, no_return);
         
         if strcmpi(scm.drive_style, 'inhibitory')
             FS = scm.fixed_source(time(ii));
+            IW = 0;
+%             IW = scm.I_drive .* double(new.map * (time(ii) >=0));
         else  % excitatory drive style implements these in the dVe parameter
             FS = 0;
         end
@@ -225,7 +226,7 @@ EC = rmfield(EC, no_return);
 		new.Ve = last.Ve ...
 			+ dt / scm.tau_e * ( ...
 				(scm.Ve_rest - last.Ve) ...
-				+ last.dVe + FS ...                              % offsets from K+, FS, and IW
+				+ last.dVe + scm.IZ + FS - IW ...                          % offsets from K+, EZ, FS, and IW
                 + scm.rho_e * Psi_ee(last.Ve) .* last.Phi_ee ...      %E-to-E
                 + scm.rho_i * Psi_ie(last.Ve) .* last.Phi_ie ...      %I-to-E
 				+ last.Dee/dx^2 .* del2_(last.Ve) ...
@@ -242,7 +243,8 @@ EC = rmfield(EC, no_return);
 
 % 4. update the firing rates
 	function update_firing_rates
-		IW = scm.I_drive .* double(new.map * (time(ii) >=0));
+		
+        IW = 10 * scm.I_drive .* double(new.map * (time(ii) >=0));
         
 		new.Qe = ...
 			scm.Qe_max .* ( ...
@@ -279,17 +281,17 @@ EC = rmfield(EC, no_return);
 			);
         
         
-        % This is not interacting with anything right now. Just thinking
-        % about adding another ingredient to the sauce.
-        new.GABA = ...  % chloride? 
-			last.GABA ...
-			+ dt / .1 .* ( ...
-				- 1 .* last.GABA ...  % decay term.
-				+ 1.5 .* ...              % reaction term.
-					last.Qi ./ ( 1 + exp( -last.Qi ) ) ...
-                + 1.5 * new.map ...
-                + .25 ./ dx^2 * del2_(last.GABA) ...  % diffusion term.
-			);
+%         % This is not interacting with anything right now. Just thinking
+%         % about adding another ingredient to the sauce.
+%         new.GABA = ...  % chloride? 
+% 			last.GABA ...
+% 			+ dt / .1 .* ( ...
+% 				- 1 .* last.GABA ...  % decay term.
+% 				+ 1.5 .* ...              % reaction term.
+% 					last.Qi ./ ( 1 + exp( -last.Qi ) ) ...
+%                 + 1.5 * new.map ...
+%                 + .25 ./ dx^2 * del2_(last.GABA) ...  % diffusion term.
+% 			);
         
 %         new.GABA = new.GABA + dt/2 * ( ...
 %             1.5 * new.map ...  
@@ -386,39 +388,46 @@ EC = rmfield(EC, no_return);
 % Store electrode values
 	function get_electrode_values
 		
+        
 		if ~exist('NP', 'var')  % Initialize
-			for v = union(out_vars, {'Qe', 'Ve'})
+			for v = out_vars
 				NP.(v{:}) = zeros([Nsteps, scm.dimsNP], 'single');  % Microscale
-				EC.(v{:}) = zeros([Nsteps, scm.dimsEC], 'single');  % Macroscale
+% 				EC.(v{:}) = zeros([Nsteps, scm.dimsEC], 'single');  % Macroscale
 			end
-		else  % ... or store
-			for v = union(out_vars, {'Qe', 'Ve'})
-				NP.(v{:})(ii, :, :) = reshape(last.(v{:})(indsNP), [1, scm.dimsNP]); 
-				
-				% Take the local mean for ECOG electrodes
-				blurEC = conv2(last.(v{:}), ones(3) ./ 9, 'same');  
-				EC.(v{:})(ii, :, :) = reshape(blurEC(indsEC), [1, scm.dimsEC]);
-			end
-		end
+        end  % ... or store
+        for v = out_vars
+%             NP.(v{:})(ii, :, :) = reshape(last.(v{:})(indsNP), [1, scm.dimsNP]); 
+            NP.(v{:})(ii, :, :) = last.(v{:})(xNP, yNP); 
+
+            % Take the local mean for ECOG electrodes
+%             blurEC = conv2(last.(v{:}), ones(3) ./ 9, 'same');  
+%             EC.(v{:})(ii, :, :) = reshape(blurEC(indsEC), [1, scm.dimsEC]);
+        end
+		
 	end
 
 % Visualize results
 	function visualize
 		if scm.visualization_rate > 0
 			if ~exist('fig', 'var') || isempty(fig)
-				fig = create_fig_(out_vars, scm.grid_size, indsNP, indsEC);
+				fig = create_fig_(out_vars, scm.grid_size, indsNP);
                 ss = mkdir(sprintf('SCM/%s/vids/%s_%d/', scm.label, scm.label, scm.sim_num));
 			end
 			if diff(floor((time(ii) - [dt 0]) * scm.visualization_rate))
 				for sp = 1:numel(fig.ih)
 					set(fig.ih(sp), 'cdata', last.(out_vars{sp}))
-					colorbar
+% 					colorbar
 				end
 
 				set(fig.ah, 'string', sprintf('T = %0.3f', time(ii)));
 				drawnow;
+                
+%                 try
                 im = frame2im(getframe(fig.fig));
                 imwrite(im, sprintf('SCM/%s/vids/%s_%d/%0.4f.png', scm.label, scm.label, scm.sim_num, time(ii)));
+%                 catch
+%                     print(fig.fig, sprintf('SCM/%s/vids/%s_%d/%0.4f.png', scm.label, scm.label, scm.sim_num, time(ii)), '-dpng');
+%                 end
                 
 			end
 		end
@@ -524,18 +533,19 @@ function fig = create_fig_(out_vars, grid_size, addyNP, addyEC)
 	end
 
 	% Indicate electrode positions.
-	colorEC = [0 1 1];
+% 	colorEC = [0 1 1];  % No more show EC
 	colorNP = [1 0 1];
 	
 	hold(h(1), 'on')
 	
-	[xE, yE] = ind2sub(grid_size, addyEC);
-	[xN, yN] = ind2sub(grid_size, addyNP);
-	kE = convhull(xE(:), yE(:));
+% 	[yE, xE] = ind2sub(grid_size, addyEC);  % No more show EC
+	[yN, xN] = ind2sub(grid_size, addyNP);
+% 	kE = convhull(xE(:), yE(:));  % No more show EC
 	kN = convhull(xN(:), yN(:));
-	plot(h(1), xE(kE), yE(kE), '-', 'color', colorEC);
+% 	plot(h(1), xE(kE), yE(kE), '-', 'color', colorEC);  % No more show EC
 	plot(h(1), xN(kN), yN(kN), '-', 'color', colorNP);
-	legend(h(1), {'EC', 'NP'}, 'location', 'southeast', 'textcolor', [1 1 1])
+% 	legend(h(1), {'EC', 'NP'}, 'location', 'southeast', 'textcolor', [1 1 1])  % No more show EC
+    legend(h(1), 'NP', 'location', 'southeast', 'textcolor', [1 1 1]);
 	legend(h(1), 'boxoff')
 
 	hold(h(1), 'off')
