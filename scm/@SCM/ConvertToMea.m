@@ -82,8 +82,8 @@ function ConvertToMea(scm)
 %   mea = add_noise_(mea, 2);  % Add 3D brownian noise with snr=2; the spectra after this transformation looked similar to recorded seizures - could also use (much) higher snr pink noise
 % 	qe_mat = rescale(single(qe_mat), 0, 25);  % range is based on experimentation
 % 	mea.firing_rate = reshape(qe_mat, size(mea.Data));
-	mea.event_inds = rate2events_(mea);
-	mea.event_mat_size = size(mea.Data);
+% 	mea.event_inds = rate2events_(mea);
+% 	mea.event_mat_size = size(mea.Data);
 	mea.params = init_mea_params();
 	fprintf('Saving %s ... ', mea.Path);
 	save(mea.Path, '-struct', 'mea');
