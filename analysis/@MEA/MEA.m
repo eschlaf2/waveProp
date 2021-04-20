@@ -124,7 +124,10 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
             end
             
             mea.Raw = temp.Data;
-            [mea.BadChannels, bad0] = mea.get_bad_channels();
+            bad0 = [];
+            if size(mea.Raw, 2) < 100  % don't do this for the big sims
+                [mea.BadChannels, bad0] = mea.get_bad_channels();
+            end
             U = union(bad0, mea.BadChannels);
             I = intersect(bad0, mea.BadChannels);
             C = U(~ismember(U, I));
