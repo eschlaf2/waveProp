@@ -40,7 +40,8 @@ classdef SCM < handle
                     if nargin == 1
                         mdl = validatestring(varargin{1}, ...
                             {'steyn-ross', 'martinet', 'wip', ...
-                            'FS', 'SW', 'IW', 'IWa'});
+                            'FS', 'SW', 'IW', 'IWa', 'IW_c7', 'IW_coloc', ...
+                            'IW_big'});
                         switch mdl
                             case 'steyn-ross'
                                 scm = scm.init();
@@ -103,7 +104,7 @@ classdef SCM < handle
                                 scm.visualization_rate = 0;
                                 scm.depo_block = false;
                                 scm.padding = [10 10];
-                                scm.duration = 30;
+                                scm.duration = 32;
                                 
                                 
                                 % Save and visualize some extra fields for testing
@@ -117,15 +118,13 @@ classdef SCM < handle
                                 scm.expansion_rate = 0;
 
 
-                                % Add a fixed source
+                                % Add a fixed source. Use the same value as
+                                % in 'IW', but change the location
                                 center = round( [1.5 1.5] / scm.dx );
                                 radius = round( [.25 .25] / scm.dx );
 
-                                dVe = mode(scm.source, 'all');
-                                dVe_max = max(scm.source, [], 'all');
-                                scm.source = zeros(scm.grid_size);
-                                scm.source(scm.ellipse()) = dVe;
-                                scm.source(scm.ellipse(center, radius)) = dVe_max;
+                                dVe = max(scm.source, 'all');  
+                                scm.source = double(scm.ellipse(center, radius)) * dVe;
 
 
                                 % Keep the electrodes in the center so that
@@ -178,35 +177,31 @@ classdef SCM < handle
                                 scm.dt = 2e-4;
                                 scm.grid_size = round( [5 5] / scm.dx);
                                 scm.sim_num = 0;
-                                dVe = 1.2;
                                 scm.save = true;
                                                                
                                 scm.visualization_rate = 10;
-                                scm.I_drive = 5;
-                                scm.depo_block = true;
+                                scm.I_drive = 0.5;
+                                scm.depo_block = false;
                                 scm.padding = [10 10];
                                 scm.duration = 60;                                
                                 
                                 
                                 % Save and visualize some extra fields for testing
+                                scm.out_vars = {'Qe', 'Ve', 'Qi', 'Vi', 'K', 'Dii'};
                                 scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi', 'K', 'Dii'};
-                                scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'dVi', 'Dii', 'map', 'state', 'GABA'};
 
                                 % Design the IW
                                 scm.expansion_rate = 0.1;  % 0.25
-%                                 scm.excitability_map(scm.excitability_map > 0) = 3;
-                                scm.excitability_map = 3*ones(scm.grid_size);
+                                scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
+                                scm.excitability_map = 3 * ones(scm.grid_size);
 
 
-
-                                % Add a fixed source
+                                % Add a fixed source and IZ
+                                scm.IZ = 1.2;
                                 center = round( [2.2 2.2] / scm.dx );
                                 radius = round( [.25 .25] / scm.dx );
-
-                                scm.source = zeros(scm.grid_size);
-                                scm.source(scm.ellipse()) = dVe;
-                                scm.source(scm.ellipse(center, radius)) = dVe + 1;
-
+                                scm.source = scm.ellipse(center, radius, 1);
+                                
 
                                 % Move the electrodes off the center
                                 scm.centerNP = round( [3.5 3.5] / scm.dx );
@@ -214,7 +209,7 @@ classdef SCM < handle
 
                                 % Potassium is dynamic but dV*, Dii have sigmoid response functions            
 
-                                scm.stim_center = round( [2.0 3.5] / scm.dx );  % 4.6 is edge
+                                
 
                                 scm.dVe = [-Inf, Inf]; % limits are naturally imposed with sigmoid functions
                                 scm.dVi = [-Inf, Inf];
@@ -223,37 +218,75 @@ classdef SCM < handle
 
                                 scm.drive_style = 'inhibitory';
 
+                            case 'IW_big'
+                                scm = SCM('IW');
+                                scm.label = 'IW_big';
+                                scm.basename = 'SCM/IW_big/IW_big';
+                                scm.dimsNP = [24 24];
+                                scm.centerNP = scm.stim_center;
+                                
+                                scm.visualization_rate = 0;
+                                scm.duration = 35;
+                                scm.padding = [2 2];
+                                
+                                % make a small version to compare (upper
+                                % left corner of big MEA)
+%                                 scm.dimsNP = [4 4];
+%                                 scm.centerNP = [9 24];
+%                                 scm.visualization_rate = 10;
+
                             case 'IWa'
                                 scm = SCM('IW');
-                                scm.label = 'IW_rand';
-                                scm.basename = 'SCM/IW_rand/IW_rand';
+                                scm.label = 'IW_big';
+                                scm.basename = 'SCM/IW_big/IW_big';
+                                scm.visualization_rate = 0;
+                                scm.duration = 35;
+                                scm.padding = [5 5];
+                                scm.dimsNP = [32 32];
                                 
                                 
                                 
-                                scm.visualization_rate = 10;
-                                scm.t0_start = 0;
+                                scm.centerNP = scm.stim_center;
+                                
+                                
+                            case 'IW_coloc'
+                                scm = SCM('IW');
+                                scm.label = 'IW_coloc';
+                                scm.basename = 'SCM/IW_coloc/IW_coloc';
+                                
+                                scm.source = scm.ellipse(scm.stim_center, 3, 1);
+                                scm.visualization_rate = 0;
+
+                            case 'IW_colin'
+                                scm = SCM('IW');
+                                scm.label = 'IW_colin';
+                                scm.basename = 'SCM/IW_colin/IW_colin';
+                                
+                                scm.stim_center = [];
+                                scm.centerNP = [];
+                                scm.source = scm.ellipse();
+                            case 'IW_c7'
+                                
+                                scm = SCM('IW');  % no dynamics on external drives
+                                scm.sim_num = 90;
+                                scm.stim_center = [45 23];
+                                scm.centerNP = [41 25];
+                                scm.source = scm.ellipse([40 20], 3);
+                                scm.excitability_map = 5 * ones(scm.grid_size);  % without this the IW directions dominate too much
+                                scm.Qi_collapse([1 2]) = [30 -2];
+                                scm.I_drive = 2;
                                 
                             case 'wip'
-                                % Looking for a dVe/dVi pair that
-                                % generates diffuse TW
+                                % Look at stronger FS
                                 
-                                scm = SCM('steyn');  % no dynamics on external drives
-                                scm.dx = 0.1;
-                                scm.dt = 2e-4;
-                                scm.grid_size = round( [5 5] / scm.dx);
+                                scm = SCM('IW');  % no dynamics on external drives
+                                
 scm.sim_num = 9;
-% scm.t0_start = 0;
-dVe = 1.2;
-% scm.D = .35;  
-                            scm.save = true;
+
                             scm.visualization_rate = 10;
-                                scm.depo_block = true;
                                 scm.padding = [2 10];
 scm.duration = 60;
-                                
-                                
-scm.dimsNP = [4 4];
-                                % scm.dt = 1e-4;
+scm.dimsNP = [24 24];                                           
                                 
                                 
                                 
@@ -261,25 +294,13 @@ scm.dimsNP = [4 4];
                                 scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi', 'K', 'Dii'};
                                 scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'dVi', 'Dii', 'map', 'state', 'GABA'};
 
-                                % Design the IW
-                                scm.expansion_rate = 0.1;  % 0.25
-% scm.excitability_map(scm.excitability_map > 0) = 3;
-scm.I_drive = 3;
-% scm.Nii_b = 100;
-
-
-% Add a fixed source
-center = round( [2.2 2.2] / scm.dx );
-radius = round( [.25 .25] / scm.dx );
-% center = round( [1 1] / scm.dx );
-
-scm.source = zeros(scm.grid_size);
-scm.source(scm.ellipse()) = dVe;
-scm.source(scm.ellipse(center, radius)) = dVe + 1;
-
-
-% Move the electrodes off the center
-scm.centerNP = round( [3.5 3.5] / scm.dx );
+scm.stim_center = [25 20];
+scm.centerNP = [25 15];
+scm.source = scm.ellipse([25 10], 3);
+% scm.excitability_map = 5 * ones(scm.grid_size);
+% scm.Qi_collapse([1 2]) = [30 -3];
+% scm.I_drive = 2;
+% scm.t0_start = 0;
 
 
 % Add Martinet Potassium dynamics (commented out because testing sigmoid
@@ -289,49 +310,11 @@ scm.centerNP = round( [3.5 3.5] / scm.dx );
 % scm.tau_dVi = 250 * 1;  % Speed up Vi reaction (with 0.8)
 % scm.tau_dD = 200 * 50;  % slow down the changes
 
-                              
-
-scm.stim_center = round( [4.0 3.5] / scm.dx );  % 4.6 is edge
-scm.post_ictal_source_drive = nan;
-
-
-
-% scm.Dii = [0.2 Inf];
-scm.IC.Dii = scm.D;  % not currently dynamic... function of K
-scm.drive_style = 'inhibitory';
-scm.excitability_map = 3 * ones(scm.grid_size);
-% scm.IC.Dii = ndgrid(linspace(.01, .4, 50), 1:50);
-% scm.IC.Dee = scm.D/100;  % not used in Martinet formulation (always
-% updates to Dii/100)
-
-% scm.IC.Qe = 18.47;
-% scm.IC.Qi = 32.68;
-% scm.IC.Ve = -57.71;
-% scm.IC.Vi = -58.01;
-
-scm.dVe = [-Inf Inf];
-scm.dVi = [-inf inf];
-
-% Looking at relationship between dVe & dVi
-% scm.sigmoid_kdVe(2) = 5;
-% scm.sigmoid_kdVi(2) = 5;
-% scm.sigmoid_kD(2) = .3;
-% scm.plot_sigmoids
-% scm.IC.K = .36;
-
-scm.depo_block = false;
-
-
-scm.Qi_collapse(1) = 20;
-% scm.sigmoid_kD(2) = .25;
-
-
-% % Add a fixed sink
-% center = round( [2.2 3] / scm.dx );
-% radius = [3, 3];
-% scm.source(scm.ellipse(center, radius)) = 0;
-
-% scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
+% default behavior is to do this as part of the integration; here, this is to
+% override the map from the last time step (so you don't have to rerun the
+% burn-in when you change the map)
+% scm.map = scm.generate_contagion;  
+scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
 % (e.g. 10)
 
                                 
@@ -359,8 +342,8 @@ scm.Qi_collapse(1) = 20;
 %             end
             if isempty(P.IC), P.IC = []; end  % set default IC
 			P.IC = P.IC.resize(P.grid_size);
-			if all(P.stim_center) && isempty(P.map)
-				P.IC.map = false(P.grid_size);  % Source of ictal activity (on/off)
+            if all(P.stim_center) && isempty(P.map)
+                P.IC.map = false(P.grid_size);  % Source of ictal activity (on/off)
                 if all(P.stim_center > 0)
                     P.IC.map(P.stim_center(1), P.stim_center(2)) = 1;
                 end
@@ -374,7 +357,33 @@ scm.Qi_collapse(1) = 20;
             
         end
 
-        
+        function set_layout(scm, idx)
+            
+            if nargin < 2, idx = 'a'; end
+            iz = scm.IZ;
+            [xx, yy] = find(iz > 0);
+            C = mean([xx yy]);  % IZ center
+            R = max(abs([xx yy] - C));  % IZ radius
+            fsr = .25/scm.dx;  % fixed source radius
+            
+            r = [.3 .1] .* R;
+            switch lower(idx)
+                case 'a'
+                    scm.stim_center = C + [1 -1] .* r;
+                    scm.source = scm.ellipse(C + [1 1] .* r, fsr, 1);
+                case 'b'
+                    scm.stim_center = C + [1 -10] .* r;
+                    scm.source = scm.ellipse(C + [1 -8] .* r, fsr, 1);
+                case 'c'
+                    scm.stim_center = C + [1 -2] .* r;
+                    scm.source = scm.ellipse(C + [1 6] .* r, fsr, 1);
+                case 'd'
+                    scm.stim_center = C + [1 -10] .* r;
+                    scm.source = scm.ellipse(C + [1 -2] .* r, fsr, 1);
+                otherwise
+                    error('Input ''%s'' not recognized', idx)
+            end
+        end
         function set_random_layout(scm)
             rng(scm.sim_num+500); % set the seed
             rand(30);  % blow out some numbers
@@ -383,14 +392,14 @@ scm.Qi_collapse(1) = 20;
             dVe_max = max(scm.source, [], 'all');
 
             scm.source = double(scm.ellipse()) * dVe_base;
-            ez_inds = find(scm.ellipse());  % define the EZ
-            N = numel(ez_inds);
+            iz_inds = find(scm.ellipse());  % define the IZ
+            N = numel(iz_inds);
             gs = scm.grid_size;
             [xx, yy] = meshgrid(1:gs(1), 1:gs(2));
 
-            iw_loc = ez_inds(randi(N));
-            fs_loc = ez_inds(randi(N));
-            mea_loc = ez_inds(randi(N));
+            iw_loc = iz_inds(randi(N));
+            fs_loc = iz_inds(randi(N));
+            mea_loc = iz_inds(randi(N));
 
             scm.stim_center = [xx(iw_loc), yy(iw_loc)];  % get IW onset location
             scm.source(scm.ellipse([xx(fs_loc), yy(fs_loc)], 3)) = dVe_max;
@@ -426,6 +435,38 @@ scm.Qi_collapse(1) = 20;
         function clean(scm)
             delete(sprintf('%s_%d_*.mat', scm.basename, scm.sim_num));
         end
+        function map_ = generate_contagion(scm)
+            % pre-generate the contagion style recruitment map
+            rng(scm.sim_num+1);  % add 1 in case you use sim_num=0
+            
+            map_ = inf(scm.grid_size);
+            if scm.expansion_rate <= 0, return; end
+            dt_ = scm.dt * 10;  % lower precision is ok; worth increase in speed
+            p_wavefront = 2^(scm.expansion_rate * dt_/scm.dx) - 1;  % area is recruited at this rate
+            
+            recruited = false(scm.grid_size);  % set state negative to indicate "not recruited"
+            recruited(scm.stim_center(1), scm.stim_center(2)) = true;  % stim center is recruited at t = 0;
+            map_(recruited) = 0;
+            tt = dt_;  % advance tt
+            
+            % repeat until end of simulation or all nodes are recruited
+            while tt < (scm.duration + scm.padding(2)) && any(isinf(map_), 'all')
+                                
+                % find non-recruited points with recruited neighbors
+                boundary = conv2(recruited, [0 1 0; 1 -4 1; 0 1 0], 'same') > 0;  
+                
+                % advance wavefront randomly
+                dice = rand(size(recruited));  
+                wavefront = (dice < p_wavefront) & boundary;
+                
+                recruited(wavefront) = true;
+                
+                map_(wavefront) = tt;
+                
+                tt = tt + dt_;
+            end
+
+        end
         function map_ = generate_map(scm)
             % Generates a linear radial distance from source map with some
             % 2D gaussian noise
@@ -446,20 +487,41 @@ scm.Qi_collapse(1) = 20;
 
         end
         function rotate(self, theta), self.Rotate(theta); end  % legacy
-        function inds = NPinds(scm)
+        function dims = get.dimsNP(scm)
+            dims = arrayfun(@min, scm.dimsNP, scm.grid_size);
+        end
+        function ctr = get.centerNP(scm)
+            if isempty(scm.centerNP)
+				scm.centerNP = scm.grid_size / 2; 
+            end
+            ctr = scm.centerNP;
+            xx = 1:scm.grid_size(1);
+            yy = 1:scm.grid_size(2);
+            [~, ext_x] = sort(abs(xx - ctr(1))); ext_x = sort(xx(ext_x(1:scm.dimsNP(1))));
+            [~, ext_y] = sort(abs(yy - ctr(2))); ext_y = sort(yy(ext_y(1:scm.dimsNP(2))));
+            ctr = mean([ext_x', ext_y']);
 
-            x_offset = ( (1:scm.dimsNP(1)) - floor(scm.dimsNP(1)/2) );
-            y_offset = ( (1:scm.dimsNP(2)) - floor(scm.dimsNP(2)/2) );
-            [xx, yy] = ndgrid(x_offset, y_offset);
-
-            inds = sub2ind(scm.grid_size, ...
-                scm.centerNP(1) + xx(:), ...
-                scm.centerNP(2) + yy(:));
+        end
+        function [inds, ext_x, ext_y] = NPinds(scm)
+            % Computes the indices extracted as the MEA. Recomputes
+            % scm.centerNP and scm.dimsNP when called.
+            
+            mea_mask = false(scm.grid_size);
+            ctr = scm.centerNP;
+            
+            xx = 1:scm.grid_size(1);
+            yy = 1:scm.grid_size(2);
+            [~, ext_x] = sort(abs(xx - ctr(1))); ext_x = sort(xx(ext_x(1:scm.dimsNP(1))));
+            [~, ext_y] = sort(abs(yy - ctr(2))); ext_y = sort(yy(ext_y(1:scm.dimsNP(2))));
+            mea_mask(ext_x, ext_y) = true;
+            inds = find(mea_mask);
+    
+            
         end
         function inds = ECinds(scm)
             % Never used this... might need help
-            x_offset = ( (1:scm.dimsNP(1)) - floor(scm.dimsNP(1)/2) ) * scm.scaleEC;
-            y_offset = ( (1:scm.dimsNP(2)) - floor(scm.dimsNP(2)/2) ) * scm.scaleEC;
+            x_offset = ( (1:scm.dimsEC(1)) - floor(scm.dimsEC(1)/2) ) * scm.scaleEC;
+            y_offset = ( (1:scm.dimsEC(2)) - floor(scm.dimsEC(2)/2) ) * scm.scaleEC;
             [xx, yy] = ndgrid(x_offset, y_offset);
 
             inds = sub2ind(scm.grid_size, ...
@@ -468,18 +530,21 @@ scm.Qi_collapse(1) = 20;
         end
         function show_layout(scm)
             
-%             X = zeros(scm.grid_size);
-            X = max(scm.source, [], 3);
-            base = max(X(:));
+            X = zeros(scm.grid_size);
+            X(logical(scm.IZ)) = 1;
+            X(scm.NPinds) = 4;  % mea
+            X(scm.source) = 2;
             
-            X(scm.stim_center(1), scm.stim_center(2)) = base+1;  % IW
-            X(scm.NPinds) = base+2;  % mea
+            X(scm.stim_center(1), scm.stim_center(2)) = 3;  % IW
+%             [xx, yy] = ind2sub(scm.grid_size, scm.NPinds);
+%             inds = sub2ind(scm.grid_size, yy, xx);
+            
             
 %             X(~scm.excitability_map) = -1;
             figure('name', 'layout'); imagesc(X);
             cb = colorbar;
-            set(cb, 'ticks', 1:4, 'limits', [0 base+2], ...
-                'ticklabels', {'EZ', 'FS', 'IWs', 'MEA'})
+            set(cb, 'ticks', 1:4, 'limits', [0 4], ...
+                'ticklabels', {'IZ', 'FS', 'IWs', 'MEA'})
         end
         function phi = theta_FS(scm)
             phi = nan(size(scm.source, 3), 1);
@@ -518,6 +583,10 @@ scm.Qi_collapse(1) = 20;
 	
 	properties  % updates
         
+        
+        % Epileptogenic zone and fixed source. A baseline increase in excitability over a
+        % subregion of the sim. Default shapes set in the getters
+        IZ = 1.2
         
         % A predetermined IW map. Generate this if the IW is independent of
         % the rest of the sim. It should be a grid of recruitment times. I
@@ -763,6 +832,26 @@ scm.Qi_collapse(1) = 20;
     
     
     methods  % Emily parameter functions
+        function FS = get.source(scm)
+            % Default the fixed source to a .25x.25 cm ellipse centered at
+            % [2.2, 2.2] cm with the value given in scm.FS (this is in
+            % addition to IZ)
+            if isempty(scm.source), scm.source = 0; end
+            if numel(scm.source) == 1
+                center = round( [2.2 2.2] / scm.dx );
+                radius = round( [.25 .25] / scm.dx );
+                scm.source = double(scm.ellipse(center, radius)) * scm.source;
+            end
+            FS = scm.source;
+        end
+        function IZ = get.IZ(scm)
+            % Default the epileptogenic zone to an ellipse with the value
+            % given in scm.IZ
+            if numel(scm.IZ) == 1
+                scm.IZ = double(scm.ellipse()) * scm.IZ;
+            end
+            IZ = scm.IZ;
+        end
         function qm = Qi_max_fun(scm, state)
             % Model of inhibitory collapse. Max inhibitory firing rate
             % collapses following an inverse gaussian (this was chosen
@@ -828,19 +917,21 @@ scm.Qi_collapse(1) = 20;
             str = sprintf('%s/%s/%s_Seizure%d_Neuroport_%d_%d.mat', ...
                 pwd, scm.label, scm.label, scm.sim_num, scm.padding);
         end
-        function map = ellipse(scm, C, R)
+        function map = ellipse(scm, C, R, value)
             % map = scm.ellipse(center=grid_size/2, radius=grid_size/2-4)
             % Returns a binary map matching scm.grid_size with an ellipse
             % centered at C (1x2) with radius R (1x2)
             
             if nargin < 2 || isempty(C),  C = scm.grid_size ./ 2; end
             if nargin < 3 || isempty(R); R = floor(scm.grid_size / 2 - 4); end
+            if nargin < 4 || isempty(value); value = true; end
+            
             if numel(R) == 1, R = [R R]; end
             [ix, iy] = ind2sub(scm.grid_size, 1:prod(scm.grid_size));
 
             map = false(scm.grid_size);
             ellipse = sum( ([ix' iy'] - C).^2 ./ R.^2, 2 ) < 1;
-            map(ellipse) = true;
+            map(ellipse) = value;
         end
         function t0s = get.t0_start(p)
             if isempty(p.t0_start), p.t0_start = -p.padding(1); end
@@ -865,17 +956,21 @@ scm.Qi_collapse(1) = 20;
 			end
 			dt = P.dt;
 
-		end
+        end
+        function outs = get.out_vars(scm)
+            outs = [scm.out_vars, {'Qe', 'Ve'}];
+            [~, o_inds] = unique(outs);
+            outs = outs(sort(o_inds));
+            
+        end
 		function grid_size = get.grid_size(p)
 			if any(mod(p.grid_size, 2)), p.grid_size = p.grid_size + mod(p.grid_size, 2); end
 			grid_size = p.grid_size;
-		end
-        function center = get.centerNP(P)
-            if isempty(P.centerNP)
-				P.centerNP = round(P.grid_size / 2); 
-            end
-            center = P.centerNP;
-		end
+        end
+%         function dims = get.dimsNP(scm)
+%             dims = arrayfun(@min, scm.dimsNP, scm.grid_size);
+%         end
+        
 		function center = get.centerEC(P)
             if isempty(P.centerEC)
                 P.centerEC = round(P.grid_size / 2);
