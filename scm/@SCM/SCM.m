@@ -528,7 +528,7 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
                 scm.centerNP(1) + xx(:), ...
                 scm.centerNP(2) + yy(:));
         end
-        function show_layout(scm)
+        function h = show_layout(scm)
             
             X = zeros(scm.grid_size);
             X(logical(scm.IZ)) = 1;
@@ -541,7 +541,7 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
             
             
 %             X(~scm.excitability_map) = -1;
-            figure('name', 'layout'); imagesc(X);
+            h = figure('name', 'layout'); imagesc(X);
             cb = colorbar;
             set(cb, 'ticks', 1:4, 'limits', [0 4], ...
                 'ticklabels', {'IZ', 'FS', 'IWs', 'MEA'})
