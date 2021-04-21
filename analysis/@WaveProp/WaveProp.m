@@ -154,6 +154,16 @@ classdef WaveProp
             M(num_finite < s.MinFinite(1)) = nan;
 			mask = s.p > s.sig | isnan(M);
             
+            % Limit to smooth changes as these represent waves rather than
+            % noise
+            dir = atan2(s.Vy, s.Vx);
+            dir(mask) = nan;
+            dir_sm = movmean(exp(1j*dir), 2);  
+            dir_sm(abs(dir_sm) < cos(pi/8)) = nan; % this ensures consecutive angles differ by less than 45°
+            d2 = movmean(dir_sm, .04, 'samplepoints', M.time);  % waves traveling at 100mm/s should be on the MEA ~40 ms
+            d2(d2 < cos(pi/4)) = nan;  % 
+            mask = isnan(d2);
+            
             % mask times when VNS is active in CUCX5
             if strcmpi(s.Name, 'cucx5_seizure3')
                 vns_times = s.time >= 13 & s.time <= 29;
@@ -204,11 +214,13 @@ classdef WaveProp
 			RB = RB(s.Inds);
         end
         
-		function D = get.Direction(s)
-			D = atan2(s.Vy, s.Vx);
-			D = D(s.Inds);
-			D(s.mask) = nan;
-			D = D - s.RotateBy;
+		function D = get.Direction(M)
+			D = atan2(M.Vy, M.Vx);
+			D = D(M.Inds);
+			D(M.mask) = nan;
+            
+            
+			D = angle(d2) - M.RotateBy;
 			D = angle(exp(1j * D));  % Keep in range [-pi pi]
         end
         
