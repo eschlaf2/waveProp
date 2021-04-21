@@ -160,7 +160,7 @@ classdef WaveProp
             dir(mask) = nan;
             dir_sm = movmean(exp(1j*dir), 2);  
             dir_sm(abs(dir_sm) < cos(pi/8)) = nan; % this ensures consecutive angles differ by less than 45°
-            d2 = movmean(dir_sm, .04, 'samplepoints', M.time);  % waves traveling at 100mm/s should be on the MEA ~40 ms
+            d2 = movmean(dir_sm, .04, 'samplepoints', s.time);  % waves traveling at 100mm/s should be on the MEA ~40 ms
             d2(d2 < cos(pi/4)) = nan;  % 
             mask = isnan(d2);
             
