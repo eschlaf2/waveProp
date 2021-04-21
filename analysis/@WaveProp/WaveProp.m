@@ -220,7 +220,7 @@ classdef WaveProp
 			D(M.mask) = nan;
             
             
-			D = angle(d2) - M.RotateBy;
+			D = angle(D) - M.RotateBy;
 			D = angle(exp(1j * D));  % Keep in range [-pi pi]
         end
         
