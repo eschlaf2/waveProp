@@ -110,7 +110,7 @@ function hist1D_(ax, obj)
     dir = obj.Direction;
     [H, C] = ksdensity([dir - 2*pi; dir; dir + 2*pi], ...
         1.25 * pi * linspace(-1, 1, 100), ...
-        'bandwidth', pi/8);
+        'bandwidth', pi/16);
     plot(ax, H, C, 'linewidth', 2);
     axis(ax, 'tight');
     xticks(ax, []); yticks(ax, [-pi pi]); grid(ax, 'on');
