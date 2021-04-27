@@ -35,6 +35,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		lfp_lo
 		custom
 		firing_rate
+        iw_firing_rate
 		mua_events
 		wave_fits
 		event_times
@@ -76,7 +77,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
     end
 	
 
-	methods % init, setters and getters
+	methods % 
 		
 		function mea = MEA(path, SR)
 			
@@ -467,11 +468,11 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
         % D = mea.make_3d(data=mea.Data)
             if nargin < 2, data = mea.Data; end
             nT = size(data, 1);
-            D = nan([max(mea.Position), nT]);
+            D = nan([nT, max(mea.Position)]);
             temp = nan(max(mea.Position));
-            for ii = 1:nT, 
+            for ii = 1:nT
                 temp(mea.locs) = data(ii, :); 
-                D(:, :, ii) = temp; 
+                D(ii, :, :) = temp; 
             end
         end
 		
@@ -566,9 +567,30 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			pos = mea.Position;
 			pos(mea.BadChannels, :) = [];
 			pos(mea.ExcludedChannels, :) = [];
-		end
+        end
 		
 			
+        function d = create_low_pass_filter(mea)
+            d = designfilt('lowpassfir', ...
+                'passbandfrequency', .1, ...
+                'stopbandfrequency', 1, ...
+                'stopbandattenuation', 30, ...
+                'samplerate', mea.SamplingRate);
+            save('low_pass_filter', 'd')
+        end
+        function fr_lo = get.iw_firing_rate(mea)
+            if isempty(mea.iw_firing_rate)
+                % mea.create_low_pass_filter;
+                load('low_pass_filter', 'd');
+                fr_lo = filtfilt(d, mea.firing_rate);
+                fr_lo = max(fr_lo, 0);  % filtering may introduce negatives
+                fr_lo = filloutliers(fr_lo, 'linear', 'ThresholdFactor', 10);
+                mea.iw_firing_rate = fr_lo;
+            else
+                fr_lo = mea.iw_firing_rate;
+            end
+            
+        end
 		function fr = get.firing_rate(mea)
 			if isempty(mea.firing_rate)
 				fr = mea.compute_firing_rate(mea); 
@@ -663,10 +685,129 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 	end
 	
 	methods % wave fitting
+        
+        function [out, M] = get_IW_templates(mea, M, win, max_templates, varargin)
+            % [out, M] = get_IW_templates(mea, M=::saved Miw::, win=4, max_templates=Inf, varargin)
+            % Use max descent type analysis to find IW times and templates
+            if nargin < 4 || isempty(max_templates), max_templates = inf; end
+            if nargin < 3 || isempty(win), win = []; end
+            if nargin < 2 || isempty(M)
+                M = WaveProp.load(mea, {'Miw'});
+                M = M.Miw;
+                M.MinFinite = 10;
+            end
+            MIN_FR = 30;
+            
+            data_fr = movmax(mea.iw_firing_rate, 2*M.HalfWin, ...
+                'omitnan', 'SamplePoints', mea.Time);
+            if isempty(win)
+%                 [~, ~, win] = arrayfun(@(ii) ...
+%                     findpeaks(data_fr(:, ii), mea.Time, ...
+%                     'SortStr', 'descend', 'NPeaks', 1), ...
+%                     1:size(data_fr, 2), 'uni', 0);
+%                 win = median(cell2mat(win));
+%                 if isnan(win), win = 1; end
+                [~, ~, win] = findpeaks(nanmedian(data_fr, 2), mea.Time, ...
+                    'SortStr', 'descend', 'NPeaks', 1);
+            end
+            data_fr(data_fr < MIN_FR) = nan;
+            data_fr = filloutliers(data_fr, nan, 2, 'ThresholdFactor', 3);
+            ind_t = mea.time2inds(M.time);
+            data_fr = mea.make_3d(data_fr(ind_t, :));
+
+            
+            dat = M.Data - M.HalfWin + M.time;  % Get the TOA
+            SZ = size(dat);
+            dat_sm = movmean(reshape(dat, SZ(1), []), win, 'omitnan', ...  % smooth over a XXs window (4s bc if IW moves at 1mm/s then it should be on the MEA for 4s)
+                'SamplePoints', M.time);
+            dat_sm = reshape(filloutliers(dat_sm, nan, 2), SZ);
+            dat_sm(isnan(data_fr)) = nan;
+%             mask = sum(isfinite(dat), [2 3]) < M.MinFinite;
+            mask = sum(isfinite(dat_sm), [2 3]) < M.MinFinite;
+            dat_sm(mask, :, :) = nan;
+            N = sum(isfinite(dat_sm), [2 3]);
+            tt = nanmedian(dat_sm, [2 3]);
+            tt(isnan(tt)) = M.time(isnan(tt));
+            
+            [tt, so] = sort(tt);
+            dat_sm = dat_sm(so, :, :);
+            data_fr = data_fr(so, :, :);
+            N = N(so);
+            
+%             tt = tt;
+            while any(diff(tt) <= 0)
+                for jj = find(diff(tt) <= 0)' + 1
+                    tt(jj) = tt(jj - 1) + 1e-5;
+                end
+            end
+            
+            [~, locs_t] = findpeaks(N, tt, 'MinPeakDistance', win/2, 'MinPeakHeight', 30);
+            [~, locs_] = min(abs(tt - locs_t'));  
+            
+            template = dat_sm(locs_, :, :);
+            fr_template = data_fr(locs_, :, :);
+            
+            N = nanmedian(fr_template, [2 3]);
+            fr_mask = N/max(N) >= .5;
+            template = template(fr_mask, :, :);
+            fr_template = fr_template(fr_mask, :, :);
+            locs_t = locs_t(fr_mask);
+            
+
+            % Return <max_templates> with highest total firing rate
+            if isfinite(max_templates) && numel(locs_t) > max_templates
+                inds = 1:min(max_templates, numel(locs_t));
+%                 N = sum(isfinite(template), [2 3]);
+                N = nanmedian(fr_template, [2 3]);
+                [~, so] = sort(N, 'descend');
+                so = sort(so(inds));
+                template = template(so, :, :);
+                fr_template = fr_template(so, :, :);
+                locs_t = locs_t(so);
+            end
+             
+            out = struct('template', template, ...
+                'firing_rate', fr_template, ...
+                'time', locs_t, 'win', win);
+            
+        end
+        
 		function F = flow(s)
 			F = WaveFlow(s);
-		end
+        end
 
+        function M = max_descent_IW(mea, times, varargin)
+            % Use max descent method to compute IW-like wave propagation
+            
+            MIN_FR = 30;
+            if nargin < 2 || isempty(times)
+                times = mea.Time(1):.1:mea.Time(end); 
+            end
+            data = mea.iw_firing_rate;
+%             data = data - MIN_FR; data(data < 0) = 0;  % Require min firing rate of 30
+            
+            S = warning; warning off;
+			N = numel(times);
+			M(N) = MaxDescent(varargin{:});
+            D0 = mea.MaxDescentData;
+            dataN = normalize(data, 'scale');
+            dataN(data < MIN_FR) = 0;  % Require min firing rate of 30
+%             dataN = data ./ MIN_FR;  % Considers MIN_FR to be a significant firing rate
+            mea.MaxDescentData = -dataN;
+			for ii = 1:N
+				t0 = times(ii);
+				M(ii) = MaxDescent(mea, t0, ...
+                    'halfwin', 1, ...
+                    varargin{:});		
+			end
+			M = WaveProp.resize_obj(M);
+            M.MinFinite = 10;  % Set to 10 to accommodate slow movement relative to window
+			M.Name = ['IW_' mea.Name];
+            
+            warning(S);
+            mea.MaxDescentData = D0;
+        end
+        
 		function M = max_descent(mea, times, varargin)
             if nargin < 2 || isempty(times) 
                 times = mea.Time(1):.01:mea.Time(end); 

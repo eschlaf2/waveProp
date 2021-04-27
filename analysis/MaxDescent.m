@@ -27,8 +27,8 @@ classdef MaxDescent < WaveProp
 					mea.MaxDescentData = zscore(mea.filter(mea.Data, mea.SamplingRate, obj.FBand));
 				end
 				window = obj.get_window(mea);
-			else
-				obj = obj.parse_inputs(param_names, varargin{:});
+            else
+				obj = obj.parse_inputs(obj.ParamNames, varargin{:});
 				window = data;
 			end
 			
