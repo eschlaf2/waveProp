@@ -4,6 +4,8 @@ classdef MaxDescent < WaveProp
 		HalfWin = 0.05
 		FBand = [1 50]
         Ascent = false
+        MinFiniteLow = 10
+        DiffsOrPeaks char {mustBeMember(DiffsOrPeaks,{'diffs','peaks'})} = 'diffs'
 	end
 	
 	properties (Hidden = true)
@@ -16,7 +18,7 @@ classdef MaxDescent < WaveProp
 			
 			if nargin < 1, return, end
 			if ischar(data), obj = obj.parse_inputs(data, t0, varargin{:}); return; end
-			if isa(data, 'MEA')
+            if isa(data, 'MEA')
 				mea = data;
 				obj.t0 = t0;
 				obj.HalfWin = mea.params.half_win / 1e3;
@@ -30,13 +32,12 @@ classdef MaxDescent < WaveProp
             else
 				obj = obj.parse_inputs(obj.ParamNames, varargin{:});
 				window = data;
-			end
+            end
 			
 	
 			obj.Data = obj.get_data(window);
 			obj.Data = obj.Data / mea.SamplingRate;
-% 			obj.Data = obj.get_data(mea);
-% 			if numel(unique(obj.Data(~isnan(obj.Data)))) < 3, return, end
+            if obj.HalfWin < .05, obj.MinFinite = obj.MinFiniteLow; end
 			obj = obj.compile_results;
 			
         end
@@ -49,11 +50,15 @@ classdef MaxDescent < WaveProp
 			window = data(t_inds, :);
         end
         
-		function data = get_data(~, window)
+		function data = get_data(M, window)
 			
 			window = window - window(1, :);  % set first time point as baseline (for visualization early)
 			
-			[change, time_point] = min(diff(window, 1, 1));  % Find time of maximal descent
+            if strcmpi(M.DiffsOrPeaks, 'peaks')
+                [change, time_point] = min(window);  % Find time of minimal peak
+            else
+                [change, time_point] = min(diff(window, 1, 1));  % Find time of maximal descent
+            end
 			non_decreasing = change >= 0;  % Find non-decreasing traces
 			bdry = (time_point == 1) | (time_point == size(window, 1) - 1);  % ... and traces with max descent on the boundary (these are often not part of the wave and confuse the analysis)
 			inactive = range(window) < 1;

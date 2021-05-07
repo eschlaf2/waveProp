@@ -16,6 +16,8 @@ classdef WaveProp
 		Quadratic = false
 		RotateBy = 0
         MinFinite = 30
+        Length = 4  % length of the MEA (always 4 mm, unless it's a sim)
+        MMpElectrode = .4  % mm per electrode (again, always 4 unless it's a sim)
 % 		HalfWin
 % 		FBand
     end
@@ -212,9 +214,10 @@ classdef WaveProp
         
 		function D = get.Direction(M)
 			D = atan2(M.Vy, M.Vx);
-			D = D(M.Inds);
-			D(M.mask) = nan;
             
+            inds_ = M.Inds;
+            M.Inds = [];
+			D(M.mask) = nan;
             
             % Limit to smooth changes as these represent waves rather than
             % noise
@@ -226,17 +229,19 @@ classdef WaveProp
             
 			D = angle(d2) - M.RotateBy;
 			D = angle(exp(1j * D));  % Keep in range [-pi pi]
+            M.Inds = inds_; %#ok<MCVM>
+            D = D(inds_);
         end
         
 		function M = get.Magnitude(self)
             % in mm/s
-			M = sqrt(self.Vx.^2 +  self.Vy.^2) * .4;  % Fits return electrodes/second. Convert to mm/s
+			M = sqrt(self.Vx.^2 + self.Vy.^2) * self.MMpElectrode;  % Fits return electrodes/second. Convert to mm/s
 			M = M(self.Inds);
             M(self.mask) = nan;
         end
         function M = get.AltMagnitude(self)
             t_ext = range(self.Data, [2 3]);  % time taken for wave to cross MEA
-            M = 5.67 ./ t_ext;  % speed in mm/second (5.67 mm = length of MEA diagonal)
+            M = self.Length * sqrt(2) ./ t_ext;  % speed in mm/second (5.67 mm = length of MEA diagonal)
             M = M(self.Inds);
             M(self.mask) = nan;
         end
@@ -292,6 +297,8 @@ classdef WaveProp
         %% Helpful others
         
         function [dat, tt, pos] = preproc_discharges(M)
+            
+            % Reshape data into a 2D matrix; 
             BASELINE_CUTOFF = 2;  % Use 4 if you switch to robust normalization
             dat = reshape(M.Data, length(M.Data), []);
             tt = M.time;
@@ -300,40 +307,55 @@ classdef WaveProp
             locs_ = find(normalize(sum(isfinite(dat))) > -1);
             dat = dat(:, locs_);
             
+            % If using very short windows (i.e. likely to have only a few
+            % electrodes active at a time), "extend" the windows using a
+            % moving average
             if M.HalfWin < .03
                 dat = movmean(dat + tt, .1, 'omitnan', 'SamplePoints', tt);
+                dat = filloutliers(dat, nan, 2);  % remove outliers introduced by smoothing
             end
-            dat = filloutliers(dat, nan, 2);
+            
+            % Remove time points with fewer than MinFinite electrodes
+            % active
             mask_ = sum(isfinite(dat), 2) < M.MinFinite;
             dat(mask_, :) = [];
             tt(mask_) = [];
             
-            
+            % Require that discharges be at least 50 ms apart (again, this
+            % shouldn't really be doing anything in the M or D10 methods
+            % since those are already controlling for this... mostly for
+            % experimental short window methods)
             [~, locs_t] = findpeaks(sum(isfinite(dat), 2), tt, ...
                 'MinPeakDistance', .05, 'minpeakheight', M.MinFinite);
             [~, locs_i] = min(abs(locs_t' - tt));
             
+            % Z-score the data at each time point
             dat = normalize(dat(locs_i, :), 2, 'zscore', 'std');
             tt = tt(locs_i);
-            nanmask = all(isnan(dat), 2);  % robust normalizing will remove 
+            nanmask = all(isnan(dat), 2);  % robust normalizing will remove all points sometimes (shouldn't need it after prior treatment anyway)
             dat(nanmask, :) = [];
             tt(nanmask) = [];
             
-            % One more pass to get rid of outliers coming from the
-            % normalization
+            % Remove forms that look nothing like anything else (i.e.
+            % discharges that have high distance at the .01 quantile)
             ddd = pdist(fillmissing(dat, 'constant', 0), 'squ');
             ddd = squareform(ddd/size(dat, 2));
             
             level = quantile(ddd, .01);
-%             plot(tt, level);
-%             yline(BASELINE_CUTOFF);
-%             ylim([0 2.5])
-%             title('q(pdist, 0.01)')
             
             locs_i = level < BASELINE_CUTOFF;
+            if sum(~locs_i) > 2
+                % Again, this shouldn't be doing much. It's here for
+                % the sake of the clustering more than anything, but noise
+                % should be well removed by now, so send a warning if this
+                % removes more than two discharges. 
+                warning('More than 2 discharges (%d) removed as outliers.', sum(~locs_i)); 
+            end
+            
             dat = dat(locs_i, :);
             tt = tt(locs_i);
             
+            % Compute position for easy shaping on return
             [xx, yy] = ind2sub([10, 10], locs_);
             pos = [xx(:), yy(:)];
             
@@ -348,9 +370,7 @@ classdef WaveProp
             k = 1;
             
             [dat, tt, pos] = M.preproc_discharges;
-            
-            
-            
+                        
             X = fillmissing(dat, 'constant', 0);
             % eva = evalclusters(single(X), @kmedoids, 'gap', 'klist', 5:30);
 
@@ -441,57 +461,84 @@ classdef WaveProp
             D2squared = nansum(sqdx,2).*n./nstar; % Correction for missing coordinates
             D2 = sqrt(D2squared);
         end
-        function [dist_rho, dist_p, tt] = distance(M, templates, pthresh)
+        function [dist_rho, tpl_id, tt, full] = distance(M, templates)
+            % Converts correlation to distance (1 - rho);
+            % [dist_rho, tpl_id, tt, full] = distance(M, templates)
+            [rho, ~, tt, rho_sig, pval_sig] = M.correlation(templates);
+            dist_rho = 1 - rho_sig;
+            full = 1 - rho;
+            tpl_id = pval_sig(:, 2);
+            
+        end
+        
+        function [rho, pval, tt, rho_sig, pval_sig] = correlation(M, templates)
+            % [rho, pval, tt, rho_sig, pval_sig] = correlation(M, templates)
+            % Outputs:
+            %     rho: correlation for each discharge-template pair. 
+            %     pval: p-value (non-zero rho) corresponding to rho
+            %     tt: is the time of the discharge. 
+            %     rho_sig: correlation of matching the lowest pvalue (most
+            %         certainty of non-zeros correlation)
+            %     pval_sig: (Nx2), lowest pvalue in first column and template
+            %         number in second column
             
             assert(~isempty(templates), 'Input must be non-empty.')
-            if nargin < 3 || isempty(pthresh), pthresh = 5e-2; end
+            
+            % z-score the templates and reshape to 2d (time x electrode#)
             templates = normalize(reshape(templates, size(templates, 1), 100)');
-%             dat = M.Data;
-%             mask_ = sum(isfinite(dat), [2 3]) >= M.MinFinite;
-            [dat, tt, pos] = M.preproc_discharges;
+
+            % preprocess discharges (a little cleaning, but mostly this
+            % just extracts the times where there are enough finite
+            % electrodes and normalizes the data at each time point)
+            [dat, tt, pos] = M.preproc_discharges;  
             locs_ = sub2ind([10 10], pos(:, 1), pos(:, 2));
-            dist_rho = nan(size(dat, 1), size(templates, 1));
-            dist_p = dist_rho;
+            
+            % initialize matrices to hold results
+            rho = nan(size(dat, 1), size(templates, 2));
+            pval = rho;
+            
+            % compute correlate (rho) and p-val (where H0 is "correlation
+            % is 0") for each TW and template pair
             for ii = 1:size(templates, 2)
-%                 for jj = find(mask_)'
                 for jj = 1:size(dat, 1)
-%                     XY = [rescale(reshape(templates(ii, :, :), [], 1)), ...
-%                         rescale(reshape(dat(jj, :, :), [], 1))];
-                    temp = nan(100, 1);
+
+                    % reshape the discharge to match the template shape and
+                    % put template and discharge into a 100x2 array
+                    temp = nan(100, 1);  
                     temp(locs_) = dat(jj, :); 
                     XY = [templates(:, ii), temp];
+                    
+                    % Remove electrodes with nan values
                     XY = XY(~any(isnan(XY), 2), :);
+                    
+                    % if fewer than 5 electrodes remain, don't compute corr
                     if size(XY, 1) < 5, continue; end
-                    [rho, p_] = corr(XY);
-                    dist_rho(jj, ii) = 1 - rho(2);
-                    dist_p(jj, ii) = p_(2);
+                    [rho_, p_] = corr(XY);
+                    
+                    % store the results
+                    rho(jj, ii) = rho_(2);
+                    pval(jj, ii) = p_(2);
                 end
             end
             
-            % choose the template that has the most extreme value with a
-            % significant fit
-            [~, idx_p] = min(dist_p, [], 2);
-            [max_dist, template_idx] = max(abs((1-dist_rho) .* double(dist_p < pthresh)), [], 2);
-            idx_mask = (max_dist == 0) & idx_p ~= template_idx;
-            template_idx(idx_mask) = idx_p(idx_mask);
+            % Additionally return the correlation and p-val for the
+            % template where each discharge had the most significant p-val.
             
+            % Choose the template with the most significant pvalue
+            [~, template_idx] = min(pval, [], 2);
             
-%             % Choose the template with the most significant fit
-%             [~, template_idx] = min(dist_p, [], 2);
-            
-            
-            inds = sub2ind(size(dist_rho), 1:size(dist_rho, 1), template_idx');
-            dist_p = dist_p(inds(:));
-            mask_ = isnan(dist_p);
-            dist_rho = dist_rho(inds(:));
-            dist_rho(mask_) = nan;
+            inds = sub2ind(size(rho), 1:size(rho, 1), template_idx');
+            pval_sig = pval(inds(:));
+            mask_ = isnan(pval_sig);
+            rho_sig = rho(inds(:));
+            rho_sig(mask_) = nan;
             template_idx(mask_) = nan;
-            dist_p = [dist_p template_idx];
+            pval_sig = [pval_sig template_idx];
         end
         
-        function [res, dir_sm, win, thresh] = discharge_directions(M, win, thresh)
+        function [dir_out, sp_out, dir_sm, win, thresh] = discharge_directions(M, win, thresh)
             % out = discharge_directions(M, win=0.05, thresh=pi/4)
-            % Returns the first direction from each independent discharge.
+            % Returns the direction from each independent discharge.
             % Inputs: 
             %   win: min time between discharges to use (in seconds)
             %   thresh: threshold on directionality  
@@ -500,6 +547,8 @@ classdef WaveProp
             
             D = M.Direction;
             tt = M.time;
+            SP = M.AltMagnitude;
+            SP(~isfinite(D)) = nan;
             
             dir = exp(1j * D);
             dir_sm = movmean(dir, win, 'omitnan', 'SamplePoints', tt);
@@ -509,10 +558,11 @@ classdef WaveProp
                 'minpeakheight', max(cos(thresh/2), .5), ...
                 'minpeakdistance', win);
             [~, locs_i] = min(abs(tt(:) - locs(:)'));
-            res = nan(size(dir_sm));
-            res(locs_i) = angle(dir_sm(locs_i));
+            dir_out = deal(nan(size(dir_sm)));
+            dir_out(locs_i) = angle(dir_sm(locs_i));
             
-            dir_sm = angle(dir_sm);
+            sp_out = movmean(SP, win, 'omitnan', 'SamplePoints', tt);
+            sp_out(~isfinite(dir_out)) = nan;
             
         end
         function dir_sm = smooth_angular(M, dir, win, thresh)
@@ -567,6 +617,12 @@ classdef WaveProp
             dir_sm = angle(dir_sm);
             
         end
+        function [dir_index, win] = directionality_index(M, win)
+            % dir_index = directionality_index(M, win=[])
+            % Wrapper to get directionality index from F.smoothed_direction
+            if nargin < 2, win = []; end
+            [~, dir_index, win] = M.smoothed_direction(win);
+        end
         function [dir_sm, dir_index, win, thresh] = smoothed_direction(M, win, thresh)
             % Returns the directions smoothed over <win> second windows
             % where directionality is at least <thresh> (i.e. length of
@@ -581,9 +637,12 @@ classdef WaveProp
             end
             dir_sm = movmean(dir, win, 'omitnan', 'SamplePoints', M.time);
             dir_index = abs(dir_sm);
+            N = movsum(isfinite(dir), win, 'samplepoints', M.time);
+            dir_index(N == 1) = nan;  % enforce at least 2 discharges in a window to compute the index
             dir_sm(isnan(dir) | dir_index < thresh) = nan;
             dir_sm = angle(dir_sm);
         end
+        
         function diffs = dtheta_dt(M, win, thresh)
             if nargin < 2, win = []; end
             if nargin < 3, thresh = []; end
@@ -595,31 +654,50 @@ classdef WaveProp
         
 		%% Plotting
         
-        function [ax, out] = distance_scatter(M, iw_tpl, thresh)
+        function [ax, out] = distance_scatter(M, iw_tpl)
             % iw_tpl = mea.get_IW_templates
-            if nargin < 3 || isempty(thresh), thresh = inf; end
-            [dist, dist_p, dist_time] = M.distance(iw_tpl.template, thresh);
-            mask_ = isfinite(dist_p(:, 1)); 
-            scatter(dist_time(mask_), ...
-                1-dist(mask_), ...
-                abs(log(dist_p(mask_, 1)+eps)), ...
-                dist_p(mask_, 2), 'filled')
-            colormap(gca, hsv(max(dist_p(mask_, 2))));
+            [rho, rho_p, rho_time] = M.correlation(iw_tpl.template);
+            mask_ = isfinite(rho_p(:, 1)); 
+            scatter(rho_time(mask_), ...
+                rho(mask_), ...
+                abs(log(rho_p(mask_, 1)+eps)), ...
+                rho_p(mask_, 2), 'filled')
+            colormap(gca, hsv(max(rho_p(mask_, 2))));
             
             ylim([-1 1])
             xlim(quantile(M.time, [0 1]))
             for tt = iw_tpl.time', xline(tt); end   
             colorbar
             ax = gca;
-            ax.CLim = quantile(dist_p(mask_, 2), [0 1]) + [-.5 .5];
+            ax.CLim = quantile(rho_p(mask_, 2), [0 1]) + [-.5 .5];
             
-            out = struct('dist_rho', dist, 'dist_p', dist_p, 'time', dist_time);
+            out = struct('dist_rho', rho, 'dist_p', rho_p, 'time', rho_time);
         end
         
-        function [ax, cmap] = direction_raster(M, dir, ax)
-            if nargin < 2 || isempty(dir), dir = M.Direction; end
-            if ischar(dir), dir = M.(dir); end
-            if nargin < 3 || isempty(ax), ax = gca; end
+        function [ax, cmap] = direction_raster(M, ax, dir)
+            
+            switch nargin
+                case 1  % F.direction_raster;
+                    dir = M.Direction;
+                    ax = gca;
+                case 2
+                    if ischar(ax), ax = M.(ax); end
+                    if isnumeric(ax)  % M.direction_raster(dir)
+                        dir = ax;
+                        ax = gca;
+                    else  % F.direction_raster(ax)
+                        dir = M.Direction;
+                    end
+                case 3
+                    if ischar(ax), ax = M.(ax); end
+                    if isnumeric(ax)  % M.direction_raster(dir, ax)
+                        ax_ = dir;
+                        dir = ax;
+                        ax = ax_;
+                    end
+                otherwise
+                    error('Unexpected inputs. Expected <M.direction_raster(ax, dir)>.')
+            end
             
             cmap = hsv;
             
@@ -631,6 +709,7 @@ classdef WaveProp
             ax.ColorOrder = cmap(bin, :);
             
             hold(ax, 'on')
+            scatter(ax, M.time, dir/pi * 180, 6, [0 0 0], 'filled');
             plot(ax, M.time, dir/pi*180, 'k.'); 
             hold(ax, 'off');
             
@@ -836,7 +915,8 @@ classdef WaveProp
         
 		function obj = parse_inputs(obj, varargin)
 			for ii = 1:2:numel(varargin)
-				ff = validatestring(varargin{ii}, [obj.ParamNames(:); obj.WPParamNames(:)]);
+% 				ff = validatestring(varargin{ii}, [obj.ParamNames(:); obj.WPParamNames(:)]);
+                ff = validatestring(varargin{ii}, properties(obj));
 				obj.(ff) = varargin{ii+1};
 			end
         end
@@ -1026,8 +1106,17 @@ classdef WaveProp
         end
 		
         function pax = colorwheel(cmap, pax)
-            if nargin < 3 || isempty(pax), pax = gca; end
-            if nargin < 2 || isempty(cmap), cmap = hsv; end
+            if nargin < 2, pax = []; end
+            if nargin < 1 || isempty(cmap), cmap = hsv; end
+            
+            if isempty(pax)
+                if isa(gca, 'matlab.graphics.axis.PolarAxes'), 
+                    pax = gca; 
+                else
+                    h = figure('name', 'cwheel', 'units', 'inches', 'position', [0 0 .5 .5]);
+                    pax = polaraxes(h);
+                end
+            end
             
             theta = movmean(linspace(-pi, pi, size(cmap, 1) + 1), 2);
             theta = theta(2:end);
@@ -1178,18 +1267,6 @@ classdef WaveProp
 			reduced_data = data;
 			reduced_data(~mask) = nan;
 			
-% 			dataS = sort(data(:));
-% 			if all(isnan(dataS)), reduced_data = data; return; end
-% 			dataS(isnan(dataS)) = [];  % excluded nan values
-% 			diff_sorted = diff(dataS);  % calculate gaps between nearby data points
-% 			big_gaps = isoutlier(unique(diff_sorted));  % find large gaps between datapoints
-% 			divides = [0; find(big_gaps); numel(dataS)];  % divisions between clusters in sorted data
-% 			cluster_sizes = diff(divides);  % size of clusters
-% 			[~, largest] = max(cluster_sizes);  % choose the largest cluster
-% 
-% 			bounds = dataS(divides(largest+[0 1]) + [1; 0]);
-% 			reduced_data = data;
-% 			reduced_data(data < bounds(1) | data > bounds(2)) = nan;
         end
         
 		function S = resize_obj(s, to_struct)

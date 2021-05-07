@@ -39,12 +39,11 @@ for r = 1:R
     
     
     
-%     iw_info = get_iw_info_(F.get_file(ff).name); 
-    iw_info = get_iw_info_(F.get_file(ff));
-%     if isempty(iw_info) || all(isnan(iw_info)), continue; end
+    [iw_info, main_wave] = get_iw_info_(F.get_file(ff));
+
     % center directions around IW
-    if ~isnan(iw_info(end, 4))
-        rotate_by = iw_info(end, 4);  % end to center MG49 around the second wave
+    if ~isnan(iw_info(main_wave, 4))
+        rotate_by = iw_info(main_wave, 4);  % all directions should be set to nan except the main wave
         iw_info(:, 4) = angle(exp(1j.*(iw_info(:, 4) - rotate_by)));
     end
     
@@ -55,7 +54,7 @@ for r = 1:R
     for c = 1:C-1
         mm = F.Metrics{c};
         W.(mm).RotateBy = rotate_by;
-        W.(mm).MinFinite = BVNY.MinFinite;
+        W.(mm).MinFinite = BVNY.MinFinite(W.(mm));
         
         % make the original hist plots
         fit = W.(mm);
@@ -76,33 +75,15 @@ for r = 1:R
         % create the new 2D plot
         data = discretize_data_(plt);
         imagesc(ax(r, c), time, dir, data);
-%         if COMBINE
-%             rgb = 1-F.Style.(mm).color;
-%             im0 = ind2rgb(data, map .* rgb);
-% %             im0 = im0(:, mask, :);
-%             if c == 1, im = im0; else, im = im + im0; end
-%         else  % 'spread'
-%             if r == 1
-%                 title(ax(r, c), F.MetricNames.(mm), ...
-%                     'color', F.Style.(mm).color); 
-%             end
-% %             spread_(plt);
-% %             copyobj(plt, ax(r, c));
-%             im = ind2rgb(data, 1-(map .* [1 1 1]));
-%             imS = smooth_im_(im, A_RES);
-%             imagesc(ax(r, c), time, dir, imS);
-%         end
+
         
-        show_iw_(ax(r, c), iw_info, F.Style.(mm).color);
+        show_iw_(ax(r, c), iw_info(main_wave, :), F.Style.(mm).color);
         
         % make summary subplot
         update_summary_plot_(h_temp, ax_summ, F.Style.(mm))
     end
     
 
-    
-    
-    
 
     if COMBINE
 %         imagesc(ax(r, 1), time(mask), dir, transform_(im));
@@ -154,8 +135,28 @@ function show_iw_(ax0, iw_info, color)
     ax0.NextPlot = sts;
 end
 
-
-function iw_info = get_iw_info_(fname)
+function [iw_info, main_wave] = get_iw_info_(fname)
+    % iw_info = get_iw_info_(fname)
+    % Output: [center ll ul phi phi_pval]
+    fname0 = strsplit(fname, '_fits');
+    [iw_stats, main_wave] = BVNY.get_iw_info(fname0{1});
+    if isempty(iw_stats), iw_info = nan(1, 5); return; end
+    n_waves = numel(iw_stats);
+    iw_info = nan(n_waves, 5);
+    
+    
+    for ii = 1:n_waves
+        temp = iw_stats{ii};
+        
+        iw_info(ii, 1) = temp.onset;
+        iw_info(ii, 2:3) = temp.range;        
+        iw_info(ii, 4) = temp.wave_fit.phi; % this was in degrees at one point, but should be fixed now...
+        iw_info(ii, 5) = temp.wave_fit.p;
+    end
+    
+    
+end
+function iw_info = ZZget_iw_info_(fname)
     % iw_info = get_iw_info_(fname)
     % Output: [center ll ul phi]
     % Only show IWs in the first half of the seizure except in CUCX2_2
@@ -167,11 +168,15 @@ function iw_info = get_iw_info_(fname)
     iw_info = nan(iw.num_waves, 5);
     for ii = 1:iw.num_waves
         
-        if ii == iw.main_wave(iw.name)
+        if ii == iw.main_wave()
             temp = BVNY.get_iw_info(iw.name);
-            if isempty(temp), return; end
+            if isempty(temp.center), return; end
 %             if temp(6) > .05, temp(4) = nan; end  % set phi to nan if fit is not significant
-            iw_info(ii, :) = temp([1:4 6]);
+%             iw_info(ii, :) = temp([1:4 6]);
+            iw_info(ii, 1) = temp.center;
+            iw_info(ii, 2:3) = temp.range;
+            iw_info(ii, 4) = temp.phi / pi * 180;
+            iw_info(ii, 5) = temp.phi_pval;
             
         else
             iw.wave = ii;

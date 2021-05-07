@@ -88,7 +88,12 @@ function [dens, sub_t, xi] = compute_moving_histn_(obj, window, xi)
     dens = zeros(numel(xi), numel(sub_t));
     for ii = 1:numel(sub_t)
         inds = t > sub_t(ii) - window/2 & t < sub_t(ii) + window/2;
-        dirs = obj.Direction(inds);
+        if obj.HalfWin < .03, 
+            dirs = obj.discharge_directions;
+            dirs = dirs(inds);
+        else
+            dirs = obj.Direction(inds);
+        end
         if sum(isfinite(dirs)) < 1, continue; end
         dirs = [dirs + 2*pi; dirs; dirs - 2*pi];
         dens(:, ii) = ksdensity(dirs, xi, 'bandwidth', pi/16); 

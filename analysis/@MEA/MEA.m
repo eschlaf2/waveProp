@@ -51,6 +51,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		PeakRatio
         SpatialCoherence
         NumEvents
+        IW
 
 	end
 	
@@ -81,8 +82,15 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		
 		function mea = MEA(path, SR)
 			
-			if exist('SR', 'var'), mea.SamplingRate = SR; end
-			if exist('path', 'var'), mea.Path = path; end
+			if nargin == 2, mea.SamplingRate = SR; end
+            if nargin > 0
+                if isnumeric(path)
+                    sz = SeizureInfo;
+                    path = sz.fname{path};
+                    disp(path)
+                end
+                mea.Path = path; 
+            end
 			mea.load;
 		end
 		
@@ -165,6 +173,14 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
             
             warning(S);
         end
+        
+        function iw = get.IW(mea)
+            if isempty(mea.IW)
+                mea.IW = IW(mea); %#ok<CPROP>
+            end
+            iw = mea.IW;
+        end
+        
         function whiten(self)
             % This cleans up CUCX5 well (removes clear peak in firing rate
             % from VNS. 
@@ -437,10 +453,10 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			end
 		end
 		function time = get.Time(mea)
-			time = downsample(mea.AllTime(), mea.skipfactor);
+			time = downsample(mea.AllTime, mea.skipfactor);
 		end
 		function time = get.AllTime(mea)
-			time = mea.AllTime();
+			time = mea.AllTime();  % this is saved as a function to save space
 		end
 		
 		function set.SamplingRate(mea, value)
@@ -686,89 +702,23 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 	
 	methods % wave fitting
         
-        function [out, M] = get_IW_templates(mea, M, win, max_templates, varargin)
-            % [out, M] = get_IW_templates(mea, M=::saved Miw::, win=4, max_templates=Inf, varargin)
+        function [out, M] = get_IW_templates(mea, M, win, max_templates, method)
+            % [out, M] = get_IW_templates(mea, M=::saved Miw::, win=4, max_templates=Inf, method)
             % Use max descent type analysis to find IW times and templates
-            if nargin < 4 || isempty(max_templates), max_templates = inf; end
-            if nargin < 3 || isempty(win), win = []; end
-            if nargin < 2 || isempty(M)
-                M = WaveProp.load(mea, {'Miw'});
-                M = M.Miw;
-                M.MinFinite = 10;
-            end
-            MIN_FR = 30;
+            % Wrapper for method defined in IW.m
             
-            data_fr = movmax(mea.iw_firing_rate, 2*M.HalfWin, ...
-                'omitnan', 'SamplePoints', mea.Time);
-            if isempty(win)
-%                 [~, ~, win] = arrayfun(@(ii) ...
-%                     findpeaks(data_fr(:, ii), mea.Time, ...
-%                     'SortStr', 'descend', 'NPeaks', 1), ...
-%                     1:size(data_fr, 2), 'uni', 0);
-%                 win = median(cell2mat(win));
-%                 if isnan(win), win = 1; end
-                [~, ~, win] = findpeaks(nanmedian(data_fr, 2), mea.Time, ...
-                    'SortStr', 'descend', 'NPeaks', 1);
-            end
-            data_fr(data_fr < MIN_FR) = nan;
-            data_fr = filloutliers(data_fr, nan, 2, 'ThresholdFactor', 3);
-            ind_t = mea.time2inds(M.time);
-            data_fr = mea.make_3d(data_fr(ind_t, :));
-
+            iw = IW(mea);
             
-            dat = M.Data - M.HalfWin + M.time;  % Get the TOA
-            SZ = size(dat);
-            dat_sm = movmean(reshape(dat, SZ(1), []), win, 'omitnan', ...  % smooth over a XXs window (4s bc if IW moves at 1mm/s then it should be on the MEA for 4s)
-                'SamplePoints', M.time);
-            dat_sm = reshape(filloutliers(dat_sm, nan, 2), SZ);
-            dat_sm(isnan(data_fr)) = nan;
-%             mask = sum(isfinite(dat), [2 3]) < M.MinFinite;
-            mask = sum(isfinite(dat_sm), [2 3]) < M.MinFinite;
-            dat_sm(mask, :, :) = nan;
-            N = sum(isfinite(dat_sm), [2 3]);
-            tt = nanmedian(dat_sm, [2 3]);
-            tt(isnan(tt)) = M.time(isnan(tt));
+            if nargin < 5 || isempty(method), method = iw.Method; end
+            if nargin < 4 || isempty(max_templates), max_templates = iw.MaxTemplates; end
+            if nargin < 3 || isempty(win), win = iw.W; end
+            if nargin < 2 || isempty(M); M = ''; end
             
-            [tt, so] = sort(tt);
-            dat_sm = dat_sm(so, :, :);
-            data_fr = data_fr(so, :, :);
-            N = N(so);
+            iw.MaxTemplates = max_templates;
+            iw.W = win;
+            iw.Method = method;
             
-%             tt = tt;
-            while any(diff(tt) <= 0)
-                for jj = find(diff(tt) <= 0)' + 1
-                    tt(jj) = tt(jj - 1) + 1e-5;
-                end
-            end
-            
-            [~, locs_t] = findpeaks(N, tt, 'MinPeakDistance', win/2, 'MinPeakHeight', 30);
-            [~, locs_] = min(abs(tt - locs_t'));  
-            
-            template = dat_sm(locs_, :, :);
-            fr_template = data_fr(locs_, :, :);
-            
-            N = nanmedian(fr_template, [2 3]);
-            fr_mask = N/max(N) >= .5;
-            template = template(fr_mask, :, :);
-            fr_template = fr_template(fr_mask, :, :);
-            locs_t = locs_t(fr_mask);
-            
-
-            % Return <max_templates> with highest total firing rate
-            if isfinite(max_templates) && numel(locs_t) > max_templates
-                inds = 1:min(max_templates, numel(locs_t));
-%                 N = sum(isfinite(template), [2 3]);
-                N = nanmedian(fr_template, [2 3]);
-                [~, so] = sort(N, 'descend');
-                so = sort(so(inds));
-                template = template(so, :, :);
-                fr_template = fr_template(so, :, :);
-                locs_t = locs_t(so);
-            end
-             
-            out = struct('template', template, ...
-                'firing_rate', fr_template, ...
-                'time', locs_t, 'win', win);
+            [out, M] = iw.get_IW_templates(M);
             
         end
         
@@ -776,7 +726,13 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			F = WaveFlow(s);
         end
 
-        function M = max_descent_IW(mea, times, varargin)
+        function M = max_descent_IW(mea, type, save_bool)
+            if nargin < 2 || isempty(type), type = 'new'; end
+            if nargin < 3, save_bool = false; end
+            iw = IW(mea);
+            M = iw.save_IW_fits(type, save_bool);
+        end
+        function M = max_descent_IW0(mea, times, varargin)
             % Use max descent method to compute IW-like wave propagation
             
             MIN_FR = 30;
@@ -855,45 +811,79 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			D.Name = mea.Name;
 			warning(wng);
 			
-		end
+        end
+        
+        function wt = get_wave_times(s, varargin)
+            % Wrapper for get_discharge_times
+            [wt, peaks] = s.get_discharge_times(varargin{:});
+        end
 	
-		function [wt, peaks] = get_wave_times(s, method, min_peak_height)
-			% [wt, peaks] = get_wave_times(method='events', min_peak_height=-Inf)
-			if nargin < 2, method = 'events'; end
-			if nargin < 3, min_peak_height = 1; end
+        function wt = get_discharge_times(mea, method, min_electrodes, min_peak_height)
+			% [wt, peaks] = get_wave_times(method='maxdescent', min_electrodes=30, min_peak_height=2)
+            % Finds peaks on each channel according to method and then
+            % finds where at least <min_electrodes> have peaks in an
+            % appropriate window (20 ms in most cases since this is 50Hz,
+            % which is the upper bound of the lfp filter)
+            
+			if nargin < 2, method = 'maxdescent'; end
+			if nargin < 3 || isempty(min_electrodes), min_electrodes = 30; end
+            if nargin < 4 || isempty(min_peak_height), min_peak_height = 1; end
             method = validatestring(method, {'bsi', 'lfp', ...
                 'maxdescent', 'lfp_lo', 'events'});
-			switch method
+            
+            min_peak_dist = .02;
+            switch method
 				case 'bsi'
-					data = zscore(nanmean(s.BSI, 2));
-					minProm = 0;
+					data = normalize(mea.BSI);
+                    
 				case 'lfp'
-					data = -normalize(mean(normalize(s.lfp), 2));
-					minProm = 1;
+					data = -normalize(normalize(mea.lfp));
+                    
+					
                 case 'maxdescent'
-                    dlfpN = diff(normalize(s.lfp));
-                    data = -normalize(mean(dlfpN, 2));
-                    minProm = 1;
+                    data = -normalize(normalize(mea.lfp));
+                    data = min(data, min_peak_height*1.01); % clip so that findpeaks returns crossing times
+                    
 				case 'lfp_lo'
-					data = -zscore(mean(normalize(s.lfp_lo), 2));
-					minProm = 1;
+					data = -normalize(mea.lfp_lo);
+                    min_peak_dist = .1;
+					
 				case 'events'
-					data = normalize(mean(s.firing_rate, 2), 'scale');
-					minProm = 1;
+					data = normalize(mea.firing_rate, 'scale');
+                    if min_peak_height < 2
+                        warning('min_peak_height=%0.1f; suggest using at least 2.', min_peak_height); 
+                    end
 				otherwise
 					error('Method not recognized')
-			end
-			[pks, lcs, w, p] = findpeaks(data, s.SamplingRate, ...
-				'MinPeakHeight', min_peak_height, ...
-				'MinPeakDistance', 0, ...  %10e-3, ...
-				'MinPeakProminence', minProm);
-% 				'MinPeakHeight', 1);
-			lcs = round(lcs * s.SamplingRate);
-			outliers = isoutlier(pks);
-% 			wt = s.Time(locs(~outliers));
-			wt = s.Time(lcs);
-			peaks = struct('pks', pks, 'locs', lcs, ...
-				'w', w, 'p', p, 'outliers', outliers);
+            end
+            
+            [~, lcs] = arrayfun(@(ii) ...
+                findpeaks(data(:, ii), ...
+                    'MinPeakHeight', min_peak_height, ...
+                    'MinPeakDistance', min_peak_dist * mea.SamplingRate), ...  % require peaks at least 20 ms apart (this gives a max 50hz discharge rate)
+                1:size(data, 2), 'uni', 0);
+            ch = arrayfun(@(ii) ii * ones(size(lcs{ii})), 1:size(data, 2), 'uni', 0);
+            ch = cat(1, ch{:});
+            lcs = cat(1, lcs{:});
+            [m, n] = size(data);
+            N = sum(movmax(sparse(lcs, ch, 1, m, n), .04 * mea.SamplingRate), 2);
+            
+            [~, wt] = findpeaks(N, mea.Time, ...
+                'minpeakheight', min_electrodes, ...
+                'minpeakdistance', min_peak_dist);  % again, impose max 50 Hz firing rate
+            
+            % This was the old way ... no longer returning the peaks struct
+% 			[pks, lcs, w, p] = findpeaks(data, mea.SamplingRate, ...
+% 				'MinPeakHeight', min_peak_height, ...
+% 				'MinPeakDistance', 0, ...  %10e-3, ...
+% 				'MinPeakProminence', minProm);
+% % 				'MinPeakHeight', 1);
+% 			lcs = round(lcs * mea.SamplingRate);
+% 			outliers = isoutlier(pks);
+% % 			wt = s.Time(locs(~outliers));
+% 			wt = mea.Time(lcs);
+% 			peaks = struct('pks', pks, 'locs', lcs, ...
+% 				'w', w, 'p', p, 'outliers', outliers);
 			
 			
         end
