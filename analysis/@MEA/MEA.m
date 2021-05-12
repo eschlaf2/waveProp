@@ -13,7 +13,7 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 		SamplingRate = 1000
         Units = '0.25 microvolts'
 		event_inds
-        
+        GridSize = [10 10]  % unless it's a sim
 	end
 	
 	properties (Hidden = true)
@@ -351,12 +351,14 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
         
         
         function exclude = exclude_by_iw(mea)
-            load(['iw_mats/' mea.Name], 'iw')
-            if iw.main_wave(mea.Name) == 0
-                exclude = [];
+            [iw, mw] = BVNY.get_iw_info(mea.Name);
+            mea.ExcludedChannels = [];
+            if isempty(iw)
+                return
             else
-                iw.wave = iw.main_wave(mea.Name);
-                exclude = iw.outliers;
+                iw = iw{mw};
+                locs_iw = find(isfinite(iw.template.template(mw, :)));
+                exclude = find(~ismember(mea.locs, locs_iw));
             end
             mea.ExcludedChannels = exclude;
         end
@@ -729,10 +731,11 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
         function M = max_descent_IW(mea, type, save_bool)
             if nargin < 2 || isempty(type), type = 'new'; end
             if nargin < 3, save_bool = false; end
-            iw = IW(mea);
+            iw = IW(mea); %#ok<CPROPLC>
             M = iw.save_IW_fits(type, save_bool);
         end
-        function M = max_descent_IW0(mea, times, varargin)
+        
+        function M = ZZmax_descent_IW0(mea, times, varargin)  % ZZ'd on 5/8/21
             % Use max descent method to compute IW-like wave propagation
             
             MIN_FR = 30;
@@ -766,19 +769,22 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
         
 		function M = max_descent(mea, times, varargin)
             if nargin < 2 || isempty(times) 
-                times = mea.Time(1):.01:mea.Time(end); 
+%                 times = mea.Time(1):.01:mea.Time(end); 
+                times = mea.get_discharge_times;
             end
-            S = warning; warning off;
-			N = numel(times);
-			M(N) = MaxDescent(varargin{:});
-% 			mea.MaxDescentData = zscore(mea.filter(mea.Data, mea.SamplingRate, M(N).FBand)); 
-			for ii = 1:N
-				t0 = times(ii);
-				M(ii) = MaxDescent(mea, t0, varargin{:});		
-			end
-			M = WaveProp.resize_obj(M);
+            
+            M = MaxDescent(mea, times, varargin{:});
+%             S = warning; warning off;
+%             N = numel(times);
+% 			M(N) = MaxDescent(varargin{:});
+% % 			mea.MaxDescentData = zscore(mea.filter(mea.Data, mea.SamplingRate, M(N).FBand)); 
+% 			for ii = 1:N
+% 				t0 = times(ii);
+% 				M(ii) = MaxDescent(mea, t0, varargin{:});		
+% 			end
+% 			M = WaveProp.resize_obj(M);
 			M.Name = mea.Name;
-            warning(S);
+%             warning(S);
 		end
 		
 		function E = dir_events(mea, times, varargin)
@@ -792,30 +798,36 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
 			E.Name = mea.Name;
 		end
 		function D = delays(mea, times, varargin)
-			N = numel(times);
-			wng = warning;
-			warning('off');
-			D(N) = Delays(mea, times(N), varargin{:});
 			
-            tic
-            for ii = 1:N-1
-                if ~mod(ii, 10)
-                    fprintf('Computed delay %d/%d (%0.2f seconds)\n', ii-1, N, toc); 
-                    tic; 
-                end
-                t0 = times(ii);
-                D(ii) = Delays(mea, t0, varargin{:});		
-            end
-			
-			D = WaveProp.resize_obj(D);
-			D.Name = mea.Name;
-			warning(wng);
+% 			wng = warning;
+% 			warning('off');
+
+            
+            D = Delays(mea, times, varargin{:});
+            
+%             N = numel(times);
+% 			D(N) = Delays(mea, times(N), varargin{:});
+% 			
+%             tic
+%             for ii = 1:N-1
+%                 if ~mod(ii, 10)
+%                     fprintf('Computed delay %d/%d (%0.2f seconds)\n', ii-1, N, toc); 
+%                     tic; 
+%                 end
+%                 t0 = times(ii);
+%                 D(ii) = Delays(mea, t0, varargin{:});		
+%             end
+% 			assignin('base', 'D', D);  % temp for debugging resize
+%             
+% 			D2 = WaveProp.resize_obj(D);
+% 			D2.Name = mea.Name;
+% 			warning(wng);
 			
         end
         
         function wt = get_wave_times(s, varargin)
             % Wrapper for get_discharge_times
-            [wt, peaks] = s.get_discharge_times(varargin{:});
+            wt = s.get_discharge_times(varargin{:});
         end
 	
         function wt = get_discharge_times(mea, method, min_electrodes, min_peak_height)

@@ -2,7 +2,7 @@ function hist_figs(F, pat, style)
     
 pat = string(pat);
 if nargin < 3 || isempty(style), style = 'spread'; end
-style = validatestring(style, {'combined', 'spread'});
+style = validatestring(style, {'combined', 'spread', 'scatter'});
 COMBINE = strcmpi(style, 'combined');
 A_RES = 512;
 which_file = find(strcmpi(F.Seizures.patient, pat));
@@ -10,8 +10,6 @@ R = numel(which_file);
 C = numel(F.Metrics) + 1;
 P = F.Seizures.patientAlt;
 duration = F.Seizures.duration;
-
-map = [0; linspace(0, 1, 128)'];
 
 
 [h, ax] = F.create_fig(pat);
@@ -37,7 +35,12 @@ for r = 1:R
         rotate_by = 0;
     end
     
-    
+    tE = duration(ff);
+%         mask = time >=0 & time <= tE;
+
+    % update tmax
+    if tE > tmax, tmax = tE; end
+
     
     [iw_info, main_wave] = get_iw_info_(F.get_file(ff));
 
@@ -48,39 +51,44 @@ for r = 1:R
     end
     
     ax_summ = ax(r, end);
-    ax_summ.Tag = 'hist1d';  % used to be 'ksdens'
+    set(ax_summ, 'tag', 'hist1d', 'nextplot', 'add');
+%     ax_summ.Tag = 'hist1d';  % used to be 'ksdens'
     set(ax(r, 1:end-1), 'tag', 'hist2D', 'nextplot', 'replacechildren');
     
     for c = 1:C-1
         mm = F.Metrics{c};
         W.(mm).RotateBy = rotate_by;
         W.(mm).MinFinite = BVNY.MinFinite(W.(mm));
-        
-        % make the original hist plots
         fit = W.(mm);
-        fit.hist(F.Smoothing, false, false, h_temp); 
         
-        % get info from the original main plot
-        ax0 = findobj(h_temp, 'tag', 'Main');
-        plt = ax0.Children;
-        time = plt.XData;
-        dir = plt.YData;
-        tE = duration(ff);
-%         mask = time >=0 & time <= tE;
-        
-        % update tmax
-        if tE > tmax, tmax = tE; end
-        
-    
-        % create the new 2D plot
-        data = discretize_data_(plt);
-        imagesc(ax(r, c), time, dir, data);
+        switch style
+            case 'ZZspread'
+                % make the original hist plots
+                fit.hist(F.Smoothing, false, false, h_temp); 
+
+                % get info from the original main plot
+                ax0 = findobj(h_temp, 'tag', 'Main');
+                plt = ax0.Children;
+                time = plt.XData;
+                dir = plt.YData;
+
+                % create the new 2D plot
+                data = discretize_data_(plt);
+                imagesc(ax(r, c), time, dir, data);
+                
+                % make summary subplot
+                update_summary_plot_(h_temp, ax_summ, F.Style.(mm))
+            case 'spread'
+                scatter(ax(r, c), fit.time, fit.Direction, 2, 'filled', ...
+                    'markerfacecolor', [0 0 0], 'markerfacealpha', .5);
+                [f, xi] = circ_ksdens(fit.Direction);
+                plot(ax_summ, f, xi, F.Style.(mm));
+        end
 
         
         show_iw_(ax(r, c), iw_info(main_wave, :), F.Style.(mm).color);
         
-        % make summary subplot
-        update_summary_plot_(h_temp, ax_summ, F.Style.(mm))
+        
     end
     
 
@@ -113,7 +121,7 @@ function show_iw_(ax0, iw_info, color)
     N = size(iw_info, 1);
     sts = ax0.NextPlot;
     ax0.NextPlot = 'add';
-    ylims = ax0.YLim;
+    ylims = [-pi pi];
     
     for ii = 1:N
         if any(isnan(iw_info(ii, 1:3))), continue; end

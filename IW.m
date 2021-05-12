@@ -50,6 +50,7 @@ classdef IW < handle
         onsets
         durs
         outliers
+        GridSize
     end
     
     methods
@@ -75,6 +76,14 @@ classdef IW < handle
         function locs = get.locs(self) 
             if isempty(self.locs), self.locs = self.mea.locs; end
             locs = self.locs;
+        end
+        
+        function gs = get.GridSize(self)
+            gs = self.mea.GridSize;
+        end
+        
+        function set.GridSize(self, value)
+            self.mea.GridSize = value;
         end
                 
         function mea = get.mea(self)
@@ -445,7 +454,7 @@ classdef IW < handle
             
         end
         function pos = get.position(self)
-            [p1, p2] = ind2sub([10, 10], self.locs);
+            [p1, p2] = ind2sub(self.mea.GridSize, self.locs);
             pos = [p1, p2];
         end
         

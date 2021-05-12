@@ -1,68 +1,56 @@
-classdef WaveProp < handle & matlab.mixin.Copyable
-	% I want this to take a set of TOAs and show me things about them... So
-	% then, I think I want my MaxDescent and Delays to only hold the data
-	% and method-specific parameters (this is probably not far off of what
-	% they do)
-    
-    
-    %%% Commenting these out (5/10/21); may need to make other adjustments
-    %%% as a result, but I'm pretty sure these are things that just reflect
-    %%% inefficiencies of learning
-%     properties (Hidden = true)
-% 		WPParamNames = "Quadratic"
-% 	end
-
+classdef WaveProp
+	
 	properties 
-		
-        Patient string
-        Seizure string
-        Position
-        
-        GridSize = [10 10]  % Size of the MEA (# of electrodes along each dimension; always [10 10] unless it's a sim)
-		Length = 4  % length of the MEA (always 4 mm, unless it's a sim)
+		Name
+        Patient
+        Seizure
+		Vx = nan
+		Vy = nan
+		p = nan
+		Beta = nan(1, 6)
+		Curvature = nan
+		Data
+		sig = 0.05
+		NClust
+		ClustSize
+		Quadratic = false
+		RotateBy = 0
+        MinFinite = 30
+        Length = 4  % length of the MEA (always 4 mm, unless it's a sim)
         MMpElectrode = .4  % mm per electrode (again, always 4 unless it's a sim)
-        
-        TOA  % this is the important one to save (especially for delays method since it takes a long time to compute
-        t0
-
+% 		HalfWin
+% 		FBand
     end
     
-
-	properties (Transient = true)
-
-        ResultOfFit
-        NClust  % I don't even know what this does anymore (5/9/21)
-		ClustSize
-        
-        sig = 0.05
-        RotateBy = 0
-        MinFinite = 30
-        Quadratic = false
-		Original = false
+    
+    properties (Transient = true, Hidden = false)
+        Original = false
+    end
+	
+	properties (Transient = true, Hidden = true)
+% 		t_inds
+% 		res
+		
 		Magnitude
         AltMagnitude
 		Direction
-		
+		Time
+		Position
 		scale_quiver = 1
 		complexZ
 		Inds = []
 		Early = [-Inf 25]
 		Late = [30 Inf]
 		MinDetections = 100
-        
-        % Move these to dependent after the next rerun (of everything...)
-        Vx 
-		Vy
-		p
-		Beta
-		Curvature
 	end
 	
-	
+	properties (Hidden = true)
+		WPParamNames = "Quadratic"
+		t0
+	end
 	
 	properties (Dependent = true, Hidden = false)
 
-        Name string
 		Z
         time
 		mask
@@ -76,8 +64,6 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 		N_detections_early
 		N_detections_late
         FName
-        Data
-        locs
     end
     
     methods  % imports
@@ -87,91 +73,13 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 	
 	methods  % Getters and Setters
         
-        function set.Name(obj, value)
-            value = string(value);
-            ps = strsplit(value, {'_Seizure', ' ', '_'});  % Assume PP_SeizureXX assignment
-            obj.Patient = ps(1);
-            obj.Seizure = ps(2);
-        end
-        
-        function name = get.Name(obj)
-            name = sprintf("%s_Seizure%s", obj.Patient, obj.Seizure);
-        end
-        
-        function out = get.ResultOfFit(obj)
-            % If fits haven't been run, run them now (fit a plane to each
-            % time)
-            if isempty(obj.ResultOfFit)
-                inds_ = obj.Inds; % Temporarily set inds to default to only generate fits for actual data
-                obj.Inds = [];
-                
-                % Get the observed TOA
-                toa = obj.TOA;
-                Nt = size(obj.TOA, 1);
-                locs_ = obj.locs;
-                
-                % Initialize matrices to store the results and fit a plane
-                % at each time point
-                V = nan(Nt, 2); p_ = nan(Nt, 1); beta = nan(Nt, 3);
-                for ii = 1:Nt
-                    [V(ii, :), p_(ii), beta(ii, :)] = ...
-                        obj.fit_plane(toa(ii, locs_), obj.Position);
-                end
-                
-                % Save the result to a table
-                obj.ResultOfFit = table(V, p_, beta);
-                
-                % Reset inds to whatever they were
-                obj.Inds = inds_;
-            end
-            out = obj.ResultOfFit;
-        end
-        
-        function set.TOA(obj, value)
-            % Store as 2d matrix
-            if ndims(value) == 3
-                value = value(:, :);
-            end
-            obj.TOA = value;
-        end
-        
-        function res = get.TOA(obj)
-            % Convert TOA to 3D (and return .Inds)
-            
-            m = numel(obj.t0); 
-            n = size(obj.TOA, 2);
-            toa_size = [m, obj.GridSize];  % result should be TIMExXxY
-            res = nan(toa_size);  % initialize matrix to hold the result
-            
-            % Get the indices where the TOA data belongs and generate the
-            % resulting TOA
-            xx = repmat(obj.Position(:, 1)', m, 1);
-            yy = repmat(obj.Position(:, 2)', m, 1);
-            tt = repmat((1:m)', 1, n);
-            
-            locs_ = sub2ind(toa_size, tt(:), xx(:), yy(:));
-            res(locs_) = obj.TOA;
-            
-            res = res(obj.Inds, :, :);
-        end
-        
-        function data = get.Data(self)
-            % Wrapper for self.TOA
-            % renamed Data to TOA to be more clear about what's in here
-            
-            data = self.TOA;
-        end
-        
-        function set.Data(self, value)
-            % Data is a wrapper for TOA (more clear naming)
-            self.TOA = value;
-        end
         
         function fname = get.FName(self)
-            % Returns the name of the file where the TOA are stored
-            fname = sprintf("WaveFits/%s_Seizure%s/", self.Patient, self.Seizure);
-            warning('You probably want to call .Name here rather than .FName');
-%             fname = sprintf('%s_Seizure%s_fits.mat', self.Patient, self.Seizure);
+            if self.Original
+                fname = sprintf('wave_prop/%s_Seizure%s_Neuroport_10_10_wave_prop.mat', self.Patient, self.Seizure);
+            else
+                fname = sprintf('%s_Seizure%s_fits.mat', self.Patient, self.Seizure);
+            end
         end
         
         function pat = get.Patient(self)
@@ -199,31 +107,32 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 			end
         end
         
-        function set.time(self, value)
+        function self = set.time(self, value)
             self.t0 = value;
         end
         
+		function obj = set.Beta(obj, val)
+			assert(isempty(val) || any(size(val) == 6));
+			if isempty(val) || size(val, 2) == 6
+				obj.Beta = val;
+			else
+				obj.Beta = val';
+			end
+        end
+        
 		function beta = get.Beta(obj)
-			beta = obj.ResultOfFit.beta(obj.Inds, :);
-        end
-        
-        function vx = get.Vx(obj)
-            vx = obj.ResultOfFit.V(:, 1);
-        end
-        
-        function vy = get.Vy(obj)
-            vy = obj.ResultOfFit.V(:, 2);
+			beta = obj.Beta(obj.Inds, :);
         end
         
 		function mgn = get.NormedMagnitude(obj)
-			mgn = filloutliers(obj.Magnitude, nan, 'median', 'thresholdfactor', 10);
-			mgn = normalize(mgn);
+			mgn = obj.Magnitude;
+			mgn(isoutlier(mgn)) = nan;
+			mgn = (mgn - nanmean(mgn)) / nanstd(mgn);
 			mgn = mgn(obj.Inds);
         end
         
 		function logp = get.logp(s)
-            % returns XX from expression p=5e-XX
-			logp = -log10(s.p/5);
+			logp = -log(s.p)/log(10);
 			logp = logp(s.Inds);
         end
         
@@ -240,17 +149,17 @@ classdef WaveProp < handle & matlab.mixin.Copyable
         end
         
 		function mask = get.mask(s)
-			M = filloutliers(sqrt(s.Vx.^2 + s.Vy.^2), nan, 'median', ...
-                'thresholdfactor', 100);
-            
-            % require full window (set to .95 bc a few of the windows are short a ms)
-            if ismember('T', properties(s))  
+			M = sqrt(s.Vx.^2 + s.Vy.^2);
+			M(M > 1e6) = nan;
+			M(isoutlier(M)) = nan;
+            if ismember('T', properties(s))  % require full window (set to .95 bc a few of the windows are short a ms)
                 M(s.T < .95*2*s.HalfWin) = nan;
             end
 			M = M(s.Inds);
             num_finite = sum(isfinite(s.Data), [2 3]);
             M(num_finite < s.MinFinite(1)) = nan;
 			mask = s.p > s.sig | isnan(M);
+            
             
             
             % mask times when VNS is active in CUCX5
@@ -264,6 +173,19 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             end
         end
         
+		function D = get.Data(s)
+			if size(s.Data, 1) ~= numel(s.t0)
+				time_dim = find(size(s.Data) == numel(s.t0));
+				if isempty(time_dim)
+					D = reshape(s.Data, [numel(s.t0) size(s.Data)]);
+				else
+					D = shiftdim(s.Data, time_dim-1);
+				end
+			else
+				D = s.Data;
+			end
+			D = D(s.Inds, :, :);
+        end
         
 		function time = get.time(s)
 			time = s.t0;
@@ -297,10 +219,9 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             M.Inds = [];
 			D(M.mask) = nan;
             
-            % Remove points where directions show large shifts within 50
-            % ms. (this shouldn't do anything to M and D10 methods, but some
-            % experimental methods [e.g. M10] benefit from this)
-            dir_sm = movmean(exp(1j*D), .05, 'samplepoints', M.t0);  
+            % Limit to smooth changes as these represent waves rather than
+            % noise
+            dir_sm = movmean(exp(1j*D), 2);  
             dir_sm(abs(dir_sm) < cos(pi/8)) = nan; % this ensures consecutive angles differ by less than 45°
             d2 = movmean(dir_sm, .04, 'omitnan', 'samplepoints', M.time);  % waves traveling at 100mm/s should be on the MEA ~40 ms
             d2(abs(d2) < .9) = nan;  % require strong similarity in directions
@@ -318,7 +239,6 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 			M = M(self.Inds);
             M(self.mask) = nan;
         end
-        
         function M = get.AltMagnitude(self)
             t_ext = range(self.Data, [2 3]);  % time taken for wave to cross MEA
             M = self.Length * sqrt(2) ./ t_ext;  % speed in mm/second (5.67 mm = length of MEA diagonal)
@@ -327,14 +247,13 @@ classdef WaveProp < handle & matlab.mixin.Copyable
         end
         
 		function psig = get.p(s)
-			psig = s.ResultOfFit.p_(s.Inds);
+			psig = s.p(s.Inds);
 		end
 		
 		%% Summary stats
 		function e = early(s)
 			e = s.time > s.Early(1) & s.time < s.Early(2);
-        end
-        
+		end
 		function l = late(s)
 			l = s.time > s.Late(1) & s.time < s.Late(2);
 		end
@@ -373,18 +292,13 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 		
 	end
 	
-	methods  % Most of the things
+	methods 
 		
         %% Helpful others
         
-        function ll = get.locs(M)
-            % convert x-/y-position to indices
-            ll = sub2ind(M.GridSize, M.Position(:, 1), M.Position(:, 2));
-        end
         function t_inds = time2inds(M, tt)
             [~, t_inds] = min(abs(M.time(:) - tt(:)'));
         end
-        
         function [dat, tt, pos] = preproc_discharges(M)
             
             % Reshape data into a 2D matrix; 
@@ -414,16 +328,9 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             % shouldn't really be doing anything in the M or D10 methods
             % since those are already controlling for this... mostly for
             % experimental short window methods)
-            
-            % Reshape the data so there are zeros between discharge times
-            ttI = tt(1):.001:tt(end);
-            [~, tt_inds] = min(abs(ttI - tt), [], 2);
-            countsI = zeros(size(ttI));
-            countsI(tt_inds) = sum(isfinite(dat), 2);
-            
-            [~, locs_t] = findpeaks(countsI, ttI, ...
+            [~, locs_t] = findpeaks(sum(isfinite(dat), 2), tt, ...
                 'MinPeakDistance', .05, 'minpeakheight', M.MinFinite);
-            [~, locs_i] = min(abs(locs_t - tt));
+            [~, locs_i] = min(abs(locs_t' - tt));
             
             % Z-score the data at each time point
             dat = normalize(dat(locs_i, :), 2, 'zscore', 'std');
@@ -456,7 +363,6 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             pos = [xx(:), yy(:)];
             
         end
-        
         function [dat, tt, pos, IDX, C, D] = cluster(M, h, varargin)
             if nargin < 2 || isempty(h)
                 h = figure; fullwidth(true); 
@@ -558,7 +464,6 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             D2squared = nansum(sqdx,2).*n./nstar; % Correction for missing coordinates
             D2 = sqrt(D2squared);
         end
-        
         function [dist_rho, tpl_id, tt, full] = distance(M, templates)
             % Converts correlation to distance (1 - rho);
             % [dist_rho, tpl_id, tt, full] = distance(M, templates)
@@ -663,7 +568,6 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             sp_out(~isfinite(dir_out)) = nan;
             
         end
-        
         function dir_sm = smooth_angular(M, dir, win, thresh)
             % Returns the directions smoothed over <win> second windows
             % where directionality is at least <thresh> (i.e. length of
@@ -676,7 +580,6 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             dir_sm(isnan(dir) | dir_index < thresh) = nan;
             dir_sm = angle(dir_sm);
         end
-        
         function [res, dir_sm, win, thresh] = ZZdischarge_directions(M, win, thresh)
             % out = discharge_directions(M, win=0.1, thresh=pi/4)
             % Returns the first direction from each independent discharge.
@@ -717,14 +620,12 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             dir_sm = angle(dir_sm);
             
         end
-        
         function [dir_index, win] = directionality_index(M, win)
             % dir_index = directionality_index(M, win=[])
             % Wrapper to get directionality index from F.smoothed_direction
             if nargin < 2, win = []; end
             [~, dir_index, win] = M.smoothed_direction(win);
         end
-        
         function [dir_sm, dir_index, win, thresh] = smoothed_direction(M, win, thresh)
             % Returns the directions smoothed over <win> second windows
             % where directionality is at least <thresh> (i.e. length of
@@ -807,7 +708,6 @@ classdef WaveProp < handle & matlab.mixin.Copyable
                 'ygrid', 'on', 'ylim', 1.1*[-pi pi]);
             
         end
-        
         function [ax, out] = distance_scatter(M, iw_tpl)
             % iw_tpl = mea.get_IW_templates
             [rho, rho_p, rho_time] = M.correlation(iw_tpl.template);
@@ -828,54 +728,32 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             out = struct('dist_rho', rho, 'dist_p', rho_p, 'time', rho_time);
         end
         
-        function [ax, cmap, bin] = direction_raster(M, ax, dir, cmap)
-            % .direction_raster(ax=gca, dir=.Direction, cmap=hsv)
-            % All inputs are optional, but ax must come first if given
-            
-            ax_default = gca;
-            dir_default = M.Direction;
-            cmap_default = hsv;
+        function [ax, cmap] = direction_raster(M, ax, dir)
             
             switch nargin
                 case 1  % F.direction_raster;
-                    dir = dir_default;
-                    ax = ax_default;
-                    cmap = cmap_default;
+                    dir = M.Direction;
+                    ax = gca;
                 case 2
                     if ischar(ax), ax = M.(ax); end
-                    if isnumeric(ax)  
-                        if size(ax, 2) == 1, dir = ax; cmap = cmap_default; % M.direction_raster(dir)
-                        else, cmap = ax; dir = dir_default; % M.direction_raster(cmap)
-                        end
-                        ax = ax_default;
+                    if isnumeric(ax)  % M.direction_raster(dir)
+                        dir = ax;
+                        ax = gca;
                     else  % F.direction_raster(ax)
-                        dir = dir_default;
-                        cmap = cmap_default;
+                        dir = M.Direction;
                     end
                 case 3
-                    if ~isa(ax, 'matlab.graphics.axis.Axes')  % M.direction_raster(dir, cmap)
-                        dir = ax; cmap = dir; 
-                        ax = ax_default;
-                    else
-                        if isvector(dir)  % M.direction_raster(ax, dir)
-                            cmap = cmap_default;
-                        else  % M.direction_raster(ax, cmap)
-                            cmap = dir;
-                            dir = dir_default;
-                        end
+                    if ischar(ax), ax = M.(ax); end
+                    if isnumeric(ax)  % M.direction_raster(dir, ax)
+                        ax_ = dir;
+                        dir = ax;
+                        ax = ax_;
                     end
-                    if ischar(dir), dir = M.(dir); end
-                case 4  % M.direction_raster(ax, dir, cmap)
-                    if ischar(dir), dir = M.(dir); end
-                    assert( ...
-                        isa(ax, 'matlab.graphics.axis.Axes') ...
-                        && isvector(dir) ...
-                        && size(cmap, 2) == 3, ...
-                        'Unexpected inputs. Expected <M.direction_raster(ax, dir, cmap)>.');
                 otherwise
-                    error('Unexpected inputs. Expected <M.direction_raster(ax, dir, cmap)>.')
+                    error('Unexpected inputs. Expected <M.direction_raster(ax, dir)>.')
             end
             
+            cmap = hsv;
             
             mask_ = isfinite(dir);
             bin = discretize(dir(mask_), linspace(-pi, pi, size(cmap, 1) + 1));
@@ -890,11 +768,9 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             hold(ax, 'off');
             
             yticks(-180:90:180);
-            title(ax, strrep(M.Name, '_', ' '));
             ax.Tag = 'direction_raster';
             
         end
-        
         function h = summary_plot(M, varargin)
             h = figure('name', 'summary_plot');
             T = tiledlayout(h, 5, 1);
@@ -987,72 +863,68 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 			end
         end
         
-        function dot_size = get_dot_size(M, ax)
-            % Get a good dot size to represent an electrode for a scatter
-            % plot.
-            uu = ax.Units;
-            ax.Units = 'points';
-            pos = ax.Position;
-            ax.Units = uu;
-            dot_size = min(pos(3:4))/max(M.GridSize);
-            dot_size = dot_size^2;
-        end
-        
         function ax = plot_residuals(M, varargin)
             [ax, tt] = WaveProp.parse_plot_inputs(varargin{:});
-            set(ax.Parent, 'name', 'residuals');
-            
             ind = M.time2inds(tt);
             data = squeeze(M.Data(ind, :, :));
             
-            % fit a plane
-            xx = M.Position(:, 1); yy = M.Position(:, 2);
-            zfit = M.Beta(ind, 1) + M.Beta(ind, 2) * xx + M.Beta(ind, 3) * yy;
-            
-            % Draw a scatter of the data
-            dot_size = M.get_dot_size(ax);
-			scatter(ax, xx, yy, dot_size, data(:) - zfit, 'filled', 's'); 
-            ax.CLim = [-1 1] * quantile(abs(data(:) - zfit), .95);
-            colormap(ax, make_diverging_colormap);
-            
-			title(ax, ["Residuals" ...
-                sprintf('T=%.2f\np=%.4g\nspeed=+%.2f%s', ...
-                tt, M.p(ind), M.Magnitude(ind), 'mm/s')]); 
-			hold(ax, 'off');
-            cb = colorbar;
-            title(cb, 'Resid');
-            
-            xlim(ax, [0 M.GridSize(1) + 1]);
-            ylim(ax, [0 M.GridSize(2) + 1]);
-			ax.Tag = checkname(['figs' filesep M.Name '_' class(M) '_' ...
-                num2str(tt) '_plot_residuals']);
-			
-        end
-        
-		function ax = plot3D(M, varargin)
-			% ax = plot(obj, t0, ax); % if object has only one time point, t0=obj.time
-			[ax, tt] = WaveProp.parse_plot_inputs(varargin{:});
-            M_temp = M.sub(M.time2inds(tt));
-            
             % Get the data and x-/y-axis positions
-            data = squeeze(M_temp.Data);
 			N = size(data);
 			[p1, p2] = ind2sub(N, find(isfinite(data)));
             
+            % fit a plane
+            %%% BOOKMARK %%%
+            M.estimate_wave(data, [p1 p2]);
+            
             % Draw a scatter of the data
-			scatter3(ax, p1, p2, M_temp.Data(isfinite(data)), [], M_temp.Data(isfinite(data)), 'filled'); 
+			scatter3(ax, p1, p2, F.Data(isfinite(data)), [], F.Data(isfinite(data)), 'filled'); 
             
             % Show the fitted plane
 			hold(ax, 'on');
 			[xx, yy] = ndgrid(1:N(1), 1:N(2));
-			zfit = M_temp.Beta(1) + M_temp.Beta(2) * xx + M_temp.Beta(3) * yy;
-			im = surf(ax, xx, yy, min(M_temp.Data(:)) * ones(N), data, 'linestyle', 'none'); 
+			zfit = F.Beta(1) + F.Beta(2) * xx + F.Beta(3) * yy;
+			im = surf(ax, xx, yy, min(F.Data(:)) * ones(N), data, 'linestyle', 'none'); 
 			im.Tag = 'Data';
 			surfax = surf(ax, xx, yy, zfit, 'linestyle', 'none', 'facealpha', .5);
 			surfax.Tag = 'Fit';
-			title(ax, sprintf('T=%.2f\np=%.4g\nspeed=+%.2f%s', M_temp.time, M_temp.p, M_temp.Magnitude, 'mm/s')); 
+			title(ax, sprintf('T=%.2f\np=%.4g\nspeed=+%.2f%s', F.time, F.p, F.Magnitude, units)); 
 			hold(ax, 'off');
-			ax.Tag = checkname(['figs' filesep M_temp.Name '_' class(M_temp) '_' num2str(tt) '_plot3D']);
+			ax.Tag = checkname(['figs' filesep M.Name '_' class(M) '_' num2str(F.time) '_plot3D']);
+			
+        end
+        
+		function ax = plot3D(obj, varargin)
+			% ax = plot(obj, t0, ax); % if object has only one time point, t0=obj.time
+			[ax, tt] = WaveProp.parse_plot_inputs(varargin{:});
+			if numel(obj.time) == 1
+				F = obj;
+				units = '';
+			else				
+				[~, ind] = min((obj.time - tt).^2);
+				F = obj.sub(ind);
+				F.Magnitude = obj.NormedMagnitude(ind);
+				units = 'std';
+            end
+            
+            % Get the data and x-/y-axis positions
+            data = squeeze(F.Data);
+			N = size(data);
+			[p1, p2] = ind2sub(N, find(isfinite(data)));
+            
+            % Draw a scatter of the data
+			scatter3(ax, p1, p2, F.Data(isfinite(data)), [], F.Data(isfinite(data)), 'filled'); 
+            
+            % Show the fitted plane
+			hold(ax, 'on');
+			[xx, yy] = ndgrid(1:N(1), 1:N(2));
+			zfit = F.Beta(1) + F.Beta(2) * xx + F.Beta(3) * yy;
+			im = surf(ax, xx, yy, min(F.Data(:)) * ones(N), data, 'linestyle', 'none'); 
+			im.Tag = 'Data';
+			surfax = surf(ax, xx, yy, zfit, 'linestyle', 'none', 'facealpha', .5);
+			surfax.Tag = 'Fit';
+			title(ax, sprintf('T=%.2f\np=%.4g\nspeed=+%.2f%s', F.time, F.p, F.Magnitude, units)); 
+			hold(ax, 'off');
+			ax.Tag = checkname(['figs' filesep obj.Name '_' class(obj) '_' num2str(F.time) '_plot3D']);
 			
         end
         
@@ -1077,25 +949,23 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             phi = atan2(vy, vx);
             speed = norm([vx vy]) * s.MMpElectrode;
             
-            % Create an alternate direction using only the first 20% of
-            % observed times (gives an idea of how linear the wave
-            % trajectory is; if the arrows line up, the trajectory is
-            % linear; otherwise, this is a good indication that the waves
-            % are not well described by a plane
-%             d2 = data;
-%             d2(data > quantile(data, .2, 'all')) = nan;
-%             [fy, fx] = gradient(d2);
-%             Z_ = complex(fx, fy);
-%             Z_ = Z_./nanmean(abs(Z_), 'all');
-%             v_alt = nanmean(Z_, 'all');
+            d2 = data;
+            d2(data > quantile(data, .2, 'all')) = nan;
+            [fy, fx] = gradient(d2);
+            Z_ = complex(fx, fy);
+            Z_ = Z_./nanmean(abs(Z_), 'all');
+            v_alt = nanmean(Z_, 'all');
             
             axis(ax, 'square');
             % Get dot_size
-            dot_size = s.get_dot_size(ax);
+            uu = get(ax, 'units'); 
+            set(ax, 'units', 'points', 'nextplot', 'replacechildren');
+            pos = get(ax, 'position');
+            ax.Units = uu;
+            dot_size = (min(pos(3:4))/10).^2;
             
             [xx, yy] = find(isfinite(data));
-            val = data(isfinite(data)) * 1e3;  % convert from s to ms
-            units = 'ms';
+            val = data(isfinite(data));
             
             % Show the time data
 			scatter(ax, xx, yy, dot_size, val, 'filled', 's', directive{:});
@@ -1113,12 +983,12 @@ classdef WaveProp < handle & matlab.mixin.Copyable
                 'MaxHeadSize', .5, 'color', [1 0 0]);
             
             % Add the alternate arrow (temporary)
-%             v_alt = v_alt*.8*max(grid_size);
-%             vx = real(v_alt); vy = imag(v_alt);
-%             X = grid_center - [vx, vy]/2;  % center the arrow 
-%             qq2 = quiver(ax, X(1), X(2), vx, vy, s.scale_quiver, ...
-%                 'LineWidth', 2, ...
-%                 'MaxHeadSize', .5, 'color', [0 1 0]);
+            v_alt = v_alt*.8*max(grid_size);
+            vx = real(v_alt); vy = imag(v_alt);
+            X = grid_center - [vx, vy]/2;  % center the arrow 
+            qq2 = quiver(ax, X(1), X(2), vx, vy, s.scale_quiver, ...
+                'LineWidth', 2, ...
+                'MaxHeadSize', .5, 'color', [0 1 0]);
             
             
             hold(ax, 'off')
@@ -1127,7 +997,7 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             ylim([0 grid_size(2) + 1]);
             axis(ax, 'equal');
             cb = colorbar;
-            title(cb, sprintf('TOA [%s]', units))
+            title(cb, 'TOA [s]')
             title(ax, sprintf('t = %0.3f s', tt));
             lgd_string = ...
                 sprintf('\\phi=%0.0f\\circ\n sp=%0.1f mm/s\n p=%0.4g', rad2deg(phi), speed, pval);
@@ -1186,6 +1056,7 @@ classdef WaveProp < handle & matlab.mixin.Copyable
         
 		function obj = parse_inputs(obj, varargin)
 			for ii = 1:2:numel(varargin)
+% 				ff = validatestring(varargin{ii}, [obj.ParamNames(:); obj.WPParamNames(:)]);
                 ff = validatestring(varargin{ii}, properties(obj));
 				obj.(ff) = varargin{ii+1};
 			end
@@ -1208,45 +1079,42 @@ classdef WaveProp < handle & matlab.mixin.Copyable
         end
         
 		%% Updates
-        
-        function toa = toa_from_first_N_electrodes(M, N)
-            if nargin < 2 || isempty(N), N = 20; end
-            
-            toa = M.TOA(:, :);
-            [~, so] = sort(fillmissing(toa, 'constant', -99), 2, 'descend');  % <fillmissing> because NaNs come first in descent sort
-            
-            for ii = 1:size(toa, 1)
-                toa(ii, so(ii, N+1:end)) = nan;
-            end
-            
-        end
-        
 		function M = refit_data(M)
+			W = warning;
+			warning('off', 'stats:statrobustfit:IterationLimit');
 			M.Inds = [];  % Remove time resampling
-            M.ResultOfFit = [];
-            M.ResultOfFit;
-% 			data = M.Data;
-%             [px, py] = find(squeeze(any(isfinite(data))));
-%             M.Position = [px, py];
-%             
-%             N = size(data, 1);
-%             locs = sub2ind(size(data, [2 3]), M.Position(:, 1), M.Position(:, 2));
-%             
-%             for ii = 1:N
-%                 dat = data(ii, locs);
-%                 [V, M.p(ii), beta] = M.fit_data(dat, M.Position, M.Quadratic);
-%                 M.Vx(ii) = V(1);
-%                 M.Vy(ii) = V(2);
-%                 M.Beta(ii, :) = beta;		
-%                 M.Curvature(ii) = WaveProp.curvature_from_beta(beta);
-%                 ZZ = complex(V(1), V(2));
-%                 ZZ(abs(ZZ) > 1e6) = nan;
-%                 M.Magnitude(ii) = abs(ZZ);
-%                 M.Direction(ii) = angle(ZZ);
-%                 
-%             end
-%             warning(W);
+			data = M.Data;
+            [px, py] = find(squeeze(any(isfinite(data))));
+            M.Position = [px, py];
             
+            N = size(data, 1);
+            locs = sub2ind(size(data, [2 3]), M.Position(:, 1), M.Position(:, 2));
+            
+            for ii = 1:N
+                dat = data(ii, locs);
+                [V, M.p(ii), beta] = M.fit_data(dat, M.Position, M.Quadratic);
+                M.Vx(ii) = V(1);
+                M.Vy(ii) = V(2);
+                M.Beta(ii, :) = beta;		
+                M.Curvature(ii) = WaveProp.curvature_from_beta(beta);
+                ZZ = complex(V(1), V(2));
+                ZZ(abs(ZZ) > 1e6) = nan;
+                M.Magnitude(ii) = abs(ZZ);
+                M.Direction(ii) = angle(ZZ);
+                
+            end
+            warning(W);
+            
+            
+% 			eval(sprintf('sN = %s();', class(s)));
+% 			sN = s;
+% 			sN.Beta = [];
+% 			locs = find(isfinite(data));
+% 			[p1, p2] = ind2sub(size(s.Data), locs);
+% 			sN.Data = data(locs)';
+% 			sN.Position = [p1(:) p2(:)];
+% 			sN = sN.compile_results('nocluster');
+% 			warning(W);
         end
         
 		function s = compute_curvature(s)
@@ -1292,8 +1160,39 @@ classdef WaveProp < handle & matlab.mixin.Copyable
         end
         
 		function F = sub(obj, ind)
-            F = copy(obj);
-            F.Inds = ind;
+			obj.Inds = [];
+			N = min(numel(obj.time), numel(obj.Vx));
+			eval(sprintf('F = %s;', class(obj)));
+			F.t0 = obj.t0(ind);
+			for f = string(fieldnames(obj)')
+				temp = obj.(f);
+				sz = size(temp);
+
+                try
+				if all(sz < N) || ischar(obj.(f))
+					F.(f) = temp;
+				elseif isvector(temp)
+					F.(f) = temp(ind);
+				elseif ismatrix(temp)
+					F.(f) = temp(ind, :);
+				else
+					assert(size(temp, 1) >= N);
+% 					dim = 3;
+% 					temp = shiftdim(temp, dim-1);
+					sz = size(temp);
+					temp = reshape(temp, N, []);
+					data = reshape(temp(ind, :), [1 sz(2:end)]);
+					F.(f) = data;
+                end
+                catch ME
+                    if ~strcmpi(ME.identifier, 'MATLAB:class:noSetMethod')
+                        rethrow(ME)
+                    else
+                        continue
+                    end
+                end
+
+			end
         end
         
 		function F = split(obj)
@@ -1348,32 +1247,9 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 			
 		end
 		
-    end
-    
-    methods  % Reload
-        function obj = reload(obj, S)
-            % I renamed some fields on 5/10/21; this is just to make sure
-            % everything gets reloaded correctly. Won't be necessary after
-            % the next re-run
-            if isstruct(S) && isfield(S, 'Data')
-                obj.GridSize = size(S.Data, [2 3]);
-                [px, py] = ndgrid(1:obj.GridSize(1), 1:obj.GridSize(2));
-                obj.Position = [px(:), py(:)];
-                obj.TOA = S.Data(:, :);
-            end
-        end
-    end
+	end
 		
 	methods (Static)
-        function obj = loadobj(S)
-            
-            if isstruct(S)
-                obj = WaveProp;
-                obj = reload(obj, S);
-            end
-            
-        end
-        
 		function [ax, tt, directive] = parse_plot_inputs(ax, tt, varargin)
             directive = {}; 
             deft_tt = 0;
@@ -1413,26 +1289,20 @@ classdef WaveProp < handle & matlab.mixin.Copyable
                 if isa(gca, 'matlab.graphics.axis.PolarAxes'), 
                     pax = gca; 
                 else
-                    h = figure('name', 'cwheel', 'units', 'inches', ...
-                        'position', [0 0 1 1], 'resize', 'off');
+                    h = figure('name', 'cwheel', 'units', 'inches', 'position', [0 0 .5 .5]);
                     pax = polaraxes(h);
                 end
             end
             
-            theta_lims = linspace(-pi, pi, size(cmap, 1));
-            ph =@(ii) polarhistogram(pax, theta_lims(ii), theta_lims(ii:ii+1), ...
-                'linestyle', 'none', 'facecolor', cmap(ii, :), 'facealpha', 1);
-            pax.NextPlot = 'add';
-            arrayfun(@(ii) ph(ii), 1:size(cmap, 1) - 1);
-            pax.NextPlot = 'replace';
-            set(pax, 'rtick', [], 'rlim', [0 2], 'nextplot', 'replace', ...
-                'thetatick', -pi/2:pi/2:pi, 'thetalim', [-pi pi], ...
-                'thetaaxisunits', 'degrees', 'color', 'none', ...
-                'rdir', 'reverse');
-            pax.ThetaTickLabel = cellfun(@(s) [s '\circ'], pax.ThetaTickLabel, 'uni', 0);
+            theta = movmean(linspace(-pi, pi, size(cmap, 1) + 1), 2);
+            theta = theta(2:end);
             
+            polarscatter(pax, theta, .9*ones(size(theta)), [], theta, 'filled');
+            set(pax, 'rlim', [0 1], 'rtick', [], 'colormap', cmap, ...
+                'thetatick', -pi/2:pi/2:pi, 'thetalim', [-pi pi], ...
+                'thetaaxisunits', 'degrees', 'color', 'none');
             pax.Tag = 'colorwheel';
-
+%             axis(pax, 'square')
             
         end
 
@@ -1453,9 +1323,8 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 				X = [X {obj.(ff).(field)}]; %#ok<AGROW>
 			end
 			mat = cat(2, X{:});
-        end
-        
-        function fits = file2fit(res)
+		end
+		function fits = file2fit(res)
 			
 			f = string(fieldnames(res));
 			for ff = f'
@@ -1489,65 +1358,72 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 			A = beta(5);
 			B = beta(6);
 			C = complex(A, B);
-        end
-        
-        function [V, p, beta] = fit_data(data, position, quadratic)
-            % At one point I was messing with fitting quadratics. This will
-            % probably never happen again, but who knows.
-            if nargin < 3, quadratic = false; end
-            if quadratic, [V, p, beta] = WaveProp.fit_quadratic(data, position);
-            else, [V, p, beta] = WaveProp.fit_plane(data, position);
-            end
-        end
-        
-        function [V, p, beta] = fit_quadratic(data, position)
-            % Fit a quadratic plane to the data. Return nan if not enough
-            % data or if beta are zero. 
-            
-			V = nan(1, 2); p = nan; beta = nan(1, 6);
-            if numfinite(data(:)) < 3, return; end
-            
-            X = [position prod(position, 2) position.^2];
-            
-            % fit the delay vs two-dimensional positions
-            [beta,stats] = robustfit(X, data, 'fair'); 
-            
-            % perform F test that last two coefs are both 0.
-            H = [0 1 0; 0 0 1];  % These are defaults, but here for clarity
-            c = [0 ; 0];
-            p = linhyptest(beta, stats.covb, c, H, stats.dfe);  
-			
-			% beta is invalid if nan or if the slope is 0 in both directions
-			invalid = all(beta(2:3).^2 < eps);
-			if invalid, return; end		
-            
-            V = pinv(beta(2:3));
-        end
-        
-		function [V, p, beta, stats] = fit_plane(data, position)
-			% Fit a 2D plane to the data. Return nan if not enough data or
-			% beta are zero.
-			V = nan(1, 2); p = nan; beta = nan(1, 3);
-            if numfinite(data(:)) < 4, return; end
-            
-            % fit the delay vs two-dimensional positions
-            W = warning;
-            warning('off', 'stats:statrobustfit:IterationLimit');
-            warning('off', 'stats:robustfit:RankDeficient');
-            warning('off', 'MATLAB:singularMatrix');
-            [beta, stats] = robustfit(position, data, 'fair'); 
-            
-            % perform F test that last two coefs are both 0.
-            H = [0 1 0; 0 0 1];  % These are defaults, but here for clarity
-            c = [0 ; 0];
-            p = linhyptest(beta, stats.covb, c, H, stats.dfe);  
-            
-			warning(W);
-            
-			% beta is invalid if nan or if the slope is 0 in both directions
-			invalid = all(beta(2:3).^2 < eps);
-			if invalid, return; end			
+		end
+		
+		function [b, P0 ] = estimate_wave( data, position, varargin )
+			%ESTIMATE_WAVE Attempts to fit a two-dimensional plane to the delays between electrodes
+			%organized in space based on their positions.
+			%   [SRC_DIR,SPEED,CI_DIR,CI_SP]=ESTIMATE_WAVE(DELAY,POSITION,VARARGIN)
+			%   fits a plane to the DELAYs between all electrodes and the most central
+			%   electrode based on the electrode POSITIONs in space. If there are
+			%   enough electrodes with defined delays and the fit is significant, then
+			%   the direction SRC_DIR toward the source of the wave propagation is 
+			%   returned as well as the SPEED of the wave and confidence intervals
+			%   around those values (CI_DIR, CI_SP) computed via bootstrapping.
+			%   Optional: if the last input is 'plot', a representation of the delays
+			%   at each electrode position with the fitted plane will be shown.
 
+			MIN_RATIO_FINITE = 0;   % (this is overwritten later by MinFinite)
+
+			P0 = nan;
+			b = nan;
+			
+			finite = numfinite_(data);
+			
+			
+			if finite > 3 && finite/numel(data) >= MIN_RATIO_FINITE  % check enough delay data is not NaN.
+				if any(ismember({'quadratic', 'quad'}, lower(varargin)))
+					X = [position prod(position, 2) position.^2];  % predictors
+				else 
+					X = position;
+				end
+				[b,stats] = robustfit(X, data, 'fair');  % fit the delay vs two-dimensional positions
+% 				H = [0 1 0; 0 0 1];  % These are default values
+% 				c = [0 ; 0];
+				P0 = linhyptest(b, stats.covb, [], [], stats.dfe);  % perform F test that last two coefs are both 0.
+            end
+            
+        end
+        
+		function [V, p, beta] = fit_data(data, position, quadratic)
+			if nargin < 3, quadratic = false; end
+			V = nan(1, 2);
+			beta = nan(1, 6); 
+			[b, p] = WaveProp.estimate_wave(data, position);
+			[betaQ, pQ] = deal(nan);
+			if quadratic
+				try
+					[betaQ, pQ] = WaveProp.estimate_wave(data, position, 'quad');
+				catch ME
+					if ~strcmpi(ME.identifier, 'stats:robustfit:NotEnoughData')
+						rethrow(ME)
+					end
+					pQ = nan;
+				end
+			end
+			if isnan(p) && isnan(pQ), return; end
+			if isnan(pQ), beta(1:3) = b; beta(4:end) = 0;
+			elseif isnan(p), beta = betaQ; p = pQ; 
+			elseif pQ < p; beta = betaQ;
+			else, beta(1:3) = b; beta(4:end) = 0;			
+			end
+% 			if numel(beta) == 3, beta = [beta; nan(3, 1)]; end
+			% beta is invalid if nan or if the slope is 0 in both directions
+			invalid = all(beta(2:3).^2 < eps);
+			if invalid
+				return
+			end
+% 			beta = circshift(beta, -1);
 			V = pinv(beta(2:3));
         end
         
@@ -1572,48 +1448,66 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 		function S = resize_obj(s, to_struct)
 			if nargin < 2, to_struct = false;  end
 			
-            if numel(s) == 1; S = s; return; end
-             % If all positions match, continue (if not, do not combine
-             % these objects)
-            temp_position = cat(3, s.Position);
-            assert(all(temp_position(:, :, 1) == temp_position(:, :, 1:end), 'all'), ...
-                'Field <Position> is not the same for all objects');
-            
-			S = copy(s(1));
-            
-            if to_struct
+			S = s(1);
+			if to_struct
 				S = struct;
 				for p = string(properties(s(1))')
 					S.(p) = []; 
 				end
-            end
+			end
+			S.p = cat(1, s.p);
+			S.t0 = cat(1, s.t0);
+			S.Vx = cat(1, s.Vx);
+			S.Vy = cat(1, s.Vy);
+            S.Data = cat(1, s.Data);
+			S.Inds = [];
             
-            toa_new = cat(1, s.TOA);
-            S.TOA = toa_new(:, :);
-            S.t0 = cat(1, s.t0);            
-            S.Inds = [];
-            
+% 			S.Magnitude = cat(1, s.Magnitude);
             mco = metaclass(s).PropertyList;
             FF = {mco.Name};
             FF(cat(1, mco.Dependent) | cat(1, mco.Hidden) | cat(1, mco.Transient)) = [];
-%             out = struct;
-            for f = string(FF)
-                if ismember(lower(f), ["toa", "t0", "position"]), continue; end
-                new_val = cat(1, s.(f));
-                siz = size(new_val);
-                % Get unique values
-                if isvector(new_val), uu = unique(new_val);
-                else, uu = unique(new_val(:, :), 'rows');
-                end
-                
-                if size(uu, 1) == 1
-                    S.(f) = reshape(uu, 1, siz(2:end));
+			for f = string(FF)
+				if ismember(lower(f), ...
+						{'quadratic', 'sig', 'halfwin', 'fband', ...
+						'name', 'minfreq', 'p', 'magnitude', 'Vx', 'Vy', ...
+                        'samplingrate', 'patient', 'seizure', 'freq'})
+					continue
+				end
+				if isempty(s(1).(f)), continue,
                 else
-                    S.(f) = new_val;
-                end
-            end
-            
+                    temp = cat(1, s.(f));
+                    try
+%                         temp = cat(1, s.(f));
+                        t2 = temp;
+                        if ismatrix(temp)
+                            t2 = unique(temp, 'rows');
+                        elseif isvector(S.(f))
+                            t2 = unique(temp);
+                        end
+                        
+                        if size(t2, 1) == 1  % if all rows are the same, just keep one
+                            S.(f) = t2;
+                        else  % otherwise, preserve size
+                            S.(f) = temp;
+                        end
+					    
+                    catch ME  
+                        % some of the older saves had different sizes. 
+                        % Join these as cells and then reshape by hand
+                        switch ME.identifier
+                            case 'MATLAB:catenate:dimensionMismatch'
+                                S.(f) = {s.(f)};
+                            case 'MATLAB:class:noSetMethod'
+                                continue
+                            otherwise
+                                rethrow(ME);
+                        end
+                        
+                    end
+                    
 
+				end
+            end
 			
         end
         
@@ -1788,7 +1682,131 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             
         end
         
+        function fits = COMPLICATEDload(varargin)
+            
+            
+            if nargin > 0 && isa(varargin{1}, 'MEA')
+                s = varargin{1};
+                varargin(1) = [];
+            end
+            
+            args = WaveProp.parse_load(varargin{:});
+            
+            if isa(s, 'MEA')
+                fname = ['WaveFits/' s.Name];  % folder name
+                [fits, metrics] = foldercontents2struct_(fname);
+            else
+                files = args.files;
+				seizures = args.seizures;
+				metrics = args.metrics;
+				nF = numel(seizures);
+				for ii = nF:-1:1
+                    fprintf('%d: loading %s\n', ii, seizures{ii});
+                    if args.original
+                        res = load([files(ii).folder filesep files(ii).name]); 
+                        fit_temp = WaveProp.file2fit(res);
+                        for mm = metrics
+                            fits(ii).(mm{:}) = fit_temp.(mm{:}); 
+                        end
+						fits(ii).Original = true;
+                        
+                    elseif ii == nF && isempty(metrics)
+                        path = ['WaveFits/' seizures{ii}];
+                        [res, metrics] = foldercontents2struct_(path);
+                        
+                    else
+                        res = foldercontents2struct_(path);
+                        
+						not_member = ~ismember(metrics, fieldnames(res));
+						if any(not_member)
+							fits = rmfield(res, metrics(not_member));
+							metrics(not_member) = [];
+						end
+					end
+					if ~args.original
+						res.Name = strrep(seizures{ii}, '.mat', '');
+                        res.Original = args.original;
+						fits(ii) = res;
+                    end
+
+				end	
+				for ff = string(fieldnames(fits)')
+%                     if strcmpi(ff, 'fits'), continue; end
+					if ischar(fits(1).(ff))
+						F.(ff) = {fits.(ff)};
+					else
+						F.(ff) = cat(1, fits.(ff)); 
+					end
+				end
+				fits = F;
+			end	
+            
+        end
         
+		function fits = ZZload(varargin)
+			s = [];
+			if nargin > 0 && isa(varargin{1}, 'MEA')
+				s = varargin{1};
+				varargin(1) = [];
+			end
+			args = WaveProp.parse_load(varargin{:});
+			if isa(s, 'MEA')
+				if args.original
+					fname = sprintf( ...
+						'wave_prop/%s_Seizure%s_Neuroport_10_10_wave_prop.mat', ...
+						s.patient, s.seizure);
+				else
+					fname = [s.Name '_fits.mat'];
+				end
+				if ~isempty(args.metrics), fits = load(fname, args.metrics{:});
+				else, fits = load(fname); 
+				end
+				if args.original, fits = WaveProp.file2fit(fits); end
+			else
+				files = args.files;
+				metrics = args.metrics;
+				nF = numel(files);
+				for ii = nF:-1:1
+                    fprintf('%d: loading %s\n', ii, files(ii).name);
+                    if args.original
+                        res = load([files(ii).folder filesep files(ii).name]); 
+                    elseif ii == nF && isempty(metrics)
+						res = load([files(ii).folder filesep files(ii).name]);
+						metrics = fieldnames(res); 
+					else
+						res = load([files(ii).folder filesep files(ii).name], metrics{:});
+                        
+                        
+						not_member = ~ismember(metrics, fieldnames(res));
+						if any(not_member)
+							fits = rmfield(res, metrics(not_member));
+							metrics(not_member) = [];
+						end
+					end
+					if args.original
+                        fit_temp = WaveProp.file2fit(res);
+                        for mm = metrics
+                            fits(ii).(mm{:}) = fit_temp.(mm{:}); 
+                        end
+						fits(ii).Original = true;
+					else
+						res.Name = strrep(files(ii).name, '.mat', '');
+                        res.Original = args.original;
+						fits(ii) = res;
+                    end
+
+				end	
+				for ff = string(fieldnames(fits)')
+%                     if strcmpi(ff, 'fits'), continue; end
+					if ischar(fits(1).(ff))
+						F.(ff) = {fits.(ff)};
+					else
+						F.(ff) = cat(1, fits.(ff)); 
+					end
+				end
+				fits = F;
+			end						
+        end
         
 		function [out, S, dir_stats] = summary_stats(F, varargin)
 			% [out, S, dir_stats] = WP.summary_stats(F, ::'noplot'::, ::'mea'::)

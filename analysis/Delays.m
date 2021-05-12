@@ -1,6 +1,40 @@
 classdef Delays < WaveProp
+    
+	properties
+		HalfWin = 5
+		FBand = [1 13]
+		MinFreq = 3
+		Reference string = 'center'
+		MaskBy string = 'longest'
+		Freq = [nan; nan]
+		Type string = 'group'
+% 		SamplingRate
+		
+		BW = 2 % Bandwidth
+		NTapers  % # of tapers
+		FFTPad = 4
+		CohConf = 0.05
+		T
+        NCh
+		
+	end
+
+	properties (Transient = true, Access = private)
+		window
+        
+        % Used to get the TOA, but no need to save afterward
+        Time  % This will just be indices unless given as input
+        SamplingRate = 1  % Assumes 1 sample per second unless otherwise given
+        
+    end
+    
+    properties (Dependent = true, Access = public)
+		RefTrace
+	end
+    
+    
 	methods  % Constructor
-		function D = Delays(obj, t0, varargin)	
+		function D = Delays(mea, t0, varargin)	
 		% Computes the delays at time t0 for the data in <obj>. 
 		% Inputs: 
 		%    obj: struct with fields 
@@ -12,66 +46,84 @@ classdef Delays < WaveProp
 		%    t0: time at which to test the delays (centered window)
 		%
 			
+        % Early days messing with classes... Probably better to rewrite
+        % from scratch if you get irritated.
+        
 			if nargin < 1, return, end
 			if nargin < 2, t0 = []; end
 			
-			try data = obj.Data; catch, data = obj.data; end
-			for ff = string(fieldnames(obj)')
+            % If multiple times are given, loop through and then combine
+            % objects. This is a really slow way to do this, but things are
+            % working and I don't want to reorganize everything now...
+            % Tolerate the slow and then optimize later if you keep using
+            % this.
+            if numel(t0) > 1
+                N = numel(t0);
+                D0(N) = Delays(mea, t0(N), varargin{:});
+                tic
+                for ii = 1:N-1
+                    if ~mod(ii, 10)
+                        fprintf('Computed delay %d/%d (%0.2f seconds)\n', ii-1, N, toc); 
+                        tic; 
+                    end
+                    D0(ii) = Delays(mea, t0(ii), varargin{:});
+                end
+                
+                D = WaveProp.resize_obj(D0);
+                return
+            end
+            
+			try signal = mea.Data; catch, signal = mea.data; end
+			for ff = string(fieldnames(mea)')
 				switch lower(ff)
 					case 'time'
-						D.Time = obj.(ff);
+						D.Time = mea.(ff);
 					case 'name'
-						D.Name = obj.(ff);
+						D.Name = mea.(ff);
 					case 'position'
-						D.Position = obj.(ff);
+						D.Position = mea.(ff);
 					case 'samplingrate'
-						D.SamplingRate = obj.(ff);
+						D.SamplingRate = mea.(ff);
 						if isempty(D.Time)
-							D.Time = 1:size(data, 1)' / obj.(ff);
+							D.Time = 1:size(signal, 1)' / mea.(ff);
                         end
                     case 'patient'
-                        D.Patient = obj.(ff);
+                        D.Patient = mea.(ff);
                     case 'seizure'
-                        D.Seizure = obj.(ff);
+                        D.Seizure = mea.(ff);
+                    case 'gridsize'
+                        D.GridSize = mea.(ff);
 					otherwise
 						continue
 				end
 			end
 			if isempty(t0), t0 = mean(D.Time); end
+            
 			D.t0 = t0;
             D.NCh = length(D.Position);
-			D = D.parse_inputs(varargin{:});
-			[D.window, D.T] = D.get_window(data);
-			[data, D.Freq] = D.get_data();
-% 			if numel(unique(data)) < 3, return, end
-			D.Data = -data;
-			D = D.compile_results(); 	
-		end
+			D = D.parse_inputs(varargin{:});			
+			
+            % Get the data window
+            t_inds = abs(D.Time - D.t0) <= D.HalfWin;
+			D.T = range(D.Time(t_inds));
+			D.window = signal(t_inds, :);
+            
+            % compute the TOA
+            [coh, phi, freq, coh_conf] = ...
+				D.compute_coherence(D.window, D.RefTrace, D.params);
+			coh(coh < coh_conf) = nan;
+			[phi, freq_out] = D.mask_phi(coh, phi, freq);
+			delay = D.phi2delay(phi, freq);
+
+            D.TOA = -delay;
+            D.Freq = freq_out;
+	
+        end
+        
 
     end
     
-	properties
-		HalfWin = 5
-		FBand = [1 13]
-		MinFreq = []
-		Reference = 'center'
-		MaskBy = 'longest'
-		Freq = [nan; nan]
-		Type = 'group'
-		SamplingRate
-		
-		BW  % Bandwidth
-		NTapers  % # of tapers
-		FFTPad = 4
-		CohConf = 0.05
-		T
-        NCh
-		
-	end
 
-	properties (Transient = true, Access = private)
-		window
-	end
 	methods  % coherence parameters
 		function sr = get.SamplingRate(obj)
 			sr = obj.SamplingRate;
@@ -86,19 +138,6 @@ classdef Delays < WaveProp
 				mf = max(obj.DefaultMinFreq, min(3 / obj.HalfWin, range(obj.FBand)));
 			end
 		end
-		function bw = get.BW(obj)
-			bw = obj.BW;
-			if isempty(bw)
-				switch obj.HalfWin
-					case 5
-						bw = 2;
-					case 0.5
-						bw = 3;
-					otherwise
-						bw = 3 / obj.T;  % This will generate 5 tapers
-				end
-			end
-		end
 		
 		function ntapers = get.NTapers(obj)
 			ntapers = obj.NTapers;
@@ -106,14 +145,12 @@ classdef Delays < WaveProp
 				ntapers = floor(2 * (obj.T .* obj.BW)) - 1;  % one less than the shannon number
 			end
             if numel(ntapers) == 1 && ntapers < 5
-                ntapers = max(ntapers, 5);
-                warning('Number of tapers changed to 5 (from %d).', ntapers); 
+                ntapers = 5;
+                warning('Number of tapers is changed to 5 (from %d; new BW=%0.2f).', ntapers, (ntapers + 1) / 2 / obj.T); 
             end
 		end
-	end
-	properties (Dependent = true, Access = public)
-		RefTrace
-	end
+    end
+    
 	methods  % getters for dependent properties
 		
 		function reference = get.RefTrace(D)
@@ -149,32 +186,16 @@ classdef Delays < WaveProp
 	methods
 		
         function freq = get.Freq(D)
-%             freq = D.Freq;
-            freq = reshape(D.Freq, [], 2, D.NCh);
-            
-            return
-            switch class(freq)
-                case 'cell'
-                    if numel(freq) == numel(D.time)
-                        empties = cellfun(@isempty, freq);
-                        fill_with = nan(size(freq{find(~empties, 1)}));
-                        freq(empties) = {fill_with};
-                        dim = find(size(fill_with) == 1, 1);
-                        freq = cat(dim, freq{:});
-                        if dim ~= 1, 
-                            freq = shiftdim(freq, dim - 1); 
-                        end
-                    end
-            end
+            freq = reshape(D.Freq, [], 2, D.NCh);            
         end
         
-		function [data_win, T] = get_window(D, data)
+		function [data_win, T] = ZZget_window(D, data)  % ZZ'd 5/10/21
 			t_inds = abs(D.Time - D.t0) <= D.HalfWin;
 			T = range(D.Time(t_inds));
 			data_win = data(t_inds, :);
 		end
 
-		function [delay, freq_out] = get_data(D)
+		function [delay, freq_out] = ZZget_data(D) % ZZ'd 5/10/21
 			
 			[coh, phi, freq, coh_conf] = ...
 				D.compute_coherence(D.window, D.RefTrace, D.params);
@@ -212,12 +233,27 @@ classdef Delays < WaveProp
 			end
         end
         
+        function obj = reload(obj, S)
+            % Made some changes to the WaveProp properties. This is to make
+            % sure that there are no errors in loading after the changes. 
+            obj = reload@WaveProp(obj, S);
+        end
 	end
 	
 	
 	%% Static methods
 	methods (Static)
 		
+        function obj = loadobj(S)
+            if isstruct(S)
+                obj = Delays;
+                for ff = string(fieldnames(S)')
+                    if ismember(ff, {'ParamNames', 'WPParamNames'}), continue; end
+                    obj.(ff) = S.(ff); 
+                end
+                obj = reload(obj, S);
+            end
+        end
         function delay = regress_delay(phi, freq)
             % computes group delay be fitting a line to phi(f) and
             % returning slope
