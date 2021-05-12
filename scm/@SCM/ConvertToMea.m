@@ -78,6 +78,7 @@ function ConvertToMea(scm)
 		'Time', time, ... 
 		'Path', scm.mea_path ...	 
 		);
+    mea.GridSize = scm.dimsNP;
 	
 %   mea = add_noise_(mea, 2);  % Add 3D brownian noise with snr=2; the spectra after this transformation looked similar to recorded seizures - could also use (much) higher snr pink noise
 % 	qe_mat = rescale(single(qe_mat), 0, 25);  % range is based on experimentation
