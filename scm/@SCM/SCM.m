@@ -234,19 +234,6 @@ classdef SCM < handle
 %                                 scm.dimsNP = [4 4];
 %                                 scm.centerNP = [9 24];
 %                                 scm.visualization_rate = 10;
-
-                            case 'IWa'
-                                scm = SCM('IW');
-                                scm.label = 'IW_big';
-                                scm.basename = 'SCM/IW_big/IW_big';
-                                scm.visualization_rate = 0;
-                                scm.duration = 35;
-                                scm.padding = [5 5];
-                                scm.dimsNP = [32 32];
-                                
-                                
-                                
-                                scm.centerNP = scm.stim_center;
                                 
                                 
                             case 'IW_coloc'
@@ -257,24 +244,27 @@ classdef SCM < handle
                                 scm.source = scm.ellipse(scm.stim_center, 3, 1);
                                 scm.visualization_rate = 0;
 
-                            case 'IW_colin'
-                                scm = SCM('IW');
-                                scm.label = 'IW_colin';
-                                scm.basename = 'SCM/IW_colin/IW_colin';
-                                
-                                scm.stim_center = [];
-                                scm.centerNP = [];
-                                scm.source = scm.ellipse();
                             case 'IW_c7'
                                 
                                 scm = SCM('IW');  % no dynamics on external drives
                                 scm.sim_num = 90;
-                                scm.stim_center = [45 23];
-                                scm.centerNP = [41 25];
-                                scm.source = scm.ellipse([40 20], 3);
-                                scm.excitability_map = 5 * ones(scm.grid_size);  % without this the IW directions dominate too much
-                                scm.Qi_collapse([1 2]) = [30 -2];
-                                scm.I_drive = 2;
+                                scm.I_drive = 0;
+                                scm.set_layout('d');
+                                
+                                scm.centerNP = [26.5 6.5];
+                                scm.dimsNP = [4 4];
+                                scm.map = scm.generate_contagion;
+                                
+                            case 'IW_mg63'
+                                
+                                scm = SCM('IW');  % no dynamics on external drives
+                                scm.sim_num = 91;
+                                scm.I_drive = 0;
+                                scm.set_layout('c');
+                                
+                                scm.centerNP = [26.5 30.5];
+                                scm.dimsNP = [4 4];
+                                scm.map = scm.generate_contagion;
                                 
                             case 'wip'
                                 % Look at stronger FS
@@ -286,7 +276,7 @@ scm.sim_num = 9;
                             scm.visualization_rate = 10;
                                 scm.padding = [2 10];
 scm.duration = 60;
-scm.dimsNP = [24 24];                                           
+scm.dimsNP = [4 4];                                           
                                 
                                 
                                 
@@ -296,11 +286,14 @@ scm.dimsNP = [24 24];
 
 scm.stim_center = [25 20];
 scm.centerNP = [25 15];
-scm.source = scm.ellipse([25 10], 3);
+% scm.IZ = scm.ellipse([], [], 1.2);
+scm.source = scm.ellipse([25 10], 2, .8);
+scm.sigmoid_kD(2) = .2;
+% scm.expansion_rate = 0;
 % scm.excitability_map = 5 * ones(scm.grid_size);
 % scm.Qi_collapse([1 2]) = [30 -3];
 % scm.I_drive = 2;
-% scm.t0_start = 0;
+scm.t0_start = 0;
 
 
 % Add Martinet Potassium dynamics (commented out because testing sigmoid
@@ -470,6 +463,8 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
         function map_ = generate_map(scm)
             % Generates a linear radial distance from source map with some
             % 2D gaussian noise
+            map_ = inf(scm.grid_size);
+            if scm.expansion_rate <= 0, return; end
             [xx, yy] = find(ones(scm.grid_size));
             xx = xx - scm.stim_center(1);
             yy = yy - scm.stim_center(2);
@@ -924,12 +919,12 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
             
             if nargin < 2 || isempty(C),  C = scm.grid_size ./ 2; end
             if nargin < 3 || isempty(R); R = floor(scm.grid_size / 2 - 4); end
-            if nargin < 4 || isempty(value); value = true; end
+            if nargin < 4 || isempty(value); value = 1; end
             
             if numel(R) == 1, R = [R R]; end
             [ix, iy] = ind2sub(scm.grid_size, 1:prod(scm.grid_size));
 
-            map = false(scm.grid_size);
+            map = zeros(scm.grid_size);
             ellipse = sum( ([ix' iy'] - C).^2 ./ R.^2, 2 ) < 1;
             map(ellipse) = value;
         end
