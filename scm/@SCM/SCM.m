@@ -528,7 +528,7 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
             X = zeros(scm.grid_size);
             X(logical(scm.IZ)) = 1;
             X(scm.NPinds) = 4;  % mea
-            X(scm.source) = 2;
+            X(logical(scm.source)) = 2;
             
             X(scm.stim_center(1), scm.stim_center(2)) = 3;  % IW
 %             [xx, yy] = ind2sub(scm.grid_size, scm.NPinds);
