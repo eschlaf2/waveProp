@@ -86,7 +86,7 @@ function ConvertToMea(scm)
 % 	mea.event_mat_size = size(mea.Data);
 	mea.params = init_mea_params();
 	fprintf('Saving %s ... ', mea.Path);
-	save(mea.Path, '-struct', 'mea');
+	save(mea.Path, '-struct', 'mea', '-v7.3');
 	m = matfile(sprintf('%s_%d_info', scm.basename, scm.sim_num), 'Writable', true);
 	m.Qe_movie = movQ;
 	m.Ve_movie = movV;
