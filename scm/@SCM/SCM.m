@@ -435,7 +435,10 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
             map_ = inf(scm.grid_size);
             if scm.expansion_rate <= 0, return; end
             dt_ = scm.dt * 10;  % lower precision is ok; worth increase in speed
-            p_wavefront = 2^(scm.expansion_rate * dt_/scm.dx) - 1;  % area is recruited at this rate
+            
+            % Negative binomial with expected waiting time of N steps
+            N = scm.expansion_rate / scm.dx / dt_;
+            p_wavefront = (1 - N/(N + 1))/2;  % divide by 2 to account for 2 dimensions of spread
             
             recruited = false(scm.grid_size);  % set state negative to indicate "not recruited"
             recruited(scm.stim_center(1), scm.stim_center(2)) = true;  % stim center is recruited at t = 0;
@@ -852,6 +855,7 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
             % collapses following an inverse gaussian (this was chosen
             % only because it gives a smooth drop and recovery; no proposed
             % relation to mechanism). 
+            
             if nargin < 2 || all(isnan(scm.Qi_collapse)) % if no state is given, return Qi_max
                 qm = scm.Qi_max;
             else  % else update Qi_max relative to IW state
