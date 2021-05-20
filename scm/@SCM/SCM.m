@@ -446,7 +446,7 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
             tt = dt_;  % advance tt
             
             % repeat until end of simulation or all nodes are recruited
-            while tt < (scm.duration + scm.padding(2)) && any(isinf(map_), 'all')
+            while tt < scm.duration && any(isinf(map_), 'all')
                                 
                 % find non-recruited points with recruited neighbors
                 boundary = conv2(recruited, [0 1 0; 1 -4 1; 0 1 0], 'same') > 0;  
