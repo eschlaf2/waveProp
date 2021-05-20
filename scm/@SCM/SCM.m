@@ -937,6 +937,12 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
     
     
     methods  % functions for convenience/setup
+        
+        function map = get.map(scm)
+            % Default to contagion map
+            if isempty(scm.map), scm.map = scm.generate_contagion; end
+            map = scm.map;
+        end
         function str = mea_path(scm)
             str = sprintf('%s/%s/%s_Seizure%d_Neuroport_%d_%d.mat', ...
                 pwd, scm.label, scm.label, scm.sim_num, scm.padding);
@@ -991,9 +997,7 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
 			if any(mod(p.grid_size, 2)), p.grid_size = p.grid_size + mod(p.grid_size, 2); end
 			grid_size = p.grid_size;
         end
-%         function dims = get.dimsNP(scm)
-%             dims = arrayfun(@min, scm.dimsNP, scm.grid_size);
-%         end
+
         
 		function center = get.centerEC(P)
             if isempty(P.centerEC)
@@ -1003,6 +1007,7 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
 		end
 		
     end
+    
 	methods  % dependent getters
 		function obj = substruct(P, names)
 			for ff = names
