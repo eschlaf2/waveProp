@@ -92,7 +92,8 @@ for ii = 1:Nsteps
 	
     % Set the "source" locations' excitatory population resting voltage and
 	% expand the wavefront
-    update_drive
+    [iwQi_max, iw_dVe] = scm.iw_model(time(ii));
+    fs_dVe = scm.fixed_source(time(ii));
     
 	% Update equations (update <new> values)
 	update_wave_equations;
@@ -205,37 +206,27 @@ NP = rmfield(NP, no_return);
 
 % 3. update the soma voltages
 	function update_soma_voltages
-        
-        if strcmpi(scm.drive_style, 'inhibitory')
-            FS = scm.fixed_source(time(ii));
-            IW = 0;
-%             IW = scm.I_drive .* double(new.map * (time(ii) >=0));
-        else  % excitatory drive style implements these in the dVe parameter
-            FS = 0;
-        end
 
 		new.Ve = last.Ve ...
 			+ dt / scm.tau_e * ( ...
 				(scm.Ve_rest - last.Ve) ...
-				+ last.dVe + scm.IZ + FS - IW ...                     % offsets from K+, IZ, FS, and IW
-                + scm.rho_e * Psi_ee(last.Ve) .* last.Phi_ee ...      %E-to-E
-                + scm.rho_i * Psi_ie(last.Ve) .* last.Phi_ie ...      %I-to-E
+				+ last.dVe + scm.IZ + fs_dVe + iw_dVe ...         % offsets from K+, IZ, FS, and IW
+                + scm.rho_e * Psi_ee(last.Ve) .* last.Phi_ee ...  %E-to-E
+                + scm.rho_i * Psi_ie(last.Ve) .* last.Phi_ie ...  %I-to-E
 				+ last.Dee/dx^2 .* del2_(last.Ve) ...
 			);
 		new.Vi = last.Vi ...
 			+ dt / scm.tau_i * ( ...
 				(scm.Vi_rest - last.Vi) ...
-				+ last.dVi + ...                                      % offset from K+
-				+ scm.rho_e * Psi_ei(last.Vi) .* last.Phi_ei ...      %E-to-I
-				+ scm.rho_i * Psi_ii(last.Vi) .* last.Phi_ii ...      %I-to-I
+				+ last.dVi + ...                                  % offset from K+
+				+ scm.rho_e * Psi_ei(last.Vi) .* last.Phi_ei ...  %E-to-I
+				+ scm.rho_i * Psi_ii(last.Vi) .* last.Phi_ii ...  %I-to-I
 				+ last.Dii/dx^2 .* del2_(last.Vi) ...
 			);
 	end
 
 % 4. update the firing rates
 	function update_firing_rates
-		
-        IW = 10 * scm.I_drive .* double(new.map * (time(ii) >=0));
         
 		new.Qe = ...
 			scm.Qe_max .* ( ...
@@ -245,12 +236,12 @@ NP = rmfield(NP, no_return);
 			) ; % No depo block on excitatory cells 
 			
 		new.Qi = ...
-            ( scm.Qi_max_fun(new.state) + IW ) .* ( ...
+            ( iwQi_max ) .* ( ...  
                 1 ./ (1 + ...
                     exp(-pi / ( sqrt(3) * scm.sigma_i ) .* ( last.Vi - scm.theta_i )) ...
                 ) ...
             ) ...     %The I voltage must be big enough,
-            - scm.depo_block * scm.Qi_max_fun(new.state) .* ( ...
+            - scm.depo_block * iwQi_max .* ( ...
                 1 ./ ( 1 + ...
                     exp(-pi / ( sqrt(3) * 3 ) .* ( last.Vi - ( scm.theta_i + 10 ) )) ...
                 ) ...
@@ -275,7 +266,6 @@ NP = rmfield(NP, no_return);
 	end
 
 % 6. Update inhibitory gap junction strength, and resting voltages.  
-   
 	function update_gap_resting
        
         switch scm.gap_resting_update
@@ -307,6 +297,16 @@ NP = rmfield(NP, no_return);
 
 % Update source and expand wavefront
 	function update_drive
+        % Updated the implementation so the scm.iw_model(time(ii)) does
+        % this. <scm.map> is now pregenerated with IW recruitment times for
+        % each node and <scm.iw_model(t)> returns a Qi_max and dVe value
+        % which are applied in <update_firing_rates> and
+        % <update_soma_voltages> respectively. The advantage is that each
+        % element of the model is kept separate (i.e. the effect from K+ is
+        % in new.dVe{dVi}, the effect from the FS has been separated and is
+        % a constant (i.e. not defined by it's derivative?) function of
+        % time; the effect from the IW is separate and also a constant
+        % function of time.
         
         switch scm.drive_style
             case {'', 'excitatory'}
@@ -330,22 +330,14 @@ NP = rmfield(NP, no_return);
                 
             case 'inhibitory'
                 % The map for the IW updates here, but is applied directly
-                % to the voltage dynamics rather than by changing dVi. This
+                % to the Qi dynamics rather than by changing dVi. This
                 % makes it easier to modulate dVi with K+ if you want to do
                 % that. Inhibitory collapse is applied here, however.
-                if time(ii) > 0 
-                    if isempty(scm.map)  % if no pregenerated map, do an update
-                        [new.map, new.state] = update_map_smooth( ...
-                            last.state, scm.expansion_rate * dt / dx, ...
-                            scm.excitability_map, dt);
-                    else
-                        new.map = ...
-                            scm.map > time(ii) - scm.excitability_map ...
-                            & scm.map <= time(ii);
-                        new.state = time(ii) - scm.map;
-                    end
-                    
-                end
+                
+                
+                
+                
+                
             otherwise
                 error('Drive style ''%s'' not recognized');
         end
@@ -379,9 +371,12 @@ NP = rmfield(NP, no_return);
 		if scm.visualization_rate > 0
 			if ~exist('fig', 'var') || isempty(fig)
 				fig = create_fig_(out_vars, scm.grid_size, indsNP);
-                ss = mkdir(sprintf('SCM/%s/vids/%s_%d/', scm.label, scm.label, scm.sim_num));
+                ss = mkdir(sprintf('SCM/%s/vids/%s_%d/', scm.label, scm.label, scm.sim_num)); %#ok<NASGU>
 			end
 			if diff(floor((time(ii) - [dt 0]) * scm.visualization_rate))
+                if ismember('map', out_vars)  % This doesn't update as part of the dynamics anymore, so update here to show where IW is 
+                    last.map = iwQi_max > scm.Qi_max; 
+                end
 				for sp = 1:numel(fig.ih)
 					set(fig.ih(sp), 'cdata', last.(out_vars{sp}))
 % 					colorbar
@@ -427,34 +422,6 @@ end
 
 % ------------------------------------------------------------------------
 %% Supplementary functions
-
-
-function [offset_i, offset_e] = dVi(t, gs, dVe)
-    % Hack-y circular ring type IW
-    if t < 0, offset_i = zeros(gs); offset_e = dVe; return; end
-    WIDTH = 1;  % I think WIDTH probably needs to be at least Lambda to prevent excitatory transmission from inner to outer
-    RATE = 1;  % in dx/s (so if dx = .1 cm, this is in mm/s)
-    iw0 = [20 30];
-    
-    [xx, yy] = ndgrid(1:gs(1), 1:gs(2));
-    xx = xx - iw0(1); yy = yy - iw0(2);
-    D = sqrt(xx.^2 + yy.^2);
-    
-    r1 = D <= RATE * t & D >= RATE * t - WIDTH;  % outer ring
-    r2 = D <= RATE * t - WIDTH & D >= RATE * t + (t/60 - 2) * WIDTH;  % inner ring  (40)
-    r3 = D < RATE*t - 2*WIDTH;  % inside IW
-    
-    offset_i = zeros(gs);
-    offset_i(r1) = 1000; % 5
-    offset_i(r2) = 0; % -5
-    offset_i(r3) = 0;
-    offset_e = dVe;
-%     offset_e(r1 | r2) = 2;
-%     offset_e(r3) = 2;
-    
-    
-    
-end
 
 %------------------------------------------------------------------------
 function Y = del2_(X)
@@ -524,18 +491,6 @@ function fig = create_fig_(out_vars, grid_size, addyNP, addyEC)
 	fig.ih = ih;
 	fig.th = th;
 	fig.ah = ah;
-end
-
-%------------------------------------------------------------------------
-function inds = get_inds_(grid_size, center, dims, scale)
-
-	x_offset = ( (1:dims(1)) - floor(dims(1)/2) ) * scale;
-	y_offset = ( (1:dims(2)) - floor(dims(2)/2) ) * scale;
-	[xx, yy] = ndgrid(x_offset, y_offset);
-
-	inds = sub2ind(grid_size, ...
-		center(1) + xx(:), ...
-		center(2) + yy(:));
 end
 
 %------------------------------------------------------------------------

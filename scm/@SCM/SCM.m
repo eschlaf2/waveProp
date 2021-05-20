@@ -66,8 +66,8 @@ classdef SCM < handle
                                 scm.sim_num = 1;
                                 scm.padding = [5 10];
                                 scm.out_vars = {'Qe', 'Ve', 'Qi', 'Vi', 'Dii', 'K'};
-                                scm.drive_style = 'excitatory';
-                                scm.I_drive = 0;
+                                scm.drive_style = 'voltage';
+                                scm.I_drive = 0;  % set to negative something to make an excitatory IW drive (positive values will increase inhibition in current implementation)
                                 scm.Qi_collapse = nan;
                                 scm.K = [-Inf 1];
                                 
@@ -141,7 +141,7 @@ classdef SCM < handle
                                 scm.post_ictal_source_drive = nan;
 
                                 
-                                scm.drive_style = 'inhibitory';
+                                scm.drive_style = 'firing_rate';
                                 
                                 
                                 % Only simulate FS portion (i.e. update the
@@ -216,7 +216,7 @@ classdef SCM < handle
 
                                 scm.post_ictal_source_drive = nan;
 
-                                scm.drive_style = 'inhibitory';
+                                scm.drive_style = 'firing_rate';
 
                             case 'IW_big'
                                 scm = SCM('IW');
@@ -639,7 +639,7 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
         
         
         % Create an inhibitory IW. 
-        drive_style (1,:) char = 'inhibitory'  % Allow inhibitory driving (EDS, 1/26/21)
+        drive_style (1,:) char {mustBeMember(drive_style, {'voltage', 'firing_rate'})} = 'firing_rate'  % Allow inhibitory driving (EDS, 1/26/21)
         I_drive (1, 1) double = .7  % Allow inhibitory driving (EDS, 1/26/21)
         post_ictal_I_drive (1, 1) double = nan  % Allow inhibitory driving (EDS, 1/26/21)
         
@@ -850,22 +850,47 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
             end
             IZ = scm.IZ;
         end
-        function qm = Qi_max_fun(scm, state)
+        
+        
+        function [Qi_max, dVe] = iw_model(scm, time)
             % Model of inhibitory collapse. Max inhibitory firing rate
-            % collapses following an inverse gaussian (this was chosen
+            % collapses following a gaussian (this was chosen
             % only because it gives a smooth drop and recovery; no proposed
             % relation to mechanism). 
             
-            if nargin < 2 || all(isnan(scm.Qi_collapse)) % if no state is given, return Qi_max
-                qm = scm.Qi_max;
-            else  % else update Qi_max relative to IW state
-                em = scm.excitability_map;
-                em(em <= 0) = -inf;
-                qm = scm.Qi_max ...
-                    - scm.Qi_collapse(1) * scm.gaussian( ...
-                        state, em + scm.Qi_collapse(2), scm.Qi_collapse(3));
-            end 
+            % These are baselines
+            Qi_max = scm.Qi_max;
+            dVe = 0;
+            
+            if nargin < 2, return; end  % return now if no time is given
+            
+            % <state> represents time since IW onset on each node
+            state = time - scm.map; 
+            em = scm.excitability_map;  % convenience (this is the duration of the IW or the boost to Qi_max depending on the drive style)
+            em(em <= 0) = -inf;  % I think I used -1 to indicate "not excitable" somewhere
+            iw_mask = state > 0 & state <= em;  % Determine which nodes are in IW
+            
+            switch scm.drive_style
+                case 'voltage'
+                    dVe = -scm.I_drive .* double(iw_mask);
+                case 'firing_rate'
+                    
+                    % Inhibition is increased for <em> seconds before IW onset
+                    inhibitory_boost = 10 * scm.I_drive .* double(iw_mask); % the 10 here makes effect I_drive comparable to applying it to the voltage (dVi) rather than the firing rate
+
+                    % ... and then collapses following a gaussian curve
+                    % with parameters defined in <scm.Qi_collapse>
+                    Qi_max = scm.Qi_max + inhibitory_boost ...  
+                        - scm.Qi_collapse(1) * scm.gaussian( ...
+                            state, em + scm.Qi_collapse(2), scm.Qi_collapse(3));
+                otherwise
+                    error('drive_style not recognized')
+                    
+            end
+            
+            
         end
+        
         function map = get.excitability_map(P)
 			if isempty(P.excitability_map)
                 map = zeros(P.grid_size);
