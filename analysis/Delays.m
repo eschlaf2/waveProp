@@ -115,6 +115,9 @@ classdef Delays < WaveProp
 			[phi, freq_out] = D.mask_phi(coh, phi, freq);
 			delay = D.phi2delay(phi, freq);
 
+            if isempty(delay)
+                delay = nan;
+            end
             D.TOA = -delay;
             D.Freq = freq_out;
 	
@@ -252,6 +255,8 @@ classdef Delays < WaveProp
                     obj.(ff) = S.(ff); 
                 end
                 obj = reload(obj, S);
+            else
+                obj = S;
             end
         end
         function delay = regress_delay(phi, freq)

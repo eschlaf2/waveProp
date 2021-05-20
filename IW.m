@@ -31,6 +31,7 @@ classdef IW < handle
         fr_gaussian
         fr_smooth
         fr_at_peak
+        iw_fwhm
     end
     
     properties (Dependent = true)
@@ -135,24 +136,24 @@ classdef IW < handle
             [~, ind] = max(fr_);
         end
         
-        function M = max_descent_IW(iw, times, varargin)
-            % Use max descent method to compute IW-like wave propagation
-            
+        function M = max_descent_IW0(iw, times, varargin)
             mea_ = iw.mea;
             MIN_FR = iw.MinPeakFr;
-            if nargin < 2 || isempty(times)
-                times = mea_.Time(1):.1:mea_.Time(end); 
-            end
+            
             
             data = max(iw.fr_smooth, iw.MinPeakFr) - iw.MinPeakFr;
+%             data = iw.fr_smooth;
             dataN = normalize(data, 'scale');
             
             S = warning; warning off;
 			N = numel(times);
 			M(N) = MaxDescent(varargin{:});
             D0 = mea_.MaxDescentData;
-            dataN(data < MIN_FR) = 0;  % Require min firing rate of 30
+            dataN(data < MIN_FR) = 0;  % Require min firing rate of MEN_FR
             mea_.MaxDescentData = -dataN;
+%             M = MaxDescent(mea_, times, ...
+%                 'halfwin', 1, 'diffsorpeaks', iw.DiffsOrPeaks, ...  % defaults
+%                 varargin{:});
 			for ii = 1:N
 				t0 = times(ii);
 				M(ii) = MaxDescent(mea_, t0, ...
@@ -166,6 +167,55 @@ classdef IW < handle
             
             warning(S);
             mea_.MaxDescentData = D0;
+        end
+        
+        function [M, fwhm] = max_descent_IW(iw, times, varargin)
+            % Use max descent method to compute IW-like wave propagation
+            
+            mea_ = iw.mea;
+            time_ = iw.time;
+            MIN_FR = iw.MinPeakFr;
+            
+            data = iw.fr_smooth;
+            dataN = normalize(max(data, MIN_FR), 'scale');
+            
+            S = warning; warning off;
+            D0 = mea_.MaxDescentData;
+            mea_.MaxDescentData = -dataN;
+            M = MaxDescent(mea_, times, ...
+                'halfwin', 1, 'diffsorpeaks', iw.DiffsOrPeaks, ...  % defaults
+                varargin{:});
+
+            M.TOA = M.use_largest_cluster(M.TOA);
+            M.MinFinite = 10;  % Set to 10 to accommodate slow movement relative to window
+			M.Name = ['IW_' mea_.Name];
+            
+            warning(S);
+            mea_.MaxDescentData = D0;
+            
+            % Get the IW width (duration) of the IW on each electrode
+            dat = M.TOA + M.t0 - M.HalfWin;
+            fwhm = zeros(size(dat));
+            
+            [~, locs_w, ww] = arrayfun(@(ii) findpeaks(dataN(:, ii), time_), 1:size(dataN, 2), 'uni', 0);
+            for ii = 1:numel(ww)
+                li = mea_.locs(ii);
+                temp_tq = dat(:, li);
+                temp_t_all = locs_w{ii}(:);
+                [~, nearest] = min(abs(temp_tq - temp_t_all'), [], 2);
+                temp_w = ww{ii}(nearest);
+                
+                % don't add data where there isn't any, or where the times
+                % don't match
+                t_diff = temp_tq - temp_t_all(nearest);
+                mask = isfinite(t_diff) & abs(t_diff) < 3e-3;  % within 3 ms
+                temp_w(~mask) = nan;
+                
+                fwhm(:, li) = temp_w;
+            end
+
+            
+            
         end
 
         function [M, s] = save_IW_fits(iw, method, save_bool)
@@ -194,11 +244,11 @@ classdef IW < handle
         function out = compute_IW_templates(iw, method, varargin)
             % [out, M] = compute_IW_templates(iw, method, varargin)
             
-            max_templates = iw.MaxTemplates;
-            win = iw.W;
+            max_templates = iw.MaxTemplates;  % Return at most this many templates
+            win = iw.W;  % Use this as the min peak window (otherwise, autodetect)
             mea_ = iw.mea;
             time_ = mea_.Time;
-            MIN_FR = iw.MinPeakFr;
+            MIN_FR = iw.MinPeakFr;  % channels must hit this firing rate to be considered in IW
 
             if nargin < 2 || isempty(method), method = iw.Method; end
             assert(ischar(method), 'Use the <method> so that the right firing rate is used')
@@ -211,12 +261,14 @@ classdef IW < handle
             % Normalize the firing rate based on std
             frN = normalize(fr_, 'scale');
             
-            % Use the width of the largest peak as the window to differentiate between peaks            
+            % Auto-detect min peak window length: Use the width of the
+            % largest peak as the window to differentiate between peaks
             if isempty(win)  
                 num_hi_fr = movmean(sum(frN > iw.MinPeakHeight, 2), ...
                     mea_.SamplingRate*1);  % Use a 1 s smoothing window since this should wash out fast changes
                 [~, ~, win] = findpeaks(num_hi_fr, time_, ...
-                    'SortStr', 'descend', 'Npeaks', 1);
+                    'SortStr', 'descend', 'Npeaks', 1, ...
+                    'WidthReference', 'halfprom');  % halfprom is what you want here... don't change this! (halfheight sounds like what you want but it truncates; prom is what you want)
                 if isempty(win), win = 1; end
                 win = max(min(win, 60), 2);
             end
@@ -230,26 +282,32 @@ classdef IW < handle
                 1:size(fr_, 2), 'uni', 0);
             ch = arrayfun(@(ii) ii*ones(size(locs_t{ii})), 1:size(fr_, 2), 'uni', 0);
 
+            
             % Convert peak times to locs
             locs_t = cat(2, locs_t{:});
             ch = cat(2, ch{:});
             [~, locs_i] = min(abs(time_(:) - locs_t));
 
-            % Create a matrix of peaks and determine how many channels have a peak in
-            % each sliding window
+            
+            % Create a matrix of peaks and determine how many channels have
+            % a peak in each sliding window
             [m, n] = size(fr_);
             temp = movmax(full(sparse(locs_i, ch, 1, m, n)), win * mea_.SamplingRate);
             N = sum(temp, 2);
-
+            
+            
             % Find time points where many electrodes have a peak
             [~, times, durs_, proms_] = findpeaks(N, time_, ...
                 'MinPeakDistance', win, 'MinPeakHeight', iw.MinElectrodes);
 
+            
             % Compute max descent (or min peak) on time points
-            M = iw.max_descent_IW(times, 'halfwin', win/2, varargin{:});
-            dat = M.Data + M.time - M.HalfWin;
+            [M, fwhm] = iw.max_descent_IW(times, 'halfwin', win/2, varargin{:});
+            dat = WaveProp.use_largest_cluster(M.Data) + M.time - M.HalfWin;
             [~, inds] = min(abs(time_(:) - times));
             fr_max = movmax(fr_, win * mea_.SamplingRate); 
+            
+            
             fr_max = fr_max(inds, :);
             fr_max(isnan(dat(:, mea_.locs)) | fr_max < MIN_FR) = nan;
             fr_maxN = normalize(fr_max, 2);
@@ -257,21 +315,25 @@ classdef IW < handle
             fr_max = mea_.make_3d(fr_max);
             dat(isnan(fr_max)) = nan;
             fr_max(isnan(dat)) = nan;
+            fwhm(isnan(dat)) = nan;
+            
             
             % Eliminate times where not enough electrodes are active
             mask = sum(isfinite(dat), [2 3]) >= iw.MinElectrodes;
 
+            
             % Return the highest firing templates
             if max_templates < sum(mask)
                 fr_max(~mask, :, :) = 0;
                 [~, so] = sort(sum(fillmissing(fr_max, 'constant', 0), [2 3]), 'descend');
                 mask(so(max_templates+1:end)) = false;
             end
-
-
+            
+            
             out = struct( ...
                 'template', dat(mask, :, :), ...
                 'firing_rate', fr_max(mask, :, :), ...
+                'fwhm', fwhm(mask, :, :), ...
                 'time', M.time(mask), ...
                 'win', win, ...
                 'durs', durs_(mask), ...
@@ -286,119 +348,15 @@ classdef IW < handle
 
         end
         
-        function [out, M] = ZZcompute_IW_templates(iw, M)
-            % [out, M] = get_IW_templates(mea, M=::saved Miw::, win=4, max_templates=Inf, varargin)
-            % Use max descent type analysis to find IW times and templates
-            
-            max_templates = iw.MaxTemplates;
-            win = iw.W;
-            mea_ = iw.mea;
-            
-            if nargin < 2 || isempty(M), M = iw.Method; end
-            assert(ischar(M), 'Use the method instead so that the right firing rate is used')
-            
-            iw.Method = M;
-            ff = ['Miw_' M];
-            M = WaveProp.load(iw.mea, ff);
-            M = M.(ff);
-            
-                        
-            MIN_FR = iw.MinPeakFr;
-            WNG = warning; warning off;
-            
-            data_fr = movmax(iw.fr_smooth, 2*M.HalfWin, ...
-                        'omitnan', 'samplepoints', iw.time);
-            dat = M.Data - M.HalfWin + M.time;
-                        
-            if isempty(win)  % Use the width of the largest peak as the smoothing window
-                [~, ~, win] = findpeaks(max(nanmedian(iw.fr_smooth, 2), MIN_FR), mea_.Time, ...
-                    'SortStr', 'descend', 'NPeaks', 1);
-                win = min(win, 30);
-            end
-            
-            
-            max_fr = movmax(iw.fr_smooth, win, ...
-                        'omitnan', 'samplepoints', iw.time);
-            warning(WNG)
-            
-            max_fr(max_fr < MIN_FR) = nan;
-            max_fr = filloutliers(max_fr, nan, 2, 'ThresholdFactor', 3);
-            ind_t = mea_.time2inds(M.time);
-            max_fr = mea_.make_3d(max_fr(ind_t, :));
-            data_fr = mea_.make_3d(data_fr(ind_t, :));
-            dat(normalize(data_fr) < 2) = nan;
-
-            
-            SZ = size(dat);
-            dat_sm = movmean(reshape(dat, SZ(1), []), win, 'omitnan', ...  % smooth over a XXs window (4s bc if IW moves at 1mm/s then it should be on the MEA for 4s)
-                'SamplePoints', M.time);
-            dat_sm = reshape(filloutliers(dat_sm, nan, 2), SZ);
-            dat_sm(isnan(max_fr)) = nan;
-            %             mask = sum(isfinite(dat), [2 3]) < M.MinFinite;
-            mask = isfinite(dat_sm) & normalize(data_fr) > 2;
-            mask = sum(mask, [2 3]) < M.MinFinite;
-            dat_sm(mask, :, :) = nan;
-            N = sum(isfinite(dat_sm), [2 3]);  % find the number of electrodes above 2sd
-            tt = nanmedian(dat_sm, [2 3]);
-            tt(isnan(tt)) = M.time(isnan(tt));
-
-            [tt, so] = sort(tt);
-            dat_sm = dat_sm(so, :, :);
-            max_fr = max_fr(so, :, :);
-            N = N(so);
-
-
-            while any(diff(tt) <= 0)
-                for jj = find(diff(tt) <= 0)' + 1
-                    tt(jj) = tt(jj - 1) + 1e-5;
-                end
-            end
-
-            [~, locs_t, durs_, proms_] = findpeaks(N, tt, ...
-                'MinPeakDistance', win, ...  % 
-                'MinPeakHeight', iw.MinElectrodes, ...  % Require a minimum of electrodes
-                'MinPeakProminence', 0);  % ... and a minimum prominence 
-            [~, locs_] = min(abs(tt - locs_t'));  
-
-            template = dat_sm(locs_, :, :);
-            fr_template = max_fr(locs_, :, :);
-
-            N = nanmedian(fr_template, [2 3]);
-            fr_mask = N/max(N) >= .5;
-            template = template(fr_mask, :, :);
-            fr_template = fr_template(fr_mask, :, :);
-            locs_t = locs_t(fr_mask);
-            durs_ = durs_(fr_mask);
-            proms_ = proms_(fr_mask);
-
-
-            % Return <max_templates> with highest total firing rate
-            if isfinite(max_templates) && numel(locs_t) > max_templates
-                inds = 1:min(max_templates, numel(locs_t));
-            %                 N = sum(isfinite(template), [2 3]);
-                N = nanmedian(fr_template, [2 3]);
-                [~, so] = sort(N, 'descend');
-                so = sort(so(inds));
-                template = template(so, :, :);
-                fr_template = fr_template(so, :, :);
-                locs_t = locs_t(so);
-                durs_ = durs_(so);
-                proms_ = proms_(so);
-            end
-
-            out = struct( ...
-                'template', template, ...
-                'firing_rate', fr_template, ...
-                'time', locs_t, ...
-                'win', win, ...
-                'durs', durs_, ...
-                'proms', proms_, ...
-                'method', iw.Method);
-            
-        end
 
         
         %%
+        
+        function iw_fwhm_ = get.iw_fwhm(self)
+            ind = self.wave;
+            tpl = self.iw_templates;
+            iw_fwhm_ = tpl.fwhm(ind, self.locs);
+        end
         
         function fr = get.fr_at_peak(self)
             ind = self.wave;
@@ -581,6 +539,10 @@ classdef IW < handle
             sp = range(self.onsets(~self.outliers)); %#ok<CPROP>
         end
         
+        function fit = fit_iw_fwhm(self)
+            iw_fwhm_ = self.iw_fwhm;
+            fit = fitdist(iw_fwhm_(~self.outliers)', 'norm');
+        end
         
         function fit = fit_fr_peak(self)
             fr_max = self.fr_at_peak;
@@ -867,7 +829,8 @@ classdef IW < handle
                 case 'onsets'
                     axis(ax, 'square')
                     set(ax, 'nextplot', 'replacechildren', 'units', 'points');
-                    pt_width = min(ax.Position([3 4])) / 11;
+                    gs = self.GridSize;
+                    pt_width = min(ax.Position([3 4])) / max(gs);
                     
                     
                     
@@ -876,19 +839,20 @@ classdef IW < handle
                     pos = self.position(~self.outliers, :);
                     sz = self.fr_at_peak(~self.outliers);
                     szR = rescale(sz, (pt_width / 4).^2, (1.1*pt_width).^2);
-                    scatter(ax, pos(:, 1), pos(:, 2), szR, ons, 'filled');
-                    xlim([0 11]);
-                    ylim([0 11]);
+                    scatter(ax, pos(:, 1), pos(:, 2), szR, ons, 'filled', 's');
+                    
+                    xlim([0 gs(1)+1]);
+                    ylim([0 gs(2)+1]);
                     colorbar(ax);
                     title(ax, {strrep(self.name, '_', ' '); 'IW onset time (s)'});
                     
                     
-                    
                     % Add direction arrow
-                    V_ = 8 * fit.V./vecnorm(fit.V);
+                    V_ = .8 * gs(1) * fit.V./vecnorm(fit.V);
                     x = V_/2;
                     hold on
-                    quiver(ax, 5.5 - x(1), 5.5 - x(2), V_(1), V_(2), 0, ...
+                    quiver(ax, (gs(1) + 1)/2 - x(1), (gs(2) + 1)/2 - x(2), ...
+                        V_(1), V_(2), 0, ...
                         'color', [0 0 0], 'linewidth', 2)
                     hold off
                     xstring = strsplit(sprintf('Speed (mm/s): %0.3f, phi: %0.1f, p<5e%d', ...
@@ -1195,7 +1159,7 @@ classdef IW < handle
                 'template', self.iw_templates);  % this will result in a copy of templates being saved for each wave, but I don't think it should be an issue since there aren't that many waves and this should be small
             
             for ff = {'prop_sp', 'moransI', 'range', ...
-                    'wave_fit', 'fit_fr_peak', 'main_wave', ...
+                    'wave_fit', 'fit_fr_peak', 'fit_iw_fwhm', 'main_wave', ...
                     'wave_fit_alt', 'crossing_time_rel', 'ending_rel', ...
                     'fr_median_iw', 'fr_median_all', 'fr_median_late', 'fr_fwhm'}
                     
@@ -1252,7 +1216,7 @@ classdef IW < handle
                 h(2) = figure;
                 self.plot2D;
                 fc = 3;
-                for type = {'onsets', 'durs', 'power', 'freq'}
+                for type = {'onsets', 'iw_fwhm', 'power', 'freq'}
                     h(fc) = figure;
                     self.ksdensity(type{:});
                     fc = fc + 1;
@@ -1525,9 +1489,9 @@ classdef IW < handle
                 row.nchannels = numfinite(dat.fit_fr_peak.InputData.data);
 %                 row.crossing_time_rel = dat.crossing_time_rel;
 %                 row.nchan_smooth = dat.nchannels_sm;
-                for fff = {'fr_peak'}  % , 'ht', 'frq' (these are related to pxx method of computing IW)
-                    temp_fit = dat.(['fit_' fff{:}]);
-                    if strcmpi(fff{:}, 'ht'), name = 'pwr'; else, name = fff{:}; end
+                for fff = ["fr_peak" "iw_fwhm"]  % , 'ht', 'frq' (these are related to pxx method of computing IW)
+                    temp_fit = dat.(sprintf('fit_%s', fff));
+                    if strcmpi(fff, 'ht'), name = 'pwr'; else, name = char(fff); end
                     row.([name '_mu']) = temp_fit.mu;
                     ci = temp_fit.paramci;
                     row.([name '_mu_conf']) = temp_fit.mu - ci(1, 1);

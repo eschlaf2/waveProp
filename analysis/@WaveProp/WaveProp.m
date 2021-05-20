@@ -105,8 +105,9 @@ classdef WaveProp < handle & matlab.mixin.Copyable
                 inds_ = obj.Inds; % Temporarily set inds to default to only generate fits for actual data
                 obj.Inds = [];
                 
+                
                 % Get the observed TOA
-                toa = obj.TOA;
+                toa = obj.use_largest_cluster(obj.TOA);
                 Nt = size(obj.TOA, 1);
                 locs_ = obj.locs;
                 
@@ -141,18 +142,23 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             m = numel(obj.t0); 
             n = size(obj.TOA, 2);
             toa_size = [m, obj.GridSize];  % result should be TIMExXxY
-            res = nan(toa_size);  % initialize matrix to hold the result
             
-            % Get the indices where the TOA data belongs and generate the
-            % resulting TOA
-            xx = repmat(obj.Position(:, 1)', m, 1);
-            yy = repmat(obj.Position(:, 2)', m, 1);
-            tt = repmat((1:m)', 1, n);
-            
-            locs_ = sub2ind(toa_size, tt(:), xx(:), yy(:));
-            res(locs_) = obj.TOA;
-            
-            res = res(obj.Inds, :, :);
+            if n == prod(obj.GridSize)  % If the data has already been arranged, you're done
+                res = reshape(obj.TOA, toa_size); 
+            else
+                res = nan(toa_size);  % initialize matrix to hold the result
+
+                % Get the indices where the TOA data belongs and generate the
+                % resulting TOA
+                xx = repmat(obj.Position(:, 1)', m, 1);
+                yy = repmat(obj.Position(:, 2)', m, 1);
+                tt = repmat((1:m)', 1, n);
+
+                locs_ = sub2ind(toa_size, tt(:), xx(:), yy(:));
+                res(locs_) = obj.TOA;
+
+                res = res(obj.Inds, :, :);
+            end
         end
         
         function data = get.Data(self)
@@ -308,7 +314,7 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             
 			D = angle(d2) - M.RotateBy;
 			D = angle(exp(1j * D));  % Keep in range [-pi pi]
-            M.Inds = inds_; %#ok<MCVM>
+            M.Inds = inds_; 
             D = D(inds_);
         end
         
@@ -1122,7 +1128,8 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             
             
             hold(ax, 'off')
-			ax.Tag = checkname(['figs' filesep s.Name '_' class(s) '_' num2str(tt) '_plot2D']);
+            ax.Tag = checkname(sprintf("figs/%s_%s_%0.3f_plot2D", s.Name, class(s), tt));
+% 			ax.Tag = checkname(['figs' filesep s.Name '_' class(s) '_' num2str(tt) '_plot2D']);
             xlim([0 grid_size(1) + 1]);
             ylim([0 grid_size(2) + 1]);
             axis(ax, 'equal');
@@ -1360,6 +1367,8 @@ classdef WaveProp < handle & matlab.mixin.Copyable
                 [px, py] = ndgrid(1:obj.GridSize(1), 1:obj.GridSize(2));
                 obj.Position = [px(:), py(:)];
                 obj.TOA = S.Data(:, :);
+            else
+                obj = S;
             end
         end
     end
@@ -1551,21 +1560,38 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 			V = pinv(beta(2:3));
         end
         
-		function [reduced_data, T] = use_largest_cluster(data, position)
+		function [reduced_data, G] = use_largest_cluster(data, position)
 			% Use the largest cluster of data points for lfp methods
+            % Assumes first dimension is time; if 2D, <position> must be
+            % given.
+            
+            if nargin < 2
+                assert(ndims(data) == 3, 'Data must be 3d or electrode position must be given.')
+                [px, py] = find(ones(size(data, [2 3])));
+                position = [px, py];
+            end
+            
+            reduced_data = nan(size(data));
+            G = nan(size(data));
 			warning('off', 'stats:clusterdata:MissingDataRemoved');
             
-            X = [position, normalize(data(:))];
-            
-			T = clusterdata(X, ...
-				'distance', 'euclidean', ... % euclidean distance
-                'criterion', 'distance', ...
-                'linkage', 'single', ...   % Nearest neighbor
-				'cutoff', sqrt(2 + .5));  % ... must be connected and values differ by less that .5 sd
-			[~, largest] = max(histcounts(T, max(T)));
-			mask = T == largest;
-			reduced_data = data;
-			reduced_data(~mask) = nan;
+            for ii = 1:size(data, 1)
+                temp_dat = data(ii, :);
+                X = [position, normalize(temp_dat(:))];
+                if numfinite(X(:, end)) < 3, continue; end
+
+                cc = clusterdata(X, ...
+                    'distance', 'euclidean', ... % euclidean distance
+                    'criterion', 'distance', ...
+                    'linkage', 'single', ...   % Nearest neighbor
+                    'cutoff', sqrt(2 + .5));  % ... must be connected and values differ by less than .5 sd
+                [~, largest] = max(histcounts(cc, max(cc)));
+                mask = cc == largest;
+%                 reduced_data = data;
+                temp_dat(~mask) = nan;
+                reduced_data(ii, :) = temp_dat;
+                G(ii, :) = cc;
+            end
 			
         end
         
@@ -1607,7 +1633,7 @@ classdef WaveProp < handle & matlab.mixin.Copyable
                 end
                 
                 if size(uu, 1) == 1
-                    S.(f) = reshape(uu, 1, siz(2:end));
+                    S.(f) = reshape(uu, [1, siz(2:end)]);
                 else
                     S.(f) = new_val;
                 end
@@ -1756,10 +1782,9 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             %          fits from all seizures in SeizureInfo will load
             
             if nargin < 2, metrics = []; end
-            if ischar(metrics), metrics = {metrics}; end
             if nargin < 1 || isempty(mea)
                 sz = SeizureInfo;
-                metrics = findsharedmetrics_(sz);
+                if isempty(metrics), metrics = findsharedmetrics_(sz); end
                 for ii = numel(sz.patient):-1:1
                     names{ii} = sprintf('%s_Seizure%d', sz.patient{ii}, sz.seizure(ii));
                     fits(ii) = WaveProp.load( names{ii}, metrics);

@@ -20,18 +20,20 @@ end
 
 methods
     function F = fig6
+        BVNY.set_style();
         F.Seizures = F.SeizureInfo;
 %         mask = contains(F.SeizureInfo.class, 'TLE');
 %         F.Seizures = F.SeizureInfo(mask, :);
     end
     
     
-    function T = show_all_sig_corr(F, sz_name, metric, pos_or_neg)
+    function T = show_all_sig_corr(F, sz_name, metric, pos_or_neg, time_range)
         % Show each significant wavefit/correlation pair for a given
         % seizure number and metric
         if nargin < 2 || isempty(sz_name), sz_name = 'c7_Seizure1'; end
         if nargin < 3 || isempty(metric), metric = 'M'; end
         if nargin < 4 || isempty(pos_or_neg), pos_or_neg = "pos"; end
+        if nargin < 5 || isempty(time_range), time_range = [-inf inf]; end
         
         
         % Some parameters & convenience vars
@@ -54,6 +56,13 @@ methods
         
         % get the correlations and directions (only show sig fits for both)
         [rho, rho_p, rho_t] = M.correlation(tpl);
+        
+        % Get only those correlations in the specified time range
+        tr = time_range + iw{mw}.center;
+        mask = rho_t >= tr(1) & rho_t <= tr(2); 
+        rho = rho(mask); rho_p = rho_p(mask); rho_t = rho_t(mask);
+        
+        
         inds = M.time2inds(rho_t);
         if MAKE_ONE_PAGE
             subset = @(so) so(1:min(numel(so), panes_per_fig));
@@ -834,7 +843,10 @@ methods
         agree = abs(out.Dmode_d) < 60 & abs(out.Dmean_diffs) < pi/4; % & out.Dcorr_coeff >= .5;
         fprintf('Disagree:\n');
         disagree = compose('%s %d', out.pat(~agree), out.sz(~agree));
-        cellfun(@disp, disagree)
+        
+        msg = compose('%s %d: %0.0f (dMode), %0.0f (dMean)', ...
+            out.pat(~agree), out.sz(~agree), out.Dmode_d(~agree), rad2deg(out.Dmean_diffs(~agree)));
+        cellfun(@disp, msg)
         
     end
     
@@ -867,15 +879,7 @@ methods
                 yticklabels({'-\pi', '-\pi/2', '0', '\pi/2', '\pi'})
             end
             if contains(fields{ii}, 'std'), ylim([0 pi]); end
-%             if strcmp(fields{ii}, 'Dmode_d')
-%                 agree = (abs(yy) < 90);  % & out.Dcorr_coeff > .5 
-%             end
-%             if strcmp(fields{ii}, 'Dmean_diffs')
-%                 hold on;
-%                 sc = scatter(xx(~agree), yy(~agree));
-%                 set(sc, 'Marker', '*', 'MarkerEdgeColor', [0 0 0]);
-%                 hold off
-%             end
+
             grid on
             box off
             
@@ -907,9 +911,9 @@ methods
     end
 
     function allP_main_iw(F, min_electrodes)
-        if nargin < 2 || isempty(min_electrodes), min_electrodes = 0; end
+        if nargin < 2 || isempty(min_electrodes), min_electrodes = 40; end
         
-        iw_all = F.iw_info_all;
+        iw_all = BVNY.get_iw_main;
         Nch = structfun(@(s) numfinite(s.template.template(s.main_wave, :)), iw_all);
         mask = Nch >= min_electrodes;
         h = figure('name', 'iw_templates'); fullwidth(true);
@@ -941,6 +945,10 @@ methods
     
     function allP_dir_v_rho(F, metric)
         % Correlation v. angle (relative to IW angle)
+        if nargin < 2 || isempty(metric), metric = "M"; end
+        
+        h = figure('name', 'rho v phi', 'position', [0 0 4 4]);
+        ax = axes(h);
         
         data = F.CompiledData;
         mask = strcmpi(data.metric, metric) ...
@@ -948,8 +956,22 @@ methods
 %             & data.rho_pval < 5e-2;
         data = data(mask, :);
         
-        F.gscatter_pat(abs(angle(exp(1j*(data.dir-data.iw_angle)))), ...
+        F.gscatter_pat(rad2deg(angle(exp(1j*(data.dir-data.iw_angle)))), ...
             data.rho, data.patient);
+        xlabel(ax, '\phi [\circ]')
+        ylabel(ax, '\rho')
+        lgd = legend(ax, 'location', 'eastoutside');
+        title(ax, sprintf("Direction v. corr (%s)", metric))
+        xlim(ax, [-180 180])
+        ylim(ax, [-1 1])
+        xticks(ax, -180:45:180)
+        xline(ax, 0); yline(ax, 0)
+        lgd.String(contains(lgd.String, 'data')) = '';
+        axis(ax, 'square')
+        ln = findobj(ax, 'type', 'line');
+        set(ln, 'markersize', 4);
+        
+        F.print(h, F.prefix_better(metric));
     end
     
     function [h, sc] = show_dir_v_time_early_rasters(F, patient, metric)
@@ -1137,6 +1159,90 @@ methods
         
     end
     
+    function sc = allP_dir_v_time(F, metric, min_electrodes)
+        % Shows the direction v time for each patient (different seizures
+        % identified by color)
+        % sc = allP_corr_v_time(F, metric='M', thresh=5e-2, min_electrodes=0)
+        if nargin < 2 || isempty(metric), metric = 'M'; end
+        if nargin < 3 || isempty(min_electrodes), min_electrodes = 40; end
+        
+
+        % Get the data
+        data = F.CompiledData;
+        mask = strcmp(data.metric, metric) ...  % mask by metric,
+            & isfinite(data.dir) ...  % ... finite direction 
+            & data.nchannels >= min_electrodes;  % ... and # electrodes recruited to IW
+        data = data(mask, :);
+        
+        % Center all times to the IW
+        data.dir_time_offset = data.time - data.iw_center;
+        
+        % Put units in degrees
+        data.dir_deg = rad2deg(data.dir);
+%         data.dir_deg = rad2deg(angle(exp(1j*(data.dir - data.iw_angle))));
+
+        % Group by patient
+        [G, pat] = findgroups(data.patient);
+        r = numel(unique(pat));
+        
+        % Create the figure and tiled layout
+        h = figure('name', 'dir_v_time', 'position', [0 0 3 r]);
+        T = tiledlayout(h, r, 1);
+        iw_yline = @(yval, color) yline(yval, 'color', color);
+        onset_xline = @(xval, color) xline(xval, 'color', color);
+        lw = .5;
+%         gray_ = .5*[1 1 1];
+
+        % For each patient create a scatter plot of the rho value for each
+        % discharge time. Show all rho in gray; highlight significant rho
+        % in color; use different colors for each seizure
+        for ii = 1:numel(pat)
+            
+            % Show all discharges colored by seizure number
+            ax = nexttile(T, ii);
+            xx = data.dir_time_offset(G == ii);
+            yy = data.dir_deg(G == ii);
+            cc = data.seizure(G == ii);  % color by seizure
+            sc = gscatter(ax, xx, yy, cc, [], [], 6, 'off');
+
+            % Get the color corresponding to each seizure
+            cols = flipud(arrayfun(@(l) l.Color, sc, 'uni', 0));
+            
+            % Show the IW direction for each seizure
+            iw_angles = rad2deg(unique(data.iw_angle(G == ii)));
+            ln = arrayfun( ...
+                @(ii) iw_yline(iw_angles(ii), cols{ii}), 1:numel(cols));
+            set(ln, 'linewidth', lw);  % don't know why, but putting this in the iw_yline function doesn't work
+            
+            % Show the seizure onset time for each seizure
+            sz_onset = -unique(data.iw_center(G == ii));
+            ln = arrayfun( ...
+                @(ii) onset_xline(sz_onset(ii), cols{ii}), 1:numel(cols));
+            set(ln, 'linewidth', lw);
+            
+            % prettify
+            yticks([-180 0 180]);
+            title(sprintf('%s', pat(ii)))
+            xline(0)
+            hold off
+            grid on
+            ylabel('\phi');
+            xlabel('');
+            xticklabels('');
+            
+        end
+        
+        % prettify
+        xlabel('Time [s]')
+        ax = T.Children;
+        linkaxes(ax, 'xy')
+        set(ax, 'xtickmode', 'auto');
+        ax(1).XTickLabelMode = 'auto';
+        F.print(h, F.prefix_better(metric));
+
+    end
+
+    
     function sc = allP_corr_v_time(F, metric, thresh, min_electrodes)
         % Shows the correlation v time for each patient (different seizures
         % identified by color)
@@ -1171,17 +1277,17 @@ methods
             ax = nexttile(T, ii);
             xx = data.rho_time_offset(G == ii);
             yy = data.rho(G == ii);
-            sc = scatter(ax, xx, yy, 6, 'filled', 'markerfacecolor', gray_);
+            cc = findgroups(data.seizure(G == ii));  % color by patient
+            sc = scatter(ax, xx, yy, 1, cc, 'filled');
+            ax.Colormap = hsv(max(cc));
 
             % highlight significant rho in color
             hold on
-            cc = data.seizure(G == ii);  % color by patient
             mask = data.rho_pval(G == ii) < thresh;
-            sc = gscatter(ax, xx(mask), yy(mask), cc(mask), [], [], 6, 'off');
+            sc = scatter(ax, xx(mask), yy(mask), 4, cc(mask), 'filled');
             
             % prettify
             ylim([-1 1]);
-            xlim([-inf inf])
             title(sprintf('%s', pat(ii)))
             xline(0)
             hold off
@@ -1192,7 +1298,7 @@ methods
         
         % prettify
         xlabel('Time [s]')
-        linkaxes(T.Children, 'x');
+        linkaxes(findobj(h, 'type', 'axes'), 'x')        
         F.print(h, F.prefix_better(metric));
 
     end
@@ -1217,32 +1323,34 @@ methods
             dnames = ["d\phi < 90" "d\phi > 90"];
         end
         
-        h = figure('name', 'hist2d_dir', 'position', [0 0 2 1] * 2);
+        h = figure('name', 'hist2d_dir', 'position', [0 0 2 1.5] * 2);
         data = F.CompiledData;
         mask = strcmp(data.metric, metric) ...
             & data.nchannels > min_electrodes;
         data = data(mask, :);
-
-        trange = quantile(data.rho_time_offset, [0 1]);
-        tbins = linspace(trange(1), trange(2), diff(trange)/2 + 1);  % Divide times into ~2s intervals
-
-
+        
+        
+        % Uncomment here to use direction instead of correlation
+        if rho_or_dir == "rho"
+            phi = sign(data.rho) .* double(data.rho_pval < thresh);
+            sample_times = data.rho_time_offset;
+        else  % rho_or_dir == "dir"
+            % remove non-finite directions (i.e. where direction could not be estimated)
+%             data = data(isfinite(data.dir), :);  
+            dir = angle(exp(1j*(data.dir - data.iw_angle)));
+            phi = double(abs(dir) <= pi/2) - double(abs(dir) > pi/2);
+            sample_times = data.time - data.iw_center;
+        end
+        
         % Group data by patient; get indices;
         % determine the lowest number of discharges in each
         % patient. Use this as the resample number
         G = findgroups(data.patient);
         N = min(splitapply(@numel, G, G));
         
-        % Uncomment here to use direction instead of correlation
-        if rho_or_dir == "rho"
-            phi = sign(data.rho) .* double(data.rho_pval < thresh);
-            sample_times = data.rho_time_offset;
-        else
-            dir = angle(exp(1j*data.dir - data.iw_angle));
-            phi = double(abs(dir) <= pi/2) - double(abs(dir) > pi/2);
-            sample_times = data.time - data.iw_center;
-        end
-        
+        trange = quantile(sample_times, [0 1]);
+        tbins = linspace(trange(1), trange(2), diff(trange)/2 + 1);  % Divide times into ~2s intervals
+
         
         % Create a function to add noise (I set this arbitrarily...) 
         noise_for = @(inds) 1 * randn(size(inds)); 
@@ -1284,7 +1392,7 @@ methods
         
 
         % *** Show the result ***
-        T = tiledlayout(h, 2, 1);
+        T = tiledlayout(h, 3, 1);
         interp_ = @(x) interp(x, 5);  % interp for pretty
         fill_ = @(x) fillmissing(x, 'linear', 'endvalues', 'none');
         fillQ_ = @(x, val) fillmissing(x, 'constant', val, 'endvalues', 'none');
@@ -1303,7 +1411,7 @@ methods
         m0 = strsplit(metric, 'sub');
         color = F.Style.(m0(1)).color;
         gray_ = .5 * [1 1 1];
-        for jj = 1:2
+        for jj = 1:2  % Show corr and anti corr proportions
 
             % Show the CI
             ax = nexttile(T, jj);
@@ -1320,7 +1428,7 @@ methods
             hold(ax, 'on');
             mask = yy(:, 1) > 0;
             temp = area(ax, tbinsI(mask), yy(mask, 1), ...
-                'facecolor', gray_, 'linestyle', 'none'); %#ok<NASGU>
+                'facecolor', gray_, 'linestyle', 'none', 'facealpha', .5); %#ok<NASGU>
 
             % Show the mean
             plot(ax, tbinsI, mnI(:, jj), 'color', color, ...
@@ -1328,7 +1436,7 @@ methods
             hold(ax, 'off');
 
             % highlight IW time 
-            yline(ax, 0)
+            xline(ax, 0)
 
             % Prettify
             grid(ax, 'on')
@@ -1336,14 +1444,70 @@ methods
             title(ax, dnames(jj));
 
         end
+        
+        
+        %%% Compare the corr/anticorr distributions
+        childs = get(findobj(T, 'type', 'axes'), 'children');
+        ax = nexttile(T, 3);
+        
+        % Copy the objects in the first two axes into the third axis
+        cc = cellfun(@(cc) copyobj(cc, ax), childs, 'uni', 0); %#ok<NASGU>
+        delete(findobj(ax, 'type', 'area'));
+        patches = findobj(ax, 'type', 'patch');  % these are the CI
+        lns = findobj(ax, 'type', 'line');  % these are the medians
+        cl = findobj(ax, 'type', 'constantline');  % delete one of the constant lines
+        delete(cl(1));
+        
+        % Darken the patch in back
+        darker_ = brighten(color, -.75);  % Darken the color
+        set(patches(2), 'facecolor', darker_);
+        set(lns(2), 'color', darker_);
+        ax.XLim = T.Children(2).XLim;
+        
+        % Shade regions where distributions differ
+        xx = tbinsI';
+        mask = QhiI(:, 2) <= QloI(:, 1) | QhiI(:, 1) <= QloI(:, 2);
+        ylo = min(QhiI, [], 2); yhi = max(QloI, [], 2);
+        ylo(~mask) = 0; yhi(~mask) = 0;
+        yy = [ylo; flipud(yhi)];
+        xx = [xx; flipud(xx)];
+        
+        pp = patch(ax, xx, yy, 1, 'facecolor', [0 0 0], ...  % Using the gray face color is too hard to see
+            'facealpha', .8, 'linestyle', 'none'); %#ok<NASGU>
+        
+        
+        % Add a title
+        title(ax, 'Comparison');
 
-        linkaxes(T.Children, 'xy');
-        ylim(ax, [0 1]);
+        
+        if rho_or_dir == "rho", ylim(ax, [0 1]); else, ylim(ax, [0 .5]); end
 %         xlim(ax, [-30 50]);  % Nothing significant beyond this
         xlabel(ax, 'Time [s]');
-        ylabel(T, 'Rate');
-        temp = legend({'95%CI', 'CI>0', 'median'}, 'location', 'eastoutside'); %#ok<NASGU>
+        ylabel(T, 'Proportion');
+        
+        ax = findobj(T, 'type', 'axes');
+        linkaxes(ax, 'xy');
+        set(ax, 'box', 'on');
+        lgd = legend(ax(2), {'95%CI', 'CI>0', 'median'}, 'location', 'eastoutside'); %#ok<NASGU>
 
+        % Summary statement
+        fields = ["pos" "neg"];
+        for jj = 1:2
+            [~, loc] = max(QloI(:, jj));
+            rho_at_t.(fields(jj)) = mnI(loc, jj);
+            peak_t.(fields(jj)) = tbinsI(loc);
+            rho_ci_at_t.(fields(jj)) = [QloI(loc, jj) QhiI(loc, jj)];
+        end
+        
+        fprintf(['Using this method, we find that the highest ' ...
+            'probability of seeing a correlated discharge occurs at ' ...
+            't=%0.2f s (p_corr = %0.2f, [%0.2f, %0.2f]; median, 95%%CI); ' ...
+            'the highest probability of seeing an anti-correlated ' ...
+            'discharge occurs at t=%0.2f s (p_anti = %0.2f, [%0.2f, %0.2f]; '...
+            'median, 95%%CI; Figure 4C)\n'], ...
+            peak_t.pos, rho_at_t.pos, rho_ci_at_t.pos, ...
+            peak_t.neg, rho_at_t.neg, rho_ci_at_t.neg)
+    
 
         % print result
         F.print(h, F.prefix_better(sprintf('%s_%s', metric, rho_or_dir)));
@@ -2064,6 +2228,62 @@ legend('pos', 'neg')
         F.print(h, F.prefix_better(metric));
     end
     
+    function [yy, xx, pat] = allP_percent_sigest_rho_v_dir(F, metric, thresh, min_electrodes)
+        % Plots the percent of the discharges that have strong
+        % relationships with the main IW template. i.e. Percentage of
+        % correlations with p-value less than thresh for each patient and
+        % seizure.
+        if nargin < 2 || isempty(metric), metric = "M"; end
+        if nargin < 3 || isempty(thresh), thresh = 5e-2; end
+        if nargin < 4 || isempty(min_electrodes), min_electrodes = 40; end
+        
+        metric = validatestring(metric, F.Metrics);
+        
+        figure('units', 'inches', 'position', [0 0 1.5 1.25] * 2, ...
+            'name', 'TW-IW corr');
+        
+        data = F.CompiledData;
+        mask = ...  % only use data where
+            ismember(data.metric, metric) ...  % the TOA method matches
+            & isfinite(data.rho_pval) ...  % the correlation could be computed
+            & data.nchannels >= min_electrodes;  % the IW was detected on at least min_electrodes
+        data = data(mask, :);
+
+        [G, pat] = findgroups(data.patient, data.seizure);
+        
+
+        xx = splitapply(@(x) mean(isfinite(x))*100, data.dir, G);
+        lx = strcat(metric, " [% plane\neq(0,0)]");
+
+        
+        yy = splitapply(@(x) mean(x < thresh)*100, data.rho_pval, G);
+        ln = F.gscatter_pat(xx, yy, pat);
+        ylabel(strcat(metric, " [% corr\neq0]"))
+        xlabel(lx)
+        title({'TW detected'; ...
+            sprintf('(p<5e%0.0f)', log10(thresh/5))});
+        
+        legend('location', 'eastoutside')
+        axis equal
+        xlim([0 50]);
+        ylim([0 100]);
+        
+        F.print(F.prefix_better(metric));
+        
+        % Summary statement
+        fprintf(['In %d/%d seizures, at least 50%% ', ...
+            'of discharges have a non-zero correlation with '...
+            'the IW pattern (median=%0.1f%%, range=[%0.1f%%,%0.1f%%]).\n'], ...
+            sum(yy >= 50), numel(yy), quantile(yy, [.5 0 1]));
+        
+        fprintf(['This is in contrast to the plane fitting ' ...
+            'method, where we find significant fits ' ...
+            'less often (median=%0.1f%%, range=[%0.1f%%,%0.1f%%]).\n'], ...
+            quantile(xx, [.5 0 1]));
+        
+    end
+
+    
     function [xx, yy, pat] = allP_quantiles_pval_tw_v_iw(F, metrics, thresh, min_electrodes)
         % Plots the percent of the discharges that have strong
         % relationships with the main IW template. i.e. Percentage of
@@ -2090,17 +2310,18 @@ legend('pos', 'neg')
         
         m1 = metrics(1); m2 = metrics(2);
         mask =@(mm) strcmpi(data.metric, mm);
+        ff = 'rho_pval';  % dir
         if m2 == ""
 %             yy = splitapply(@(x) sum(x < thresh), data.rho_pval(mask(m1)), G(mask(m1)));
-            yy = splitapply(@numel, data.rho_pval(mask(m1)), G(mask(m1)));
+            yy = splitapply(@numel, data.(ff)(mask(m1)), G(mask(m1)));
             ly = strcat(m1, " [#]");
             tag = m1;
         else
-            yy = splitapply(@(x) mean(x < thresh)*100, data.rho_pval(mask(m2)), G(mask(m2)));
+            yy = splitapply(@(x) mean(x < thresh)*100, data.(ff)(mask(m2)), G(mask(m2)));
             ly = strcat(m2, " [% corr\neq0]");
             tag = sprintf('%s_%s', m1, m2);
         end
-        xx = splitapply(@(x) mean(x < thresh)*100, data.rho_pval(mask(m1)), G(mask(m1)));
+        xx = splitapply(@(x) mean(x < thresh)*100, data.(ff)(mask(m1)), G(mask(m1)));
         ln = F.gscatter_pat(xx, yy, pat);
         xlabel(strcat(m1, " [% corr\neq0]"))
         ylabel(ly)
@@ -2111,6 +2332,12 @@ legend('pos', 'neg')
 %         xlim([0 100]);
 %         ylim([0 100]);
         F.print(F.prefix_better(tag));
+        
+        % Summary statement
+        fprintf(['In %d/%d seizures, at least 50%% ', ...
+            'of discharges have a non-zero correlation with '...
+            'the IW pattern (median=%0.1f%%, range=[%0.1f%%,%0.1f%%]).\n'], ...
+            sum(xx >= 50), numel(xx), quantile(xx, [.5 0 1]));
         
     end
     
@@ -2327,22 +2554,78 @@ legend('pos', 'neg')
         
     end
     
+    function allP_iw_nchannels(F)
+        data = F.get_iw_table(0);  % load the iw stats
+%         mask = data.wave_num == data.main_wave;
+%         data = data(mask, :);
+        data.disagree = ismember(compose('%s %d', string(data.patient), data.seizure), F.Disagree);
+        h = figure('name', 'iw_nchannels', 'position', [0 0 .6*4 1.5] * 2);
+        T = tiledlayout(h, 1, 4);
+        
+        ax = nexttile(T, [1 2]);
+        % show all waves in outline
+        ln = F.gscatter_pat(data.nchannels, data.patient);
+        set(ln, 'markerfacecolor', 'none');
+        hold(ax, 'on')
+        for ll = ln', ll.ZData = -1*ones(size(ll.XData)); end
+
+
+        % show disagrees with asterisks
+        mask = data.disagree & data.wave_num == data.main_wave;
+        ln = F.gscatter_pat(data.nchannels(mask), data.patient(mask));
+        set(ln, 'marker', '*', 'color', [0 0 0], 'markersize', 6);
+        for ll = ln', ll.ZData = 1*ones(size(ll.XData)); end
+
+        % show main wave in color
+        [G, pat] = findgroups(data.patient, data.seizure);
+        yy = splitapply(@(a, b, c) c(a == b), data.wave_num, data.main_wave, data.nchannels, G);
+        ln = F.gscatter_pat(yy, pat);             
+        for ll = ln', ll.ZData = 0*ones(size(ll.XData)); end
+
+        hold off
+        set(findobj(T, 'type', 'line'), 'linewidth', 1)
+        title('Nchan')
+        ylabel('[#]')
+        legend('location', 'westout')
+        
+        ax = nexttile(T, [1 2]);
+        dat = data(data.wave_num == data.main_wave, :);
+        dsub = data(data.wave_num ~= data.main_wave, :);
+        max_bin = ceil(max(data.nchannels)/10) * 10;
+        histogram(ax, dsub.nchannels, 10:10:max_bin)
+        hold(ax, 'on')
+        histogram(ax, dat.nchannels, 10:10:max_bin)
+        hold(ax, 'off');
+        set(ax.Children, 'edgecolor', [1 1 1], 'edgealpha', .5);
+        xlabel(ax, 'Nchan'); ylabel(ax, 'IW candidates [counts]')
+        legend(ax, 'Secondary', 'Main')
+        title(ax, 'Channels recruited to IW')
+        
+        F.print(h, F.prefix_better(''));
+    end
     
     function [yy, ax] = allP_iw_stats(F, min_electrodes)
         % Show info about detected IW for each patient and seizure
         
         if nargin < 2, min_electrodes = 0; end
         PCUTOFF = -8;
+        SPEEDCUTOFF = 8;
         
-        fields = ["nchannels", "fr_peak_mu", "prop_sp", "p"];        
+        fields = ["fr_peak_mu", "iw_fwhm_mu", "prop_sp", "p"];        
         h = figure('name', 'iw_stats', 'position', [0 0 .6*(numel(fields)+1) 1.5] * 2);
 
         data = F.get_iw_table(0);  % load the iw stats
+        data.prop_sp(data.p >= .05) = nan;  % only show speeds where the fit was significant;
         data.p = log10(data.p/5);  % rescale p-value so that it's in terms of p=5eXX
+        data.width = data.iw_fwhm_mu .* data.prop_sp;
         
         % rescale very low pvalues
         lo_p = data.p < PCUTOFF;
         data.p(lo_p) = rescale(data.p(lo_p), PCUTOFF-1, PCUTOFF);
+        
+        % rescale very high speeds
+        hi_speed = data.prop_sp > SPEEDCUTOFF;
+        data.prop_sp(hi_speed) = rescale(data.prop_sp(hi_speed), SPEEDCUTOFF + .1, SPEEDCUTOFF + 1);
 
         % rescale low channel counts
         lo_ch = data.nchannels < min_electrodes;
@@ -2356,6 +2639,8 @@ legend('pos', 'neg')
             'prop_sp', {{{'Speed'; '(log scale)'}, '[mm/s]', 'log', [0:.2:1, 2:2:4]}}, ...
             'moransI', {{{'Moran''s'; 'index'}, '[unitless]', 'linear'}}, ...
             'p', {{'p-val', 'p=5eYY', 'linear', PCUTOFF:0}}, ...
+            'iw_fwhm_mu', {{'Duration', '[s]', 'linear'}}, ...
+            'width', {{'Width', '[mm]', 'linear'}}, ...
             'crossing_time', {{'Crossing time', '[s]', 'linear'}});
 
         data.disagree = ismember(compose('%s %d', string(data.patient), data.seizure), F.Disagree);
@@ -2772,6 +3057,11 @@ legend('pos', 'neg')
         % Show correlation v. time (relative to IW)
         F.allP_corr_v_time('M', 5e-2, MIN_ELEC);
         
+        % Show that the correlation measure is giving us more information
+        % and how it relates to the direction measure
+        F.allP_percent_sigest_rho_v_dir('M', 5e-2, MIN_ELEC);
+        F.allP_dir_v_rho("M");
+        
         % Test for times of significance (this one takes a while)
         F.allP_hist2d_tw_v_iw_effectsize('M', 5e-2, MIN_ELEC, 'rho');
         
@@ -2895,9 +3185,7 @@ methods (Static)
         T.phi_alt_deg = T.phi_alt/pi * 180;
         T.crossing_time = T.prop_sp;
         T.prop_sp = 10 * sqrt(2) * .4 ./ T.prop_sp;
-        bad_speed = isoutlier(T.prop_sp, 'ThresholdFactor', 100);
-        disp(find(bad_speed))
-        T(bad_speed, :) = [];
+        
         T.vmr_increase = T.vmr_median_iw ./ T.vmr_median_late;
         
         G = findgroups(T.patient, T.seizure);

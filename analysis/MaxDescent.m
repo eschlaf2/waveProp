@@ -14,10 +14,6 @@ classdef MaxDescent < WaveProp
         SamplingRate = 1  % Assumes 1 sample per second unless otherwise given
     end
 	
-    % This was a hack. Hopefully don't need anymore
-% 	properties (Hidden = true)
-% 		ParamNames = ["Position" "HalfWin" "FBand" "Ascent"]
-% 	end
 	
 	methods
         
@@ -38,12 +34,13 @@ classdef MaxDescent < WaveProp
                 obj.Name = mea.Name;
                 obj.Time = mea.Time;
                 obj.GridSize = mea.GridSize;
+                obj.SamplingRate = mea.SamplingRate;
 				obj = obj.parse_inputs(varargin{:});
                 if isempty(mea.MaxDescentData)
 					mea.MaxDescentData = zscore(mea.filter(mea.Data, mea.SamplingRate, obj.FBand));
                 end
                 signal = mea.MaxDescentData;
-            else  % Return the TOA based on the entire 
+            else  % Return the TOA based on the entire signal
                 obj.t0 = t0(:);
 				obj = obj.parse_inputs(varargin{:});
                 if ndims(signal) == 3  % Get positions and reshape to 2D
@@ -93,7 +90,7 @@ classdef MaxDescent < WaveProp
                     [change, time_point] = min(diff(window, 1, 1));  % Find time of maximal descent
                 end
                 non_decreasing = change >= 0;  % Find non-decreasing traces
-                bdry = (time_point == 1) | (time_point == size(window, 1) - 1);  % ... and traces with max descent on the boundary (these are not part of the wave and confuse the analysis)
+                bdry = (time_point == 1) | (time_point >= size(window, 1) - 1);  % ... and traces with max descent on the boundary (these are not part of the wave and confuse the analysis)
                 inactive = range(window) < 1;
 
                 data = time_point;
@@ -119,6 +116,8 @@ classdef MaxDescent < WaveProp
                     obj.(ff) = S.(ff); 
                 end
                 obj = reload(obj, S);
+            else
+                obj = S;
             end
         end
     end
