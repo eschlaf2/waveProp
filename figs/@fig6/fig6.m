@@ -10,7 +10,10 @@ properties
     Smoothing = 1  % seconds
     CompiledData
     FitDiffs
+    SlidingDirs
     Disagree
+    WaveFits
+    ExampleSeizures = ["c7_Seizure1" "MG49_Seizure43" "BW09_Seizure2" "CUCX4_Seizure1"]
 end
 
 properties
@@ -26,7 +29,180 @@ methods
 %         F.Seizures = F.SeizureInfo(mask, :);
     end
     
-    
+    function T = show_corr_dir_mismatches(F, metric, min_electrodes)
+        % Show TW patterns for outliers in the correlation-direction
+        % relationship
+        % T = show_corr_dir_mismatches(F, metric="M", min_electrodes=50)
+        
+        if nargin < 2 || isempty(metric), metric = 'M'; end
+        if nargin < 3 || isempty(min_electrodes), min_electrodes = 50; end
+        metric = validatestring(metric, F.Metrics);
+        
+        
+        % Parameters for figures
+        MAKE_ONE_PAGE = true;  % only show the first page of discharges
+        rows = 4; cols = 8;
+        panes_per_fig = rows * cols;
+        
+        % Get data
+        data = F.CompiledData;
+        mask = isfinite(data.dir) ...  % Reduce to data with significant direction estimates
+            & data.nchannels >= min_electrodes ...  % ... with strong IW
+            & data.metric == metric;  % ... and matches <metric>
+        data = data(mask, :);
+        
+        % Rename some fields; convert from radians to degrees
+        data.dir0_d = rad2deg(data.dir);
+        data.iw_angle_d = rad2deg(data.iw_angle);
+        data.dir_d = rad2deg(fix_angle(data.dir-data.iw_angle));
+        data.abs_dir_d = abs(data.dir_d);
+        
+        % Fit a regression and identify points with large residuals; 
+        [~, ~, r] = regress(data.rho, ...  % get the residuals
+            [ones(size(data.abs_dir_d)) data.abs_dir_d]);
+        big_r = abs(normalize(r)) > 2;  % ... and identify outliers
+        
+        % Reduce data to the set with large, counterindicative residuals
+        mask_ = big_r;  % next lines commented out bc of c7
+%         & ( ...  % outlier from regression and 
+%                 (abs(data.dir_d) > 90 & data.rho > 0) ...  % ... dir near 180 and corr
+%                 | (abs(data.dir_d) < 90 & data.rho < 0) ...  % ... or dir near 0 and anti-corr
+%             );
+        
+        
+        data = data(mask_, :);
+        data.resid = r(mask_);
+        
+        % Sort data by abs(resid)
+        [~, so] = sort(abs(data.resid), 'descend');
+        data = data(so, :);
+        
+        % If there are too many outliers, only show the first page
+        num_found = height(data);
+        
+        if num_found > panes_per_fig && MAKE_ONE_PAGE
+            G = findgroups(data.patient);
+            
+            Gcount = zeros(size(G));
+            for ii = 1:length(Gcount)
+                Gcount(ii) = sum(G(1:ii) == G(ii));
+            end
+            
+            p_max = cols;  % no more than one row of examples from each patient.
+            mask_ = Gcount <= p_max;
+            while sum(mask_) < panes_per_fig
+                p_max = p_max + 1;
+                mask_ = Gcount <= p_max;
+            end
+            dat_sub = data(mask_, :);
+            data = dat_sub(1:panes_per_fig, :);
+            
+        end
+        
+        
+        % Get the WaveProp objects
+        [G, pat, sz] = findgroups(data.patient, data.seizure);
+        M = cell(numel(pat), 1);
+        for ii = 1:length(M)
+            fit_temp = F.get_wave_fit(sprintf('%s_Seizure%d', pat(ii), sz(ii)));
+            M{ii} = fit_temp.(metric);
+        end
+        
+        
+        % Make the figures
+        num_figs = ceil(height(data) / panes_per_fig);  % max (ros*cols) panes per figure
+        for ii = 1:num_figs
+            h(ii) = figure('name', sprintf('rho_dir_mismatches_%d', ii)); fullwidth(true); %#ok<AGROW>
+            T(ii) = tiledlayout(h(ii), rows, cols); %#ok<AGROW> % If you use 'flow' here, the scatters will have be the wrong size
+            title(T(ii), sprintf("Mismatched \\rho-\\phi (%s, %d/%d)", ...
+                metric, height(data), num_found));
+        end
+        
+        % Plot the panels
+        for ii = 1:height(data)
+            which_fig = ceil(ii / panes_per_fig);
+            ax = nexttile(T(which_fig), ii); 
+            M{G(ii)}.plot2D(ax, data.time(ii)); 
+            hold(ax, 'on');  % add an invisible dot to make a pretty annotation
+            ln = plot(ax, 0, 0, '.', 'color', 'none'); 
+            hold(ax, 'off');
+            title(ax, sprintf("%s %d", pat(G(ii)), sz(G(ii))));
+            ant_str = sprintf( ...
+                '\\rho:  %3.2f,  \\phi:  %3.0f°\n\\phi TW (IW):  %3.0f° (%3.0f°)\n', ...
+                data.rho(ii), data.dir_d(ii), data.dir0_d(ii), data.iw_angle_d(ii));
+            legend(ln, ant_str, 'location', 'southoutside', ...
+                'color', 'none', 'box', 'off');
+            
+            box(ax, 'on');
+            axis(ax, 'square')
+            xlim(ax, [0 11])
+            ylim(ax, [0 11])
+            
+        end
+        
+        % Match color scheme to method
+        all_ax = findobj(T, 'type', 'axes');
+        len = size(all_ax(1).Colormap, 1);
+        mtc_color = F.Style.(metric).color;
+        cmap = make_diverging_colormap(...
+            [brighten(mtc_color, .9); brighten(mtc_color, -.9)], ...
+            mtc_color, len);
+        set(all_ax, 'colormap', cmap);
+        
+        
+        % If there aren't enough examples to fill the rows of T, copy an axis to the
+        % end. Otherwise, the figure will change size and screw up your
+        % clips in Illustrator.
+        if ii < (rows - 1) * cols + 1
+            ax = nexttile(T, panes_per_fig);
+            M{G(ii)}.plot2D(ax, data.time(ii)); 
+            % I don't think any of the prettify above affects the sizing so
+            % nothing else should be needed.
+            set(ax, 'colormap', gray);  % setting to gray just for visibility
+        end
+        
+        
+        % Match the size of the scatters for each plot
+        sc = findobj(T, 'type', 'scatter');
+        set(sc, 'sizedata', M{1}.get_dot_size(ax));
+        
+        % Fix legend locations
+        % You can't move legends inside tiledlayouts. I feel like this is
+        % usually more straightforward, but right now this is what it is...
+        
+        % Copy children of T into figure
+        kiddos = T.Children;  
+        pos0 = cell2mat(arrayfun(@(ax) ax.Position, kiddos, 'uni', 0));
+        new_kids = copyobj(T.Children, h);
+        for ii = 1:numel(new_kids)
+            new_kids(ii).Position = pos0(ii, :);
+        end
+        delete(kiddos);
+        
+        % Update legend locations and make font size a little bigger
+        align_right = @(ax, lgd) ...  % Get the "left" legend position
+            sum(ax.Position([1 3])) - lgd.Position(3);
+        align_top = @(ax, lgd) ...  % Get the "bottom" legend position
+            ax.Position(2) - lgd.Position(4);
+        for aa = findobj(h, 'type', 'axes')'
+            lgd = aa.Legend;
+            lgd.Position(1) = align_right(aa, lgd);
+            lgd.Position(2) = align_top(aa, lgd);
+            lgd.FontSize = 7.5;
+        end
+        
+        % dunno why, but if you don't `drawnow` the following warning pops
+        % up (although export actually looked ok)
+        %   Warning: Exported image displays axes toolbar. 
+        %   To remove axes toolbar from image, export again. 
+        drawnow;  
+        
+        for ii = 1:num_figs
+            tag = sprintf('%s_%d', metric, ii);
+            F.print(h(ii), F.prefix_better(tag));
+        end
+    end
+
     function T = show_all_sig_corr(F, sz_name, metric, pos_or_neg, time_range)
         % Show each significant wavefit/correlation pair for a given
         % seizure number and metric
@@ -49,7 +225,7 @@ methods
         panes_per_fig = rows * cols;
         
         % Get the iw info and WaveProp object
-        M = WaveProp.load(F.get_file(sz_num)); M = M.(metric);
+        M = F.get_wave_fit(F.get_file(sz_num)); M = M.(metric);
         [iw, mw] = BVNY.get_iw_info(sz_num);
         tpl = iw{mw}.template.template(mw, :, :);
         
@@ -389,7 +565,7 @@ methods
             seiz = sz.seizure(ii);
             fname = sprintf('%s_Seizure%d', pat, seiz);
             fprintf('%d: Starting %s\n', ii, fname);
-            fit = WaveProp.load(fname, F.Metrics);
+            fit = F.get_wave_fit(fname);
             [iw_info, mw] = BVNY.get_iw_info(fname);
             iw_info = iw_info{mw};
             iw_phi = iw_info.wave_fit.phi/pi*180;
@@ -450,8 +626,8 @@ methods
                 pre = dat.dir(dat.phase == 1); pre(isnan(pre)) = [];
                 post = dat.dir(dat.phase == 3); post(isnan(post)) = [];
 
-                out.(mm).pre(gg, :) = [circ_mode(pre) numel(pre)];
-                out.(mm).post(gg, :) = [circ_mode(post) numel(post)];
+                out.(mm).pre(gg, :) = [circ_mean(pre) numel(pre)];
+                out.(mm).post(gg, :) = [circ_mean(post) numel(post)];
                 out.iw_angle_pval(gg) = dat.angle_p_val(1);
             end
         end
@@ -459,99 +635,236 @@ methods
     end
     
     
-    function [out, mtc] = kl_divergence(F)
+    function out = kl_divergence(F)
         % This computes a bunch of measures comparing the methods and the
         % resulting distributions; not just kl_divergence. 
         % Used to generate scatter plots
         
-        RES = 64;
+        % Dkstat: This shows a circular variation of the KS statistic
+        % comparing the distribution of the differences to a Von Mises
+        % distribution with mean and kappa matching the sample mean and
+        % kappa (i.e. circular equivalent to goodness-of-fit between
+        % differences and normal distribution). Lower Kstat means the
+        % differences are better described by the VM.
         
+        RES = 64;
+        XI = linspace(-pi, pi, RES + 1);
+        ANGULAR_LAGS = diff(XI(1:2)) .* (-numel(XI)+1:numel(XI));
         MTC = F.Metrics;
+        WIN = 10;  % number of seconds in sliding window
+        QQ = [.05 .95];  % quantiles to use for moving stat summaries
+        
         data = F.CompiledData;
         mask = ismember(data.metric, MTC);
         data = data(mask, :);
         
         [G, pat, sz] = findgroups(data.patient, data.seizure);
         
-%         kl_dist = @(p, q) mean([ ...
-%             nansum(p .* log(p./(q + eps))), ...
-%             nansum(q .* log(q./(p + eps))) ...
-%             ]);
-        xi = linspace(-pi, pi, RES + 1);
+
+        % Functions to compute Kullback-Leibler divergence and Kuiper
+        % statistic
+        kl_dist = @(p, q) nansum(p .* log(p./q));  % units in nats
+        kstat = @(p, q) (max([cumsum(p(:)) - cumsum(q(:)); 0]) ...
+            + max([cumsum(q(:)) - cumsum(p(:)); 0]));
         
-        kl_dist = @(p, q) nansum(p .* log(p./q));
-        
-        nP = nchoosek(numel(MTC), 2);
+        W = F.WaveFits;
         mpairs = nchoosek(MTC, 2);
-        [Dkl, Dmode, Dmean_diffs, Dstd_diffs, Dskew_diffs, Dcorr_pval, Dcorr_coeff] = ...
-            deal(nan(max(G), nP));
-        for ii = 1:max(G)  % for each group
-            dat = data(G == ii, :);
-            [Gm, mtc] = findgroups(dat.metric);
-            assert(all(ismember(MTC, mtc)));  % throw an error if something is missing
+        nP = size(mpairs, 1);
+        
+        [Dkl, Dmode, Dmean, ...
+            mean_diffs, std_diffs, skew_diffs, kappa_diffs, ...
+            var_diffs, mov_var_diffs, ...
+            mov_mean_diffs, mov_kstat, ...
+            corr_pval, corr_coeff, kstat_diffs, pdf_kstat, mutual_info, ...
+            pdf_xcorr_coeff_normed, pdf_kstat_corr_aligned, ...
+            pdf_xcorr_coeff, pdf_xcorr_angular_lag] = deal(nan(max(G), nP));
+        
+        [bias, variance, CC, mov_std_diffs] = deal(nan(max(G), 3, nP));
+        
+        for ii = 1:max(G)  % for each seizure
             
-            
-            % Compute KL-divergence based on distribution of differences.
+            % Compute KL divergence of diffs from VM normal
             % Compare dist of diffs to VM normal with same center and std
-            W = WaveProp.load(sprintf('%s_Seizure%d', pat{ii}, sz(ii)), F.Metrics);
-            for jj = 1:nP  
-                fit1 = W.(mpairs{jj, 1});
-                fit2 = W.(mpairs{jj, 2});
-                if numel(fit1.time) > numel(fit2.time)
+%             W = WaveProp.load(sprintf('%s_Seizure%d', pat{ii}, sz(ii)), F.Metrics);
+            sz_num = find(strcmpi(W.Name, sprintf('%s_Seizure%d', pat(ii), sz(ii))));
+            
+            
+            for jj = 1:nP  % For each pair of metrics
+                
+                
+                % Get the right fit objects
+                fit1 = W.(mpairs{jj, 1})(sz_num);
+                fit2 = W.(mpairs{jj, 2})(sz_num);
+                                            
+                %%% Compute stats about the distributions
+                pdf1 = circ_ksdens(fit1.Direction, XI);
+                pdf2 = circ_ksdens(fit2.Direction, XI);
+                
+                % normalize so they sum to 1
+                pdf1 = pdf1/sum(pdf1); 
+                pdf2 = pdf2/sum(pdf2);
+            
+                [~, loc] = max([pdf1; pdf2], [], 2);
+                modes = XI(loc);
+                Dmode(ii, jj) = angle(exp(1j* diff(modes) ));  % return the angle between -pi and pi
+                means = cellfun(@(s) circ_mean(rmmissing(s.Direction)), {fit1 fit2});
+                Dmean(ii, jj) = angle(exp(1j* diff(means) ));
+            
+                % compute the KS stat between the distributions
+                pdf_kstat(ii, jj) = kstat(pdf1, pdf2);
+                
+                % Compute the circular cross correlation and determine the
+                % shift
+                cc = cconv(pdf1, fliplr(pdf2), numel(ANGULAR_LAGS));
+                [cc_max, max_ind] = max(cc);
+                angular_lag = ANGULAR_LAGS(max_ind);
+                pdf_xcorr_coeff(ii, jj) = cc_max;
+                pdf_xcorr_angular_lag(ii, jj) = angle(exp(1j*angular_lag));  % return the angle between -pi and pi
+                pdf_xcorr_coeff_normed(ii, jj) = max(normalize(cc));
+                shift_by = round(angular_lag / diff(XI(1:2)));
+                pdf_kstat_corr_aligned(ii, jj) = kstat(pdf1, circshift(pdf2, shift_by));
+                
+                %%% Compute stats about the per-discharge differences
+                if numel(fit1.time) < numel(fit2.time) % note that this will resample the times to match the method with fewer sample points
                     diffs = fit1.diff(fit2);
+                    diff_times = fit1.time;
+                    
+                    % Get time resampled directions
+                    dir1 = fit1.Direction;
+                    fit2.resample_t0(fit1.time);
+                    dir2 = fit2.Direction;
+                    fit2.Inds = [];  % set back as they were
                 else
                     diffs = fit2.diff(fit1);
+                    diff_times = fit2.time;
+                    
+                    % Get time resampled directions
+                    dir2 = fit2.Direction;
+                    fit1.resample_t0(fit2.time);
+                    dir1 = fit1.Direction;
+                    fit1.Inds = [];  % set back as they were
                 end
+                dir1(isnan(diffs)) = [];
+                dir2(isnan(diffs)) = [];
+                diff_times(isnan(diffs)) = [];
                 diffs(isnan(diffs)) = [];
                 
+                % Compute mutual information
+                edges = linspace(-pi, pi, 65);
+                px = histcounts(fit1.Direction, edges, 'Normalization', 'prob');
+                py = histcounts(fit2.Direction, edges, 'normalization', 'prob');
+                pxy = histcounts2(dir1, dir2, edges, edges, 'normalization', 'prob');
+                mutual_info(ii, jj) = sum(kl_dist(pxy, px'*py));
+                
+                
+                % Compute stats on the differences between the fits
+                % (sliding window)
+                test_times = diff_times(1):1:diff_times(end);  % compute stats at 1 s intervals throughout the seizure
+                
+                t_win = @(tt) abs(diff_times - tt) <= WIN/2;  % Get a 10 s window of diffs
+                N = arrayfun(@(tt) sum(t_win(tt)), test_times);
+                lowN_mask = N < WIN;  % at least one discharge/sec
+                test_times(lowN_mask) = [];
+                mov_stats = arrayfun(@(tt) circ_stats(diffs(t_win(tt))), test_times, 'uni', 0);
+                mov_cc = arrayfun(@(tt) circ_corrcc(dir1(t_win(tt)), dir2(t_win(tt))), test_times);
+                
+                CC(ii, :, jj) = quantile(mov_cc, [.5 QQ]);
+                
+                mov_mn = cellfun(@(s) s.mean, mov_stats);  % Extract the mean from each interval centered at test_time
+                [~, pk] = max(abs(mov_mn));  % Get the peak bias in the seizure (not used currently; <bias> used instead)
+                mov_mean_diffs(ii, jj) = mov_mn(pk);
+                bias(ii, :, jj) = quantile(abs(mov_mn), [.5 QQ]);
+                
+                mov_std = cellfun(@(s) s.std, mov_stats);
+%                 [~, pk] = max(mov_std);
+                mov_std_diffs(ii, :, jj) = quantile(mov_std, [.5 QQ]);
+                
+                mov_var = cellfun(@(s) s.var, mov_stats);  % Extract the variance at each test_time; You may be tempted to use 2*var to convert from circular to angular variance, but don't. If you convert to degrees, double the variance then, but just looking at the variance is more interpretable on a scale of 0 to 1.
+                [~, pk] = max(mov_var);
+                mov_var_diffs(ii, jj) = mov_var(pk);
+                variance(ii, :, jj) = quantile(mov_var, [.5 QQ]);
+                
+                
+                
+                circ_pdf = @(tt) circ_ksdens(diffs(t_win(tt)), XI);
+                sample_pdfs = arrayfun(@(tt) circ_pdf(tt), test_times, 'uni', 0);
+                sample_pdfs = cellfun(@(s) s / sum(s), sample_pdfs, 'uni', 0);  % normalize
+                mov_kappa = arrayfun(@(tt) circ_kappa(diffs(t_win(tt))), test_times);
+                vm_pdfs = arrayfun(@(mn, kappa) ...
+                    circ_vmpdf(XI, mn, kappa), mov_mn, mov_kappa, 'uni', 0);
+                vm_pdfs = cellfun(@(s) s/sum(s), vm_pdfs, 'uni', 0);
+                mov_k = cellfun(@(p, q) kstat(p, q), sample_pdfs, vm_pdfs);
+                mov_kstat(ii, jj) = nanmean(mov_k);
+                
+                
+                % Compute stats for full distribution
                 stats = circ_stats(diffs);
-                kappa = circ_kappa(diffs);
-                vm_pdf = circ_vmpdf(xi, stats.mean, kappa);
-                pdfD = ksdensity([diffs - 2*pi; diffs; diffs+2*pi], xi, ...
-                'bandwidth', pi/8)';
-                Dkl(ii, jj) = kl_dist(pdfD./sum(pdfD), vm_pdf./sum(vm_pdf));
-                Dmean_diffs(ii, jj) = stats.mean;
-                Dstd_diffs(ii, jj) = stats.std;
-                Dskew_diffs(ii, jj) = stats.skewness;
+                kappa_diffs(ii, jj) = circ_kappa(diffs);
+                vm_pdf = circ_vmpdf(XI, stats.mean, kappa_diffs(ii, jj));  % kappa);
+%                 vm_pdf = circ_vmpdf(xi, 0, 1);  % kappa);
+                vm_pdf = vm_pdf / sum(vm_pdf);  % normalize to sum to 1
+                pdfD = circ_ksdens(diffs, XI)';
+                pdfD = pdfD / sum(pdfD);  % normalize to sum to 1
                 
-            end
-            pdf = splitapply(@(x) ...
-                ksdensity([x - 2*pi; x; x+2*pi], xi, ...
-                'bandwidth', pi/8), dat.dir, Gm);
-            
-            [~, loc] = max(pdf, [], 2);
-            Dmode(ii, :) = angle(exp(1j*pdist(loc, 'euclidean') * 2*pi/RES));
-%             Dkl(ii, :) = pdist(pdf, kl_dist);
-%             Dkl.(sprintf('%s_%d', pat{ii}, sz(ii))) = pdist(pdf, kl_dist);
-            
-            pairs = nchoosek(1:numel(mtc), 2);
-            
-            for jj = 1:nP
-                p = pdf(pairs(jj, 1), :);
-                q = pdf(pairs(jj, 2), :);
+                Dkl(ii, jj) = kl_dist(pdfD, vm_pdf);
+                mean_diffs(ii, jj) = stats.mean;
+                var_diffs(ii, jj) = stats.var;
+                std_diffs(ii, jj) = stats.std;
+                skew_diffs(ii, jj) = stats.skewness;
+                kstat_diffs(ii, jj) = kstat(pdfD, vm_pdf);  % ...  % Kuiper stat
                 
-                [cc, pval] = circ_corrcc(p, q);
-                Dcorr_coeff(ii, jj) = cc;
-                Dcorr_pval(ii, jj) = pval;
+                % Compute circular corr coeff
+                [cc, pval] = circ_corrcc(dir1, dir2);  % this is computing the 
+                corr_coeff(ii, jj) = cc;
+                corr_pval(ii, jj) = pval;
             end
+            
+            
             
         end
         
-        out = table(Dkl, Dmode, Dmean_diffs, Dstd_diffs, Dskew_diffs, ...
-            Dcorr_pval, Dcorr_coeff, pat, sz);
+        out = table(Dkl, Dmode, Dmean, mean_diffs, std_diffs, var_diffs, skew_diffs, ...
+            bias, variance, CC, ...
+            mov_mean_diffs, mov_std_diffs, mov_var_diffs, mov_kstat, ...
+            corr_pval, corr_coeff, kappa_diffs, kstat_diffs, pat, sz, ...
+            mutual_info, pdf_kstat, pdf_xcorr_coeff, pdf_xcorr_angular_lag, ...
+            pdf_kstat_corr_aligned, pdf_xcorr_coeff_normed);
         
+    end
+    
+    function W = get.WaveFits(F)
+        if isempty(F.WaveFits)
+            W = WaveProp.load([], F.Metrics);
+            F.WaveFits = W;
+        end
+        W = F.WaveFits;
     end
     
     function out = get.FitDiffs(F)
         if isempty(F.FitDiffs)
             W = warning; warning off;
-            F.FitDiffs = F.kl_divergence;
-            F.FitDiffs.Dmode_d = F.FitDiffs.Dmode / pi * 180;
+            out = F.kl_divergence;
+            out.Dmode_d = out.Dmode / pi * 180;
+            out.pdf_shift_d = rad2deg(out.pdf_xcorr_angular_lag);
+            out.mean_diffs_d = rad2deg(out.mean_diffs);
+            
+%             [mn, ul, ll] = circ_mean(out.mean_diffs);
+%             MMM = rad2deg([mn, ll, ul]);
+            
+            
+            
+            F.FitDiffs = out;
             warning(W);
         end
         out = F.FitDiffs;
     end
-    
+    function W = get_wave_fit(F, name)
+        ind = strcmpi(F.WaveFits.Name, string(name));
+        for ff = fieldnames(F.WaveFits)'
+            W.(ff{:}) = F.WaveFits.(ff{:})(ind);
+        end
+        
+    end
     function seizure_numbers = make_polarhist(F, seizure_numbers, window)
         if nargin < 2 || isempty(seizure_numbers)
             seizure_numbers = 1:height(F.SeizureInfo);
@@ -559,11 +872,12 @@ methods
         if nargin < 3; window = []; end
         S = warning;
         warning('off');
+        
         for ii = seizure_numbers
             [iw_info, mw] = BVNY.get_iw_info(ii);
             if isempty(iw_info), continue; end
             iw_info = iw_info{mw};
-            W = WaveProp.load(F.SeizureInfo.name(ii));
+            W = F.get_wave_fit(F.SeizureInfo.name(ii));
 
             for period = ["early", "late"]
                 h = F.polarhist(W, iw_info, period, window); 
@@ -706,8 +1020,10 @@ methods
 
         h = figure('units', 'inches', 'position', [0 0 3 1]*2, ...
             'name', 'pre_post_hist');
+        
+        % For each phase show a polar histogram
         phases = ["pre" "post" "diff"];
-        for ii = 1:3
+        for ii = 1:3  
             phase = phases(ii);
             pax = polaraxes;
             subplot(1, 3 ,ii, pax)
@@ -716,21 +1032,35 @@ methods
                     'facecolor', cols(mm), 'edgecolor', cols(mm));
                 hold on
             end
-        %     set(pax, 'rlim', [0 1]);
-%             pax.RTick = [];
-
-        %     pax.ThetaTick = -180:90:180;
+        
             pax.ThetaAxisUnits = 'deg';
             lbl = pax.ThetaTickLabel;
             lbl(~ismember(lbl, {'0', '180', '90', '270'})) = {''};
             lbl = strrep(lbl, '270', '-90');
             lbl = strrep(lbl, '0', '0\circ');
             pax.ThetaTickLabel = lbl;
-            pax.LineWidth = 1;
-        %     pax.RTickLabel(1:end-1) = {''};
+            pax.LineWidth = 1;        
             title(phase)
         end
 
+        % Summarize results
+        num_seiz = numel(out.patient);
+        % definitions
+        chg_fun = @(diff) (abs(diff) > pi/2);
+        align_fun = @(pre) (abs(pre) < pi/2);
+        iw_fun = @(pre, diff) (chg_fun(diff) & align_fun(pre));
+        % apply definitions to both TW methods
+        supportIW = arrayfun(@(mm) sum(iw_fun(out.(mm).pre(:, 1), out.(mm).diff)), F.Metrics);
+        big_change = arrayfun(@(mm) sum(chg_fun(out.(mm).diff(:, 1))), F.Metrics);
+        iw_aligned = arrayfun(@(mm) sum(align_fun(out.(mm).pre(:, 1))), F.Metrics);
+        fprintf('Early TW-IW alignment (pre-IW < 90°): %d[%d]/%d seizures, %s[%s]\n', ...
+            iw_aligned, num_seiz, F.Metrics);
+        fprintf('Change in direction > 90°: %d[%d]/%d seizures, %s[%s]\n', ...
+            big_change, num_seiz, F.Metrics);
+        fprintf('Support IW-hyp (pre-IW < 90° & change > 90°): %d[%d]/%d seizures, %s[%s]\n', ...
+            supportIW, num_seiz, F.Metrics);
+        
+        
         F.print(h, F.prefix_better(''));
     end
     
@@ -747,8 +1077,6 @@ methods
         h = fig();
         ax = axes(h);  
 
-        % Note: These are the current colors assigned to M and D10. If you changes these,
-        % you will need to update this
         cols = @(mm) F.Style.(mm).color;
         mask = out.iw_angle_pval < .05;
 
@@ -759,18 +1087,20 @@ methods
         [~, so] = unique(G);
         
         
-        Gx = [G; max(G) + 1];
+        Gx = findgroups(G);  % use findgroups to remove empty patient groups
         for mm = string(F.Metrics)
 
-            xx = [Gx Gx]' + .25*[-1; 1];  % make x-values out of patient number and seizure index
+            % make x-values out of patient number and seizure index
+            xx = [Gx Gx]' + .25*[-1; 1];  
 
 
             for offset = [-360 0 360]
-                yy = unwrap([out.(mm).pre(:, 1) out.(mm).post(:, 1)]') / pi * 180;  % unwrap differences and convert to degrees
+                % unwrap differences and convert to degrees
+                yy = unwrap([out.(mm).pre(:, 1) out.(mm).post(:, 1)]') / pi * 180;  
                 yy = yy + offset;
                 N = [out.(mm).pre(:, 2) out.(mm).post(:, 2)]';
                 yy(N == 0) = nan;
-                yy = [yy [0; 180]]; %#ok<AGROW>
+%                 yy = [yy [0; 180]]; %#ok<AGROW>
 
 
                 % Indicate IW and anti-IW direction
@@ -780,13 +1110,9 @@ methods
                     yline(theta(ii), ['k' ls(ii)], 'linewidth', 1);
                 end
                 hold on
-                plot(ax, xx, yy, 'color', cols(mm), 'displayname', mm)
-                dn = ["Pre", "Post"];
-                for ii = 1:2
-                plot(xx(ii, :), yy(ii, :), '.', ...
-                    'color', cols(mm), 'displayname', dn(ii), ...
-                    'markersize', 15);
-                end
+                plot(ax, xx, yy, 'color', cols(mm), ...
+                    'marker', '.', 'markersize', 15, ...
+                    'displayname', mm)
 
 
                 % Indicate good IW direction fits
@@ -795,21 +1121,35 @@ methods
                 plot(xx(2, mask), yy(2, mask), '.', 'color', gray_);
 
             end
-        %     hold(ax, 'off');
-
-
-        %     title(mm)
+        
         end
-        xticks(ax, unique(Gx))
+        
+       
+        % Prettify
+        xticks(ax, 1:max(Gx) + 1)
         xticklabels(ax, [out.patient(so); 'HYP'])
         xtickangle(ax, 45)
         yticks(ax, -360:90:360)
         yticklabels(ax, num2str([0 90 -180 -90 0 90 180 -90 0]'))
-        ylim([-1 1] * 200)
+        ylim([-1 1] * 200);
+        ylabel('Mean direction (\circ)')
         grid on
 
         ln = findobj(ax, 'type', 'line');
-        legend(ln([round(numel(ln)/2), end]), ... % string(F.Metrics), ...
+        ln1 = findobj(ln, 'displayname', F.Metrics(1));
+        ln2 = findobj(ln, 'displayname', F.Metrics(2));
+        
+         % Add the hypothesis
+        xHyp = max(xx, [], 2) + 1;
+        lHyp1 = copyobj(ln1(1), ax);
+        set(lHyp1, 'xdata', xHyp, 'ydata', [0 180], 'color', .35*[1 1 1], ...
+            'displayname', 'IW Hyp');
+        lHyp2 = copyobj(ln1(1), ax);
+        set(lHyp2, 'xdata', xHyp, 'ydata', [0 -180], ...
+            'linestyle', '--', 'color', .5*[1 1 1]);
+        
+        % Add the legend
+        legend([ln1(1) ln2(1) lHyp1], ... % string(F.Metrics), ...
             'location', 'eastoutside', 'box', 'off')
 
         F.print(h, F.prefix_better(''))
@@ -838,27 +1178,672 @@ methods
         F.print(h, F.prefix_better(''));
     end
     
-    function disagree = get.Disagree(F)
+    function sub = FitDiffs_sub(F)
         out = F.FitDiffs;
-        agree = abs(out.Dmode_d) < 60 & abs(out.Dmean_diffs) < pi/4; % & out.Dcorr_coeff >= .5;
-        fprintf('Disagree:\n');
-        disagree = compose('%s %d', out.pat(~agree), out.sz(~agree));
+        sub = out(:, ["pat" "sz"]);
+        sub.Dmean_d = rad2deg(out.Dmean);
+        sub.pdf_kstat = out.pdf_kstat_corr_aligned;
+        sub.bias_d = rad2deg(out.bias);
+        sub.variance = out.variance;
+        sub.xcorr_lag = rad2deg(out.pdf_xcorr_angular_lag);
+        sub.xcorr_cc = out.pdf_xcorr_coeff;
+
+    end
+    
+    function disagree = get.Disagree(F)
+        out = F.FitDiffs_sub;
         
-        msg = compose('%s %d: %0.0f (dMode), %0.0f (dMean)', ...
-            out.pat(~agree), out.sz(~agree), out.Dmode_d(~agree), rad2deg(out.Dmean_diffs(~agree)));
-        cellfun(@disp, msg)
+%         agree_fun = @() ( ...
+%             abs(out.Dmean_d) < 60 ...
+%             & out.pdf_kstat < .4 ...  % distributions match
+%             );
+        agree_fun = @() ( ...
+            abs(out.xcorr_lag) < 60 ...
+            & out.pdf_kstat < .4 ...  % distributions match
+            );
+%         agree_fun = @() (...
+%             abs(out.xcorr_lag) < 60 ...
+%             & out.xcorr_cc > 0 ...  % this is doing nothing...
+%             );
+        
+        out.agree = agree_fun();
+        out.Row = compose('%s %d', out.pat, out.sz);
+        
+        show_mads = ["Dmean_d" "pdf_kstat"];
+        c=-1/(sqrt(2)*erfcinv(3/2));  % scale factor for scaled mad
+        scaled_mad = @(dat) c * nanmedian(abs(dat - nanmedian(dat)));
+        
+        fprintf('Disagree:\n');
+        fprintf('3 scaled MAD:\n');
+        arrayfun(@(ff) fprintf('%15s: %0.3g\n', ff, 3*scaled_mad(out.(ff))), show_mads);
+        disp(agree_fun)
+        disagree = out(~out.agree, :);
+
+    end
+    
+    function ax = show_distribution_comparison(F, ax, display_option, which_stat)
+        % ax = show_distribution_comparison(F, ax=gca, display_option="corr", which_stat="ci")
+        % Plots mean vs. kstat for each seizure
+        % which_stat is fed to summarize_stat (use 'ci' to show CI, 'std'
+        % to show STD, 'range' to show median and range)
+        
+        if nargin < 2, ax = gca; end
+        if nargin < 3 || isempty(display_option), display_option = "corr"; end
+        if nargin < 4, which_stat = []; end
+        if ~isa(ax, 'matlab.graphics.axis.Axes')
+            which_stat = display_option;
+            display_option = ax;
+            ax = gca;
+        end
+        
+        display_option = validatestring(display_option, ...
+            ["kstat" "corr" "MI" "shift"]);
+        out = F.FitDiffs;
+        
+        switch display_option
+            case "shift"
+                % Show difference of means
+                xx = abs(rad2deg(out.pdf_xcorr_angular_lag));
+                yy = out.pdf_kstat_corr_aligned;
+                F.gscatter_pat(ax, xx, yy, out.pat);
+                title('PDF(M) v. PDF(D10)')
+                xlabel('Shift (\circ)')
+                ylabel('K-stat')
+                xlim([-20 200]); xticks(-0:30:180); 
+                ylim([0 1.1*max(yy)])
+                
+                % Summarize results
+                disp(ax.Title.String);
+                F.summarize_stat(ax.XLabel.String, xx, '', which_stat);
+                F.summarize_stat(ax.YLabel.String, yy, '', which_stat);
+                
+            case "kstat"
+                % Show difference of means
+                xx = abs(rad2deg(out.Dmean));
+                yy = out.pdf_kstat_corr_aligned;
+                F.gscatter_pat(ax, xx, yy, out.pat);
+                title('PDF(M) v. PDF(D10)')
+                xlabel('Difference in means (\circ)')
+                ylabel('K-stat')
+                xlim([-20 200]); xticks(-0:30:180); 
+                ylim([0 1.1*max(yy)])
+                
+                % Summarize results
+                disp(ax.Title.String);
+                F.summarize_stat(ax.XLabel.String, deg2rad(xx), 'ang', which_stat);
+                F.summarize_stat(ax.YLabel.String, yy, '', which_stat);
+                
+            case "MI"
+                % Show difference of means
+                xx = abs(rad2deg(out.Dmean));
+                yy = out.mutual_info;
+                F.gscatter_pat(ax, xx, yy, out.pat);
+                title('PDF(M) v. PDF(D10)')
+                xlabel('Difference in means (\circ)')
+                ylabel('MI')
+                xlim([-20 200]); xticks(-0:30:180); 
+                ylim([0 1.1*max(yy)])
+                
+                % Summarize results
+                disp(ax.Title.String);
+                F.summarize_stat(ax.XLabel.String, deg2rad(xx), 'ang', which_stat);
+                F.summarize_stat(ax.YLabel.String, yy, '', which_stat);
+                
+            case "corr"
+                % Show difference of means
+                xx = abs(rad2deg(out.pdf_xcorr_angular_lag));
+                yy = out.pdf_xcorr_coeff_normed;
+                F.gscatter_pat(ax, xx, yy, out.pat);
+                title('PDF(M) v. PDF(D10)')
+                xlabel('Shift (\circ)')
+                ylabel('peak CC (normalized)')
+                xlim([-20 200]); xticks(-0:30:180); 
+                ylim(quantile(yy, [0 1]) + .1*range(yy)*[-1 1])
+                
+                % Summarize results
+                disp(ax.Title.String);
+                F.summarize_stat(ax.XLabel.String, deg2rad(xx), 'ang', which_stat);
+                F.summarize_stat(ax.YLabel.String, yy, '', which_stat);
+        
+        end
+        
+        
+        box off
+        axis square
+        
+
+    end
+    
+    function ax = show_per_discharge_bias_vs_variance(F, ax, varargin)
+        % ax = show_per_discharge_bias_vs_variance(F, ax=gca, ::method='median' ('min'/'max')::)
+        % Shows patient gscatter of bias vs. variance
+        if nargin < 2 || isempty(ax), ax = gca; end
+        if ischar(ax), varargin = [ax varargin]; ax = gca; end
+        
+        method = 'Median';
+        if mod(numel(varargin), 2)
+            method = validatestring(varargin{1}, {'Min', 'Max', 'Median'}); 
+        end
+        switch method
+            case 'Median'
+                data_col = 1;
+            case 'Max'
+                data_col = 3;
+            case 'Min'
+                data_col = 2;
+        end
+        
+        out = F.FitDiffs;
+        
+        xx = rad2deg(out.bias(:, data_col));
+        yy = ((out.variance(:, data_col)));  
+        F.gscatter_pat(ax, xx, yy, out.pat);
+        title('Differences')
+        xlabel([method ' bias (\circ)'])
+        ylabel([method ' variance']);
+        xlim([-20 200]); ylim([0 1]);
+        xticks(-0:30:180); yticks(0:.25:1)
+        box off
+        axis square
+        % Summarize results
+        disp(ax.Title.String);
+        F.summarize_stat(ax.XLabel.String, deg2rad(xx), 'ang');
+        F.summarize_stat(ax.YLabel.String, yy);
         
     end
+    
+    function ax = show_cc_between_methods(F, ax, use_mov_corr)
+        % ax = show_cc_between_methods(F, ax=gca, use_mov_corr=false)
+        % Shows the gscatter_pat of circular correlation (on y-axis; no
+        % x-axis)
+        
+        if nargin < 2 || isempty(ax), ax = gca; end
+        if nargin < 3 || isempty(use_mov_corr), use_mov_corr = false; end
+        if islogical(ax); use_mov_corr = ax; ax = gca; end
+        
+        % Show CC between methods
+        out = F.FitDiffs;
+        switch use_mov_corr
+            case true
+                yy = out.CC(:, 1);
+                F.gscatter_pat(ax, yy, out.pat);
+                title(sprintf('Circular\ncorrelation'))
+                % Summarize results
+                disp(ax.Title.String)
+                F.summarize_stat(ax.YLabel.String, yy);
+                disp(out(yy < 0, ["pat" "sz" "CC"]))
+                
+            case false
+
+                % Show CC between methods
+                yy = out.corr_coeff;
+                mask = out.corr_pval < .05;
+                ln = F.gscatter_pat(ax, yy, out.pat);
+                set(ln, 'markerfacecolor', 'none');
+                hold on;
+                F.gscatter_pat(ax, yy(mask), out.pat(mask));
+                hold off
+                
+                % Summarize results
+                disp(ax.Title.String)
+                F.summarize_stat(ax.YLabel.String, yy);
+                disp(out(yy < 0 & mask, ["pat" "sz" "corr_coeff" "corr_pval"]))
+                
+        end
+        
+        title(sprintf('Circular\ncorrelation'))
+        ylabel('Corr coeff')
+        ylim(quantile(yy, [0 1]) + .1*range(yy)*[-1 1])
+        box off
+        
+        
+
+    end
+    
+    function ax = show_max_dphi_dt(F, ax)
+        % ax = show_max_dphi_dt(F, ax=gca)
+        
+        % Assumes only two methods.
+        
+        WIN = 10;
+        OVERLAP = 9.9;
+        step_ = WIN - OVERLAP;
+        cellfun_ = @(varargin) cellfun(varargin{:}, 'uni', 0);
+        
+        if nargin < 2 || isempty(ax), ax = gca; end
+        
+        
+        data = F.CompiledData;
+        data = data(isfinite(data.dir), :);  % only use samples where phi is detected
+        [G, pat, ~, mtc] = findgroups(data.patient, data.seizure, data.metric);
+
+        % Compute dphi/dt
+        dphi_dt = splitapply(@(dirs, times) ...
+            {max(min(diff_phase(dirs) ./ diff(times), pi), -pi)}, ...  
+            data.dir, data.time, G);
+        sample_times = splitapply(@(t) {t(2:end)}, data.time, G);
+
+        % Estimate mean dphi/dt (with ci) using WIN s windows
+        test_times = cellfun_(@(t) t(1):step_:t(end), sample_times, 'uni', 0);
+        for ii = 1:numel(test_times)
+            temp = nan * test_times{ii};
+            [~, locs] = min(abs(sample_times{ii}(:)' - test_times{ii}(:)));
+            temp(locs) = dphi_dt{ii};
+            dphi_dt{ii} = temp;
+        end
+        dphi_dt_mn = cellfun_(@(ddt, test_t) movmean(ddt, WIN, 'omitnan', 'samplepoints', test_t), dphi_dt, test_times);
+        dphi_dt_std = cellfun_(@(ddt, test_t) movstd(ddt, WIN, 'omitnan', 'samplepoints', test_t), dphi_dt, test_times);
+        N = cellfun_(@(ddt, test_t) movsum(isfinite(ddt), WIN, 'samplepoints', test_t), dphi_dt, test_times);
+        dphi_dt_ci = cellfun_(@(std, N) 2*std./sqrt(N), dphi_dt_std, N);
+        
+        % Require 1 sample / second
+        for ii = 1:numel(N)
+            mask_ = N{ii} < WIN;
+            dphi_dt_mn{ii}(mask_) = nan;
+            dphi_dt_ci{ii}(mask_) = nan;
+        end
+        
+%         % Estimate mean and bounds using circular stats
+%         dphi_dt_mn = cellfun_(@(ddt, test_t, samp_t) ...  % this is the estimated mean dφ/dt at test_times in each patient
+%             circ_mov_stat('mean', ddt, test_t, WIN, 'samplepoints', samp_t), ...
+%             dphi_dt, test_times, sample_times, 'uni', 0); 
+% 
+%         dphi_dt_ci = cellfun_(@(ddt, test_t, samp_t) ...  % this is the ci around the estimated mean dφ/dt at test_times in each patient
+%             circ_mov_stat('confmean', ddt, test_t, WIN, 'samplepoints', samp_t), ...
+%             dphi_dt, test_times, sample_times, 'uni', 0); 
+        
+        % Convert to bounds
+        bounds = cellfun_(@(mn, ci) mn(:) + [-ci(:) ci(:)], dphi_dt_mn, dphi_dt_ci);
+        
+
+        
+%         % find points where ci do not include zero (i.e. dphi_dt
+%         % significantly non-zero)
+%         get_bounds = @(mn, ci) mn + [-ci ci];
+%         inc_zero = @(bounds) isnan(bounds(:, 1)) | (bounds(:, 1) <= 0 & bounds(:, 2) >= 0);
+%         is_significant = cellfun( ...
+%             @(mn, ci) ~inc_zero(get_bounds(mn, ci)), ...
+%             dphi_dt_mn, dphi_dt_ci, 'uni', 0);
+        
+%         % ... and set to 0 in both bounds and mn
+%         fun = @(dat, is_sig) dat .* double(is_sig);
+%         bounds = cellfun(@(mn, ci, is_sig) fun(get_bounds(mn, ci), is_sig), ...
+%             dphi_dt_mn, dphi_dt_ci, is_significant, 'uni', 0);
+%         dphi_dt_mn = cellfun(@(dat, is_sig) fun(dat, is_sig), ...
+%             dphi_dt_mn, is_significant, 'uni', 0);
+        
+%         % Find max shift where ci are furthest from zero
+%         get_ll_ = @(bounds) min(abs(bounds), [], 2);
+%         peak_ll_ = @(ll) max(ll);
+%         [ll_max, peak_non_zero] = cellfun_(@(bounds) peak_ll_(get_ll_(bounds)), bounds, 'uni', 0);
+%         shift_max = cellfun_(@(mn, loc) mn(loc), dphi_dt_mn, peak_non_zero);
+%         shift_max = abs(cat(1, shift_max{:}));
+        
+        % Find max dphi/dt
+        shift_max = cellfun(@(x) max(abs(x)), dphi_dt_mn);
+        
+        isM1 = contains(F.Metrics, "M");  % Put M on the x-axis
+        m1 = F.Metrics(isM1); m2 = F.Metrics(~isM1);
+        assert(all(pat(mtc == m1) == pat(mtc == m2)));  % Make sure patient labels are the same for each metric
+        
+        % Make the plot
+        xx = rad2deg(shift_max(mtc == m1));
+        yy = rad2deg(shift_max(mtc == m2));
+        plot([-20 200], [-20 200], '--', 'color', .5*[1 1 1]);
+        hold on
+        F.gscatter_pat(ax, xx, yy, pat(mtc == m1));
+        hold off
+        title('Peak d\phi/dt (\circ/s)')
+        xlabel(m1)
+        ylabel(m2)
+        xlim([-20 200]); xticks(0:30:180); 
+        ylim([-20 200]); yticks(0:30:180); 
+        box off
+        axis square
+        % Summarize results
+        disp(ax.Title.String);
+        F.summarize_stat(ax.XLabel.String, deg2rad(xx), 'ang');
+        F.summarize_stat(ax.YLabel.String, deg2rad(yy), 'ang');
+        
+    end
+    
+        
+    function ax = show_stat_with_range(F, ax, stat, units)
+        % ax = show_stat_with_range(F, ax=gca, stat='bias')
+        % Shows a stat for each seizure (e.g. bias, variance, cc) with its
+        % range of observations from each 10s sliding window. Median is
+        % shown with a marker; the line behind shows Q[0.05, 0.95])
+        
+        % Parse inputs
+        if nargin < 2 || isempty(ax), ax = gca; end
+        if nargin < 3 || isempty(stat), stat = 'bias'; end
+        if nargin < 4 || isempty(units), units = ""; end
+        if ischar(ax); units = stat; stat = ax; ax = gca; end
+        sts = ax.NextPlot;
+        
+        % Choose a stat and get the dataset
+        stat = validatestring(stat, {'Bias', 'Variance', 'CC', 'STD'});
+        out = F.FitDiffs;
+        
+        out.bias = abs(out.bias); 
+        out.std = out.mov_std_diffs;
+        
+        if units == "deg"
+        
+            out.bias = abs(rad2deg(out.bias));  % show bias in °
+            out.std = rad2deg(circ_var2angle(out.mov_std_diffs));  % show std in °
+            out.variance = rad2deg(circ_var2angle(2*out.variance));  % show variance in ° (convert to angular variance first)
+            
+        end
+        
+        
+        % Make the plot
+        ff = validatestring(stat, fields(out));
+        yy = out.(ff)(:, 1);
+        y_range = out.(ff)(:, 2:3);
+        F.gscatter_pat(ax, yy, out.pat, 'range', y_range);
+        switch stat
+            case 'Bias'
+                hold(ax, 'on')
+                plot(ax, 0*yy, y_range(:, 2), 'go', 'markersize', 4);  % max bias
+                plot(ax, 0*yy, yy, 'r.', 'markersize', 6);
+                hold(ax, 'off')
+                if units == "deg"
+                    fprintf('%d seizures with max bias > 60°.\n', sum(abs(y_range(:, 2)) > 60));
+                else
+                    fprintf('%d seizures with max bias > π/3.\n', sum(abs(y_range(:, 2)) > pi/3));
+                end
+            case 'Variance'
+                hold(ax, 'on')
+                plot(ax, 0*yy, y_range(:, 1), 'bo', 'markersize', 4);  % min variance
+                plot(ax, 0*yy, yy, 'r.', 'markersize', 6);
+                hold(ax, 'off')
+                if units == "deg"
+                    fprintf('%d seizures with min var > 60°.\n', sum(abs(y_range(:, 1)) > 60));
+                else
+                    fprintf('%d seizures with min var > π/3.\n', sum(abs(y_range(:, 1)) > pi/3));
+                end
+            case 'STD'
+                hold(ax, 'on')
+                plot(ax, 0*yy, y_range(:, 1), 'bo', 'markersize', 4);  % min variance
+                plot(ax, 0*yy, yy, 'r.', 'markersize', 6);
+                hold(ax, 'off')
+                if units == "deg"
+                    fprintf('%d seizures with min std > 60°.\n', sum(abs(y_range(:, 1)) > 60));
+                else
+                    fprintf('%d seizures with min std > π/3.\n', sum(abs(y_range(:, 1)) > pi/3));
+                end
+        end
+        
+        % Prettify
+        names = arrayfun(@(ll) string(ll.DisplayName), ax.Children);
+        names(names == "") = [];
+        xlim([0 12])
+        xticks(ax, 1:11);  % there are 11 patients
+        xticklabels(ax, flipud(names));
+        ylabel(ax, stat)
+        xlabel(ax, 'Patient');
+        title('Median and Q[0.05, 0.95]')
+        
+        disp(stat)
+        switch stat
+            case 'Bias'
+                if units == "deg"
+                    ylim(ax, [-20 200]);
+                    yticks(ax, 0:30:180)
+                    ylabel(ax, [ax.YLabel.String ' (°)'])
+                else
+                    ylim(ax, deg2rad([-20 200]));
+                    yticks(ax, deg2rad(0:30:180))
+                    ylabel(ax, ax.YLabel.String)
+                    polar_label(ax, 'y');
+                end
+                
+                F.summarize_stat([stat ' (med)'], deg2rad(yy), 'ang');
+                F.summarize_stat([stat ' (min)'], deg2rad(y_range(:, 1)), 'ang');
+                F.summarize_stat([stat ' (max)'], deg2rad(y_range(:, 2)), 'ang');
+                
+            case 'Variance'
+                if units == "deg"
+                    ylim(ax, [-20 200]);
+                    yticks(ax, 0:30:180)
+                    ylabel(ax, [ax.YLabel.String ' (°)'])
+                    
+                    F.summarize_stat([stat ' (med)'], deg2rad(yy), 'ang');
+                    F.summarize_stat([stat ' (min)'], deg2rad(y_range(:, 1)), 'ang');
+                    F.summarize_stat([stat ' (max)'], deg2rad(y_range(:, 2)), 'ang');
+                else
+                    ylim(ax, [0 1]);
+                    ylabel(ax, ax.YLabel.String)
+                    
+                    F.summarize_stat([stat ' (med)'], (yy), '');
+                    F.summarize_stat([stat ' (min)'], (y_range(:, 1)), '');
+                    F.summarize_stat([stat ' (max)'], (y_range(:, 2)), '');
+                end
+                
+                
+                
+            case 'STD'
+                if units == "deg"
+                    ylim(ax, [-20 200]);
+                    yticks(ax, 0:30:180)
+                    ylabel(ax, [ax.YLabel.String ' (°)'])
+                else
+                    ylim(ax, [0 1]);
+                    ylabel(ax, ax.YLabel.String)
+                end
+                
+                F.summarize_stat([stat ' (med)'], deg2rad(yy), 'ang');
+                F.summarize_stat([stat ' (min)'], deg2rad(y_range(:, 1)), 'ang');
+                F.summarize_stat([stat ' (max)'], deg2rad(y_range(:, 2)), 'ang');
+                
+            otherwise
+                F.summarize_stat([stat ' (med)'], yy);
+                F.summarize_stat([stat ' (min)'], y_range(:, 1));
+                F.summarize_stat([stat ' (max)'], y_range(:, 2));
+        end
+        
+        ax.NextPlot = sts;
+        
+            
+    end
+    
+    function allP_pdf_distance2(F)
+        
+
+        Nax = 16;  % 14 is ideal for a row of plots
+%         r = 3; c = ceil(Nax/r);
+        h = figure('name', 'pdf_distance', 'units', 'inches', ...
+            'position', [0 0 Nax+1 3.25] * .67);  
+        
+        Ts = tiledlayout(h, 1, Nax, 'tilespacing', 'none');
+        
+        
+        % Show comparison of distributions
+        ax = nexttile(Ts, [1 3]);
+        F.show_distribution_comparison(ax, "shift");
+        
+        % Show range of bias and variance for each seizure
+        aB = nexttile(Ts, [1 5]);
+        F.show_stat_with_range(aB, 'bias', 'deg');
+        
+        aV = nexttile(Ts, [1 5]);
+        F.show_stat_with_range(aV, 'var');
+
+        set([aB aV], 'xlabel', [], 'xticklabelrotation', 45)
+        
+        
+        % Show max shift
+        ax = nexttile(Ts, [1 3]);
+        F.show_max_shift(ax);
+        
+        ln = findobj(h, 'type', 'line');
+        set(ln, 'markersize', 4);
+        
+%         % Show CC between methods
+%         ax = nexttile(Ts, [1 2]);
+%         F.show_cc_between_methods(ax, false);
+
+%         % Show per discharge comparison (distribution of differences)
+%         % Bias and variance (median and max) on sliding 10 s windows
+%         ax = nexttile(Ts, [1 3]);
+%         ax = F.show_per_discharge_bias_vs_variance(ax, 'median');
+%         
+%         ax = nexttile(Ts, [1 3]);
+%         ax = F.show_per_discharge_bias_vs_variance(ax, 'max');        
+       
+        
+        
+%         % Show Kstat of differences from VM(mu_{d\phi}, kappa_{d\phi})
+%         % i.e. how VM are the differences?
+%         ax = nexttile(Ts, [1 2]);
+%         yy = out.mov_kstat;
+%         F.gscatter_pat(ax, yy, out.pat);
+%         title('Diffs v. VM')
+%         ylabel('Avg. Kuiper stat')
+%         ylim(quantile(yy, [0 1]) + .1*range(yy)*[-1 1])
+%         box off
+%         % Summarize results
+%         summarize(ax.Title.String, yy);
+%         
+%         
+%         
+%         % Show variance (peak and median)
+%         ax = nexttile(Ts, [1 3]);
+%         [~, ~, aa] = F.allP_directionality;
+%         copyobj(aa.Children, ax);
+%         set(ax, 'xlabel', aa.XLabel, 'ylabel', aa.YLabel)
+%         close(aa.Parent);
+%         lines = findobj(ax, 'type', 'line');
+%         % Convert to variance (1 - DI)
+%         for ll = lines'
+%             ll.XData = 1 - ll.XData;
+%             ll.YData = 1 - ll.YData;
+%         end
+%         ln_medians = arrayfun(@(ln) strcmpi(ln.MarkerFaceColor, 'none'), lines);
+%         xx_meds = cat(2, lines(ln_medians).XData);
+%         yy_meds = cat(2, lines(ln_medians).YData);
+%         xx_pks = cat(2, lines(~ln_medians).XData);
+%         yy_pks = cat(2, lines(~ln_medians).YData);
+%         title(ax, sprintf('Var(%s) v. Var(%s)', F.Metrics(1), F.Metrics(2)))
+%         % Summarize results
+%         disp(ax.Title.String)
+%         disp('medians')
+%         summarize(ax.XLabel.String, xx_meds);
+%         summarize(ax.YLabel.String, rmmissing(yy_meds));
+%         disp('peaks')
+%         summarize(ax.XLabel.String, xx_pks);
+%         summarize(ax.YLabel.String, rmmissing(yy_pks));
+%         legend(ax, chillins);
+        
+        
+        
+%         % Show directionality index
+%         ax = nexttile(Ts, [1 2]);
+%         mask1 = contains(mtc, "D"); % assuming comparison of an M and D metric and I want the D on the x-axis
+%         mask2 = contains(mtc, "M"); 
+%         DI = splitapply(@nanmean, data.dir_ind_05, G);
+%         xx = DI(mask1);
+%         yy = DI(mask2);
+%         assert(all(pat(mask1) == pat(mask2)));
+%         pat = pat(mask1); sz = sz(mask1);
+%         F.gscatter_pat(ax, xx, yy, pat);
+%         xlabel(unique(mtc(mask1)));
+%         ylabel(unique(mtc(mask2)));
+%         title('DI')
+%         % Summarize results
+%         disp(ax.Title.String)
+%         summarize(ax.XLabel.String, xx);
+%         summarize(ax.YLabel.String, yy);
+%         mask = yy > xx;
+%         fprintf('DI_M > DI_D in:\n')
+%         cellfun(@disp, compose('%s %d', pat(mask), sz(mask)));
+%        
+
+%         
+        
+        
+        
+        
+        
+        
+%         % Show Kstat of differences from VM(mu_{d\phi}, kappa_{d\phi})
+%         ax = nexttile(Ts, [1 2]);
+%         yy = out.mov_kstat;
+%         F.gscatter_pat(ax, yy, out.pat);
+%         title('Diffs v. VM')
+%         ylabel('Kuiper stat')
+%         ylim(quantile(yy, [0 1]) + .1*range(yy)*[-1 1])
+%         box off
+%         % Summarize results
+%         disp(ax.Title.String)
+%         summarize(ax.YLabel.String, yy);
+        
+        
+
+        
+%         % Show distribution difference of means
+%         ax = nexttile(Ts, [1 3]);
+%         xx = rad2deg(out.pdf_xcorr_angular_lag);
+%         yy = rad2deg(out.Dmean);
+%         F.gscatter_pat(ax, xx, yy, out.pat);
+%         title('Overall shift')
+%         xlabel('CC shift (\circ)')
+%         ylabel('Difference in means (\circ)')
+%         xlim([-180 180]); xticks(-180:60:180); 
+%         ylim([-180 180]); yticks(-180:60:180); 
+%         box off
+%         axis square
+%         % Summarize results
+%         disp(ax.Title.String);
+%         summarize_ang(ax.XLabel.String, deg2rad(xx));
+%         summarize_ang(ax.YLabel.String, deg2rad(yy));
+%         
+%         
+%         
+%         % Show distribution distance (correlation distance and Kuiper stat)
+%         ax = nexttile(Ts, [1 3]);
+%         xx = out.pdf_xcorr_coeff;
+%         yy = 1 - out.pdf_kstat;
+%         F.gscatter_pat(ax, xx, yy, out.pat);
+%         xlim([0 1])
+%         ylim([0 1])
+%         title('Distribution similarity');
+%         ylabel("1 - Kstat");
+%         xlabel('Cross correlation');
+%         axis square
+%         box off
+%         % Summarize results
+%         disp(ax.Title.String);
+%         summarize(ax.XLabel.String, xx);
+%         summarize(ax.YLabel.String, yy);
+%         
+        
+        
+        
+        
+        % Only show one legend
+        lgd = findobj(gcf, 'type', 'legend');
+        set(lgd(2:end), 'visible', 'off');
+        lgd(1).Location = 'eastoutside';
+
+
+        F.print(h, F.prefix_better(''));
+    end
+
     
     function allP_pdf_distance(F)
         
         out = F.FitDiffs;
         out.Dmean_diffs = rad2deg(out.Dmean_diffs);
+        out.Dmode_d = rad2deg(out.pdf_xcorr_angular_lag);
 
 
-        fields = {'Dmean_diffs', 'Dmode_d', 'Dcorr_coeff', 'Dkl'};
-        labels = {'Per discharge difference (\circ)', 'Difference in modes (\circ)', ...
-            'Circular correlation', 'KL divergence'};
+        fields = {'Dmean_diffs', 'Dstd_diffs', 'Dmode_d', 'mutual_info'};
+        labels = {'Per discharge difference (\circ)', ...
+            'Per discharge std', ...
+            'Difference in modes (\circ)', ... 
+            'MI'};
         polar_field = [0 0 0 0];
 
         h = figure('name', 'pdf_distance', 'units', 'inches', ...
@@ -897,7 +1882,7 @@ methods
                     yline(45, 'r--', 'linewidth', 1);
                     yline(-45, 'r--', 'linewidth', 1);
                 case 'Dcorr_coeff'
-                    yline(.5, 'r--', 'linewidth', 1)
+                    yline(.3, 'r--', 'linewidth', 1)
             end
         end
 
@@ -911,7 +1896,77 @@ methods
     end
 
     function allP_main_iw(F, min_electrodes)
-        if nargin < 2 || isempty(min_electrodes), min_electrodes = 40; end
+        % allP_main_iw(F, min_electrodes=50)
+        if nargin < 2 || isempty(min_electrodes), min_electrodes = 50; end
+        
+        iw_all = BVNY.get_iw_main;
+        Nch = structfun(@(s) numfinite(s.template.template(s.main_wave, :)), iw_all);
+        mask = Nch >= min_electrodes;
+        h = figure('name', 'iw_templates'); fullwidth(true);
+        T = tiledlayout(h, 4, 8);
+        
+        fields = fieldnames(iw_all);
+        [px, py] = ndgrid(1:10, 1:10);
+        pos = [px(:) py(:)];
+        for ff = string(fields(mask)')
+            ax = nexttile(T);
+            tpl = squeeze( ...  % TOA
+                iw_all.(ff).template.template(iw_all.(ff).main_wave, :, :) ...
+                );
+            M = MaxDescent;
+            M.Position = pos;
+            M.t0 = 0;
+            M.Data = tpl;
+            M.Name = ff;
+            M.plot2D(ax);
+            
+            % Convert TOA to seconds (if you do this before now, the
+            % speed in the legends will be off)
+            sc = findobj(ax, 'type', 'scatter');
+            sc.CData = sc.CData / 1e3;  % Convert from ms -> s
+            ax.CLim = ax.CLim / 1e3;
+            cb = ax.Colorbar;
+            title(cb, 'TOA [s]');
+            
+            
+            axis square
+            title(strrep(ff, '_', ' '))
+            xlim([0 11])
+            ylim([0 11])
+            xticks([])
+            yticks([])
+            box on
+        end
+        
+        % Set colomap to gray (light to dark)
+        % This is mirroring the recoloring |F.F.show_corr_dir_mismatches|.
+        % Hoping to easily distinguish between IW and method-specific TW
+        gray_ = .5*[1 1 1];
+        len = length(ax.Colormap);
+        cmap = make_diverging_colormap( ...
+            [brighten(gray_, .9); brighten(gray_, -.9)], gray_, len);
+        set(findobj(T, 'type', 'axes'), 'colormap', cmap);
+        
+        % Make quivers colored
+        qq = findobj(T, 'type', 'quiver');
+        set(qq, 'color', 1-lines(1));
+        
+        % Put legends outside
+        lgd = findobj(T, 'type', 'legend');
+        set(lgd, 'location', 'southoutside');
+        
+        % Set all scatter dots to the same size
+        sc = findobj(T, 'type', 'scatter');
+        set(sc, 'sizedata', M.get_dot_size(ax));
+        
+        
+        F.print(h, F.prefix_better(''));
+        
+    end
+    
+    function ZZallP_main_iw(F, min_electrodes)  % ZZ'd 6/1/21
+        % allP_main_iw(F, min_electrodes=50)
+        if nargin < 2 || isempty(min_electrodes), min_electrodes = 50; end
         
         iw_all = BVNY.get_iw_main;
         Nch = structfun(@(s) numfinite(s.template.template(s.main_wave, :)), iw_all);
@@ -921,7 +1976,7 @@ methods
         
         fields = fieldnames(iw_all);
         for ff = string(fields(mask)')
-            tpl = squeeze(iw_all.(ff).template.template(iw_all.(ff).main_wave, :, :));
+            tpl = squeeze(iw_all.(ff).template.template(iw_all.(ff).main_wave, :, :));  % TOA
             fr_tpl = squeeze(iw_all.(ff).template.firing_rate(iw_all.(ff).main_wave, :, :));
             [xx, yy] = find(isfinite(tpl));
             t_val = tpl(isfinite(tpl));
@@ -943,33 +1998,57 @@ methods
         
     end
     
-    function allP_dir_v_rho(F, metric)
+    function allP_dir_v_rho(F, ax, metric, min_electrodes)
         % Correlation v. angle (relative to IW angle)
-        if nargin < 2 || isempty(metric), metric = "M"; end
+        if nargin < 2 || isempty(ax), ax = []; end
+        if nargin < 3 || isempty(metric), metric = "M"; end
+        if nargin < 4 || isempty(min_electrodes), min_electrodes = 50; end
+        if ~isaxes(ax) && nargin == 3, min_electrodes = metric; metric = ax; ax = []; end
+        if ~isaxes(ax) && nargin == 2, metric = ax; ax = []; end
         
-        h = figure('name', 'rho v phi', 'position', [0 0 4 4]);
-        ax = axes(h);
+        if isempty(ax)
+            h = figure('name', 'rho v phi', 'position', [0 0 4 4]);
+            ax = axes(h);
+        else
+            h = ax.Parent;
+            while ~isa(h, 'matlab.ui.Figure')  % ... in case the axis is in a tiledlayout
+                h = h.Parent;
+            end
+        end
         
         data = F.CompiledData;
         mask = strcmpi(data.metric, metric) ...
-            & data.nchannels >= 40; % ...
-%             & data.rho_pval < 5e-2;
+            & isfinite(data.dir) ...
+            & data.nchannels >= min_electrodes; % ...
         data = data(mask, :);
         
-        F.gscatter_pat(rad2deg(angle(exp(1j*(data.dir-data.iw_angle)))), ...
-            data.rho, data.patient);
+        % Some renaming
+        data.dir0 = data.dir;
+        data.dir_d = rad2deg(fix_angle(data.dir - data.iw_angle));
+        
+        % Find outliers (i.e. points that are corr+ and d180 or corr- and
+        % d0
+        [~, ~, resid] = regress(data.rho, [ones(size(data.rho)) abs(data.dir_d)]);
+        big_r = abs(normalize(resid)) > 2;
+        
+        ln_bigR = F.gscatter_pat(ax, ...
+            data.dir_d(big_r), data.rho(big_r), data.patient(big_r));
+        hold(ax, 'on');
+        ln_all = F.gscatter_pat(ax, data.dir_d, data.rho, data.patient);
+        hold(ax, 'on');
         xlabel(ax, '\phi [\circ]')
         ylabel(ax, '\rho')
         lgd = legend(ax, 'location', 'eastoutside');
         title(ax, sprintf("Direction v. corr (%s)", metric))
         xlim(ax, [-180 180])
         ylim(ax, [-1 1])
-        xticks(ax, -180:45:180)
+        xticks(ax, -180:60:180)
         xline(ax, 0); yline(ax, 0)
         lgd.String(contains(lgd.String, 'data')) = '';
         axis(ax, 'square')
-        ln = findobj(ax, 'type', 'line');
-        set(ln, 'markersize', 4);
+%         ln = findobj(ax, 'type', 'line');
+        set(ln_all, 'markersize', 1);
+        set(ln_bigR, 'markersize', 4);
         
         F.print(h, F.prefix_better(metric));
     end
@@ -992,7 +2071,7 @@ methods
         for ss = sz_num(:)'
             
             % Load the original fit and the IW-only fit
-            M = WaveProp.load(F.get_file(ss), metric);
+            M = F.get_wave_fit(F.get_file(ss));
 
             % Refit with only the first 20 times
             data = M.(metric).TOA;
@@ -1053,7 +2132,7 @@ methods
             if isempty(iw), iw = struct; iw.phi = 0; else, iw = iw{mw}; end
 
             % Load the original fit and the IW-only fit
-            M = WaveProp.load(F.get_file(ss), metrics);
+            M = F.get_wave_fit(F.get_file(ss));
 
             for mm = metrics
                 % Refit with only the first 20 times
@@ -1150,13 +2229,318 @@ methods
         Mnew = M.Miw;
         
         ax = nexttile(T);
-        sc1 = M0.direction_scatter(ax, 'markerfacecolor', [0 0 0], 'sizedata', 2);
+        M0.direction_scatter(ax, 'markerfacecolor', [0 0 0], 'sizedata', 2);
         hold(ax, 'on');
-        sc2 = Mnew.direction_scatter(ax, 'markerfacecolor', [1 0 0], 'sizedata', 2);
+        Mnew.direction_scatter(ax, 'markerfacecolor', [1 0 0], 'sizedata', 2);
         hold(ax, 'off');
         
         sc = get(ax, 'children');
         
+    end
+    function dirs = get.SlidingDirs(F)
+        % Computes the estimated mean direction in sliding MEAN_WIN=10s windows
+        % (OVERLAP=9.9s).
+        % Returns a structure with the estimated means with CI for each TOA
+        % method in F.Metrics.
+        % Takes a little bit to compute and used to show the max shift and
+        % to count the large shifts to better to compute and store.
+        
+        % If stored, get value and return
+        if ~isempty(F.SlidingDirs), dirs = F.SlidingDirs; return; end
+        
+        MEAN_WIN = 10;
+        SHIFT_WIN = 10;
+        OVERLAP = 9.9;
+        STEP_ = MEAN_WIN - OVERLAP;
+        
+        
+        
+        data = F.CompiledData;
+        data = data(isfinite(data.dir), :);  % only use samples where phi is detected
+        
+        % Compute everything groupwise (grouped by seizure and metric)
+        [G, pat, sz, mtc] = findgroups(data.patient, data.seizure, data.metric);
+        
+        wng = warning;
+        warning('off', 'circ_confmean:requirementsNotMet');
+        
+        dirs = splitapply(@(x) {x}, data.dir, G);
+        sample_times = splitapply(@(t) {t}, data.time, G);
+        test_times = cellfun(@(t) (t(1):STEP_:t(end))', sample_times, 'uni', 0);
+%         test_times = sample_times;
+        dir_mn = cellfun(@(dirs, test_t, samp_t) ...  % get moving circular mean on 10 s windows
+            (circ_mov_stat('mean', dirs, test_t, MEAN_WIN, 'samplepoints', samp_t)), ...
+            dirs, test_times, sample_times, 'uni', 0);
+        dir_ci = cellfun(@(dirs, test_t, samp_t) ...  % get moving circular mean on 10 s windows
+            (circ_mov_stat('confmean', dirs, test_t, MEAN_WIN, 'samplepoints', samp_t)), ...
+            dirs, test_times, sample_times, 'uni', 0);
+        N = cellfun( ...  % number of sample points in the interval
+            @(samp_t, test_t) sum(abs(samp_t(:) - test_t(:)') <= MEAN_WIN/2), ...
+            sample_times, test_times, 'uni', 0);
+        for ii = 1:numel(N)
+            mask_ = N{ii} < MEAN_WIN/2;
+            dir_mn{ii}(mask_) = nan;
+            dir_ci{ii}(mask_) = nan;
+        end
+        
+        % Get the max shift occuring within a SHIFT_WIN s interval centered at
+        % each time
+        filter_times = @(tt) double(abs(tt - tt') <= SHIFT_WIN/2);  % Creates a diagonal matrix with ones indicating nearby times 
+        angle_diff = @(mn) abs(fix_angle(mn - mn'));  % Creates a diagonal matrix of pairwise angular distances
+        shifts = cellfun( @(mn, t) ...
+            max( ...  
+                angle_diff(mn) .* filter_times(t), ...  
+            [], 2), dir_mn, test_times, 'uni', 0);
+        
+        
+        % I think return a table of everything similar to CompiledData
+        % Convert all table variables to vectors
+        Gind = arrayfun(@(ii) repmat(ii, numel(test_times{ii}), 1), ...
+            1:length(test_times), 'uni', 0);
+        Gind = cat(1, Gind{:});
+        patient = pat(Gind);
+        seizure = sz(Gind);
+        metric = mtc(Gind);
+        time = cat(1, test_times{:});
+        mean = cat(1, dir_mn{:});
+        ci = cat(1, dir_ci{:});
+        intervalN = cat(2, N{:})';
+        shifts = cat(1, shifts{:});
+        
+        % Put it all together ]
+        dirs = table(patient, seizure, metric, time, mean, ci, intervalN, shifts);
+        
+        dirs.Properties.UserData = struct(...
+            'MeanWin', MEAN_WIN, 'ShiftWin', SHIFT_WIN, 'Overlap', OVERLAP);
+        F.SlidingDirs = dirs;
+        
+                
+        warning(wng)
+        
+    end
+    
+    
+    function ax = show_max_shift(F, ax)
+        % ax = show_max_shift(F, ax=gca)
+        % Shows the largest shift (in degrees) detected by each method over
+        % any 10 second window. 
+        
+        
+        WIN = 10;
+        fprintf('Computing max shift occuring within a %d second interval.\n', WIN);
+        
+        if nargin < 2 || isempty(ax), ax = gca; end
+                
+        data = F.SlidingDirs;
+        [G, pat, ~, mtc] = findgroups(data.patient, data.seizure, data.metric);
+        
+        
+        shift_max = splitapply(@max, data.shifts, G);
+        
+        
+        isM1 = contains(F.Metrics, "M");  % Put M on the x-axis
+        m1 = F.Metrics(isM1); m2 = F.Metrics(~isM1);
+        assert(all(pat(mtc == m1) == pat(mtc == m2)));  % Make sure patient labels are the same for each metric
+        
+        % Make the plot
+        xx = double(mtc == m1) + 1;
+        yy = rad2deg(shift_max);
+
+        x2 = [xx(mtc == m1), xx(mtc == m2)];
+        y2 = [yy(mtc == m1), yy(mtc == m2)];
+        pp = [pat(mtc == m1), pat(mtc == m2)];
+
+        % show lines between methods
+        for ii = 1:size(x2, 1)
+            F.gscatter_pat(ax, x2(ii, :)', y2(ii, :)', pp(ii, :)');
+            hold(ax, 'on')
+        end
+        hold(ax, 'off');
+        ln = findobj(ax, 'type', 'line');
+        set(ln, 'linestyle', '-', 'linewidth', .5);
+        names = arrayfun(@(ll) string(ll.DisplayName), ln);
+        ln = ln(~ismember(names, ["data1" "data2" ""]));
+        names = names(~ismember(names, ["data1" "data2" ""]));
+        [nn, uu] = unique(names);
+        [pp, pu] = unique(F.SeizureInfo.patient);
+        [~, so] = sort(pu);
+        map = containers.Map(string(pp), so);
+        legend(ln(uu(arrayfun(@(p) map(p), nn))));
+
+        title('Max shift')
+        xlabel('')
+        xlim([0.5 2.5]);
+        xticklabels([m1 m2]);
+        xticks([1 2]);
+        ylabel('Magnitude (°)');
+        ylim([-20 200]); yticks(0:30:180); 
+        box off
+        axis square
+        % Summarize results
+        disp(ax.Title.String);
+        F.summarize_stat(m1, deg2rad(y2(:, 1)), 'ang');
+        F.summarize_stat(m2, deg2rad(y2(:, 2)), 'ang');
+        
+       
+    end
+    
+    function ax = ZZshow_max_shift(F, ax)  % ZZ'd 5/29/21
+        % ax = show_max_shift(F, ax=gca)
+        % Shows the largest shift (in degrees) detected by each method over
+        % any 10 second window. 
+        % First computes circular moving mean over 10s windows, then finds
+        % the max range (again, sliding 10s windows)
+        % Assumes only two methods.
+        
+        WIN = 10;
+        OVERLAP = 9.9;
+        STEP_ = WIN - OVERLAP;
+        
+        if nargin < 2 || isempty(ax), ax = gca; end
+        
+        
+        data = F.CompiledData;
+        data = data(isfinite(data.dir), :);  % only use samples where phi is detected
+        [G, pat, ~, mtc] = findgroups(data.patient, data.seizure, data.metric);
+        
+        dirs = splitapply(@(x) {x}, data.dir, G);
+        sample_times = splitapply(@(t) {t}, data.time, G);
+        test_times = cellfun(@(t) t(1):STEP_:t(end), sample_times, 'uni', 0);
+%         test_times = sample_times;
+        dir_mn = cellfun(@(dirs, test_t, samp_t) ...
+            (circ_mov_stat('mean', dirs, test_t, WIN, 'samplepoints', samp_t)), ... % get moving circular mean on 10 s windows
+            dirs, test_times, sample_times, 'uni', 0);
+        dir_ci = cellfun(@(dirs, test_t, samp_t) ...
+            (circ_mov_stat('confmean', dirs, test_t, WIN, 'samplepoints', samp_t)), ... % get moving circular mean on 10 s windows
+            dirs, test_times, sample_times, 'uni', 0);
+        N = cellfun( ...
+            @(samp_t, test_t) sum(abs(samp_t(:) - test_t(:)') <= WIN/2), ...  % number of sample points in the interval
+            sample_times, test_times, 'uni', 0);
+        for ii = 1:numel(N)
+            mask_ = N{ii} < WIN/2;
+            dir_mn{ii}(mask_) = nan;
+            dir_ci{ii}(mask_) = nan;
+        end
+        
+        shift_max = cellfun(@(x, times) ...
+            max(abs(angle(exp(1j * (x - x')))) ...  % Get the largest angular shift
+                .* double(abs(times - times') <= WIN/2), ...  % ... within WIN/2 s
+            [], 'all'), ...
+            dir_mn, test_times);
+        
+        isM1 = contains(F.Metrics, "M");  % Put M on the x-axis
+        m1 = F.Metrics(isM1); m2 = F.Metrics(~isM1);
+        assert(all(pat(mtc == m1) == pat(mtc == m2)));  % Make sure patient labels are the same for each metric
+        
+        % Make the plot
+        xx = rad2deg(shift_max(mtc == m1));
+        yy = rad2deg(shift_max(mtc == m2));
+        plot([-20 200], [-20 200], '--', 'color', .5*[1 1 1]);
+        hold on
+        F.gscatter_pat(ax, xx, yy, pat(mtc == m1));
+        hold off
+        title('Max shift (\circ)')
+        xlabel(m1)
+        ylabel(m2)
+        xlim([-20 200]); xticks(0:30:180); 
+        ylim([-20 200]); yticks(0:30:180); 
+        box off
+        axis square
+        % Summarize results
+        disp(ax.Title.String);
+        F.summarize_stat(ax.XLabel.String, deg2rad(xx), 'ang');
+        F.summarize_stat(ax.YLabel.String, deg2rad(yy), 'ang');
+        
+    end
+
+    
+    
+    function h = allS_dir_v_time(F, min_electrodes)
+        % Shows the direction v time for each seizure using each method
+        % sc = allS_dir_v_time(F, min_electrodes=50)
+        if nargin < 3 || isempty(min_electrodes), min_electrodes = 50; end
+        
+
+        % Get the data
+        data = F.CompiledData;
+        mask = isfinite(data.dir) ...  % ... finite direction 
+            & data.nchannels >= min_electrodes;  % ... and # electrodes recruited to IW
+        data = data(mask, :);
+        
+        % Center all times to the IW
+        data.dir_time_offset = data.time - data.iw_center;
+        
+        % Put units in degrees and center to IW
+        data.dir = fix_angle(data.dir - data.iw_angle);  % center to IW
+        data.dir_deg = rad2deg(data.dir);
+
+        % Group by patient
+        [G, pat, sz] = findgroups(data.patient, data.seizure);
+        pat_num = findgroups(pat);
+        sz_num = cell2mat(splitapply(@(x) {findgroups(x)}, sz, pat_num));
+        c = max(pat_num); r = max(sz_num);
+        
+        % Create the figure and tiled layout
+        h = figure('name', 'dir_v_time', 'position', [0 0 2*c 1.25*r]);
+        T = tiledlayout(h, r, c, 'tilespacing', 'compact', 'padding', 'none');
+        lw = .5;
+%         gray_ = .85*[1 1 1];
+
+        % For each seizure create a scatter plot of the rho value for each
+        % discharge time. Show all rho in gray; highlight significant rho
+        % in color; use different colors for each seizure
+        tile_num = sub2ind(fliplr(T.GridSize), pat_num, sz_num);
+
+        for ii = 1:max(G)
+            
+            % Show all discharges colored by metric
+            
+            ax = nexttile(T, tile_num(ii));
+            xx = data.dir_time_offset(G == ii);
+            yy = data.dir_deg(G == ii);
+            for mm = F.Metrics
+                mask_ = data.metric(G == ii) == mm;
+                plot(ax, xx(mask_), yy(mask_), '.', 'markersize', 4, ...
+                    'color', F.Style.(mm).color, 'displayname', mm);
+                hold(ax, 'on');
+            end
+            hold(ax, 'off')
+            
+            
+            % Show the seizure onset time for each seizure
+            sz_onset = -unique(data.iw_center(G == ii));
+            xline(ax, sz_onset, ':', 'linewidth', lw, 'displayname', 'Sz onset');
+            
+            % prettify
+            yticks([-180 -90 0 90 180]);
+            yticklabels(["-180°" "" "0°" "" "180°"])
+            ylim([-200 200])
+            title(sprintf('%s %d', pat(ii), sz(ii)))
+            xline(ax, 0, 'linewidth', lw, 'displayname', 'IW passage');  % highlight IW time
+            hold off
+            grid on
+            ylabel('');
+            xlabel('Time [s]');
+%             xticklabels('');
+            
+        end
+        
+        % prettify
+        xlabel('Time [s]')
+        ax = T.Children;
+        linkaxes(ax, 'xy')
+        set(ax, 'xtickmode', 'auto');
+        ax(1).XTickLabelMode = 'auto';
+        
+        % Move axes from tiledlayout straight to figure so you can put a
+        % legend in the bottom corner
+        ax = copyobj(ax, h);
+        delete(T);
+        lgd = legend(ax(end), 'location', 'south');
+        lgd.Position(2) = 0;
+        
+        
+        F.print(h, F.prefix_better(sprintf('%s_%s_%d', F.Metrics, min_electrodes)));
     end
     
     function sc = allP_dir_v_time(F, metric, min_electrodes)
@@ -1251,6 +2635,11 @@ methods
         if nargin < 3 || isempty(thresh), thresh = 5e-2; end
         if nargin < 4 || isempty(min_electrodes), min_electrodes = 40; end
         
+        % Create ksdensity local fun
+        XI = linspace(-1, 1, 100);
+        ksdensity_ = @(xx) ksdensity(xx, XI, ...
+            'bandwidth', .1, 'boundarycorrection', 'log', ...
+            'support', [-1 1]);
 
         % Get the data
         data = F.CompiledData;
@@ -1264,27 +2653,27 @@ methods
         r = numel(unique(pat));
         
         % Create the figure and tiled layout
-        h = figure('name', 'corr_v_time', 'position', [0 0 3 r]);
-        T = tiledlayout(h, r, 1);
-        gray_ = .5*[1 1 1];
+        h = figure('name', 'corr_v_time', 'position', [0 0 4.5 r]);
+        T = tiledlayout(h, r, 4);
+        
 
         % For each patient create a scatter plot of the rho value for each
-        % discharge time. Show all rho in gray; highlight significant rho
-        % in color; use different colors for each seizure
+        % discharge time. Use different colors for each seizure
         for ii = 1:numel(pat)
             
             % Show all discharges in gray
-            ax = nexttile(T, ii);
+            ax_sc = nexttile(T, [1 3]); 
+            set(ax_sc, 'tag', 'scatter', 'nextplot', 'replacechildren');
             xx = data.rho_time_offset(G == ii);
             yy = data.rho(G == ii);
-            cc = findgroups(data.seizure(G == ii));  % color by patient
-            sc = scatter(ax, xx, yy, 1, cc, 'filled');
-            ax.Colormap = hsv(max(cc));
+            cc = findgroups(data.seizure(G == ii));  % color by seizure
+            sc = scatter(ax_sc, xx, yy, 1, cc, 'filled');
+            ax_sc.Colormap = hsv(max(cc));
 
             % highlight significant rho in color
             hold on
             mask = data.rho_pval(G == ii) < thresh;
-            sc = scatter(ax, xx(mask), yy(mask), 4, cc(mask), 'filled');
+            sc = scatter(ax_sc, xx(mask), yy(mask), 4, cc(mask), 'filled');
             
             % prettify
             ylim([-1 1]);
@@ -1294,33 +2683,55 @@ methods
             grid on
             ylabel('\rho');
             
+            % Get PDF of rho values
+            ax_hist = nexttile(T, [1 1]); 
+            set(ax_hist, 'tag', 'hist', 'nextplot', 'replacechildren');
+            pdf = splitapply(@(rho) ksdensity_(rho), yy, cc);
+            plot(ax_hist, XI, pdf');
+            ylabel(ax_hist, 'PDF');
+            set(ax_hist, 'colororder', hsv(max(cc)))
+            
+            
         end
         
         % prettify
-        xlabel('Time [s]')
-        linkaxes(findobj(h, 'type', 'axes'), 'x')        
+        xlabel(ax_sc, 'Time [s]')
+        xlabel(ax_hist, '\rho');
+        set(findobj(h, 'tag', 'hist'), 'yaxislocation', 'right');
+        linkaxes(findobj(h, 'tag', 'scatter'), 'x')        
         F.print(h, F.prefix_better(metric));
 
     end
     
     function dataR = allP_hist2d_tw_v_iw_effectsize(F, metric, thresh, min_electrodes, rho_or_dir)
-        % Shows a 2d histogram of the correlations between the tw and the
-        % iw. Uses a resampling procedure to estimate the effect size of the
-        % pos/neg discharge rate in 2*HALFWIN second windows
+        % dataR = allP_hist2d_tw_v_iw_effectsize(F, ...
+        %       metric="M", thresh=5e-2, min_electrodes=50, rho_or_dir='dir')
+        % 
+        % Shows an estimate of the probability that a discharge will be a
+        % 0°|IW (180°|IW) discharge through time.
+        % 
+        % For t in [seizure_onset:STEP=2:seizure_termination], resample
+        % from the set of discharges in a 4 second (2*HALFWIN) window
+        % centered at t and observed in seizures where an IW is detected on
+        % at least <min_electrodes>.
+
+        
         if nargin < 2 || isempty(metric), metric = "M"; end
         if nargin < 3 || isempty(thresh), thresh = 5e-2; end
-        if nargin < 4 || isempty(min_electrodes), min_electrodes = 40; end
-        if nargin < 5 || isempty(rho_or_dir), rho_or_dir = 'rho'; end
+        if nargin < 4 || isempty(min_electrodes), min_electrodes = 50; end
+        if nargin < 5 || isempty(rho_or_dir), rho_or_dir = 'dir'; end
         rho_or_dir = validatestring(rho_or_dir, ["rho" "dir"]);
         metric = string(metric);
 
         Nouter = 1e4;
         HALFWIN = 2;
+        STEP = 2;
         ptest = .05; % Show CI to this level
+        
         if rho_or_dir == "rho"
             dnames = ["Corr" "Anticorr"];
         else
-            dnames = ["d\phi < 90" "d\phi > 90"];
+            dnames = ["\phi < 90" "\phi > 90"];
         end
         
         h = figure('name', 'hist2d_dir', 'position', [0 0 2 1.5] * 2);
@@ -1330,7 +2741,7 @@ methods
         data = data(mask, :);
         
         
-        % Uncomment here to use direction instead of correlation
+        % Use direction instead of correlation
         if rho_or_dir == "rho"
             phi = sign(data.rho) .* double(data.rho_pval < thresh);
             sample_times = data.rho_time_offset;
@@ -1349,7 +2760,7 @@ methods
         N = min(splitapply(@numel, G, G));
         
         trange = quantile(sample_times, [0 1]);
-        tbins = linspace(trange(1), trange(2), diff(trange)/2 + 1);  % Divide times into ~2s intervals
+        tbins = linspace(trange(1), trange(2), diff(trange)/STEP + 1);  % Divide times into ~2s intervals
 
         
         % Create a function to add noise (I set this arbitrarily...) 
@@ -1450,6 +2861,20 @@ methods
         childs = get(findobj(T, 'type', 'axes'), 'children');
         ax = nexttile(T, 3);
         
+        % Shade regions where distributions differ
+        xx = tbinsI';
+        mask = QhiI(:, 2) <= QloI(:, 1) | QhiI(:, 1) <= QloI(:, 2);
+        ylo = min(QhiI, [], 2); yhi = max(QloI, [], 2);
+        ylo(~mask) = yhi(~mask); %yhi(~mask) = mnI(~mask, 1);
+%         ylo(~mask) = 0; yhi(~mask) = 0;
+        yy = [ylo; flipud(yhi)];
+        xx = [xx; flipud(xx)];
+        xx(isnan(yy)) = [];
+        yy(isnan(yy)) = [];
+        
+        pp = patch(ax, xx, yy, 1, 'facecolor', [0 0 0], ...  % Using the gray face color is too hard to see
+            'facealpha', .8, 'linestyle', 'none'); %#ok<NASGU>
+        
         % Copy the objects in the first two axes into the third axis
         cc = cellfun(@(cc) copyobj(cc, ax), childs, 'uni', 0); %#ok<NASGU>
         delete(findobj(ax, 'type', 'area'));
@@ -1464,30 +2889,19 @@ methods
         set(lns(2), 'color', darker_);
         ax.XLim = T.Children(2).XLim;
         
-        % Shade regions where distributions differ
-        xx = tbinsI';
-        mask = QhiI(:, 2) <= QloI(:, 1) | QhiI(:, 1) <= QloI(:, 2);
-        ylo = min(QhiI, [], 2); yhi = max(QloI, [], 2);
-        ylo(~mask) = 0; yhi(~mask) = 0;
-        yy = [ylo; flipud(yhi)];
-        xx = [xx; flipud(xx)];
-        
-        pp = patch(ax, xx, yy, 1, 'facecolor', [0 0 0], ...  % Using the gray face color is too hard to see
-            'facealpha', .8, 'linestyle', 'none'); %#ok<NASGU>
-        
         
         % Add a title
         title(ax, 'Comparison');
 
         
-        if rho_or_dir == "rho", ylim(ax, [0 1]); else, ylim(ax, [0 .5]); end
+%         if rho_or_dir == "rho", ylim(ax, [0 1]); else, ylim(ax, [0 .5]); end
 %         xlim(ax, [-30 50]);  % Nothing significant beyond this
         xlabel(ax, 'Time [s]');
         ylabel(T, 'Proportion');
         
         ax = findobj(T, 'type', 'axes');
         linkaxes(ax, 'xy');
-        set(ax, 'box', 'on');
+        set(ax, 'box', 'on', 'ylim', [0 1]);
         lgd = legend(ax(2), {'95%CI', 'CI>0', 'median'}, 'location', 'eastoutside'); %#ok<NASGU>
 
         % Summary statement
@@ -2229,23 +3643,25 @@ legend('pos', 'neg')
     end
     
     function [yy, xx, pat] = allP_percent_sigest_rho_v_dir(F, metric, thresh, min_electrodes)
+        % [yy, xx, pat] = allP_percent_sigest_rho_v_dir(F, ...
+        %       metric="M", thresh=5e-2, min_electrodes=50 )
         % Plots the percent of the discharges that have strong
         % relationships with the main IW template. i.e. Percentage of
         % correlations with p-value less than thresh for each patient and
         % seizure.
         if nargin < 2 || isempty(metric), metric = "M"; end
         if nargin < 3 || isempty(thresh), thresh = 5e-2; end
-        if nargin < 4 || isempty(min_electrodes), min_electrodes = 40; end
+        if nargin < 4 || isempty(min_electrodes), min_electrodes = 50; end
         
         metric = validatestring(metric, F.Metrics);
         
-        figure('units', 'inches', 'position', [0 0 1.5 1.25] * 2, ...
+        figure('units', 'inches', 'position', [0 0 2 1.25] * 2, ...
             'name', 'TW-IW corr');
         
         data = F.CompiledData;
         mask = ...  % only use data where
             ismember(data.metric, metric) ...  % the TOA method matches
-            & isfinite(data.rho_pval) ...  % the correlation could be computed
+            & isfinite(data.rho_pval) ...  % the correlation could be computed (dir will also be nan here)
             & data.nchannels >= min_electrodes;  % the IW was detected on at least min_electrodes
         data = data(mask, :);
 
@@ -2253,28 +3669,33 @@ legend('pos', 'neg')
         
 
         xx = splitapply(@(x) mean(isfinite(x))*100, data.dir, G);
-        lx = strcat(metric, " [% plane\neq(0,0)]");
+        lx = strcat(metric, " [% plane != (0,0)]");
 
         
         yy = splitapply(@(x) mean(x < thresh)*100, data.rho_pval, G);
-        ln = F.gscatter_pat(xx, yy, pat);
-        ylabel(strcat(metric, " [% corr\neq0]"))
+        F.gscatter_pat(xx, yy, pat);
+        ax = gca;
+        ylabel(strcat(metric, " [% corr != 0]"))
         xlabel(lx)
         title({'TW detected'; ...
             sprintf('(p<5e%0.0f)', log10(thresh/5))});
         
-        legend('location', 'eastoutside')
+        lgd = legend('location', 'eastoutside');
         axis equal
-        xlim([0 50]);
+        xlim([50 100]);
         ylim([0 100]);
+        
+        % Add a dashed line to show y=x
+        line(ax, [0 100], [0 100], 'linestyle', '--', 'color', .5*[1 1 1]);
+        lgd.String(end) = []; % remove line from legend
         
         F.print(F.prefix_better(metric));
         
         % Summary statement
-        fprintf(['In %d/%d seizures, at least 50%% ', ...
+        fprintf(['%s:\nIn %d/%d seizures, at least 50%% ', ...
             'of discharges have a non-zero correlation with '...
             'the IW pattern (median=%0.1f%%, range=[%0.1f%%,%0.1f%%]).\n'], ...
-            sum(yy >= 50), numel(yy), quantile(yy, [.5 0 1]));
+            metric, sum(yy >= 50), numel(yy), quantile(yy, [.5 0 1]));
         
         fprintf(['This is in contrast to the plane fitting ' ...
             'method, where we find significant fits ' ...
@@ -2405,41 +3826,64 @@ legend('pos', 'neg')
         F.print(F.prefix_better(sprintf('%s_%s', m1, m2)));
     end
     
-    function [xx, yy, ax] = allP_directionality(F, metrics)
-        % Shows the mean directionality index over 5s intervals
+    function [xx, yy, ax] = allP_directionality(F, metrics, win)
+        % Shows the mean directionality index over win s intervals
         
         data = F.CompiledData;
         if nargin < 2, metrics = F.Metrics; end
+        if nargin < 3, win = 10; end
         
-        figure('units', 'inches', 'position', [0 0 2 2]);
-        mask = contains(data.metric, metrics);
+        figure('units', 'inches', 'position', [0 0 3 2]);
+        mask = contains(data.metric, metrics) ...
+            & isfinite(data.dir);
         data = data(mask, :);
 
-        m1 = metrics{1}; m2 = metrics{2};
+        m2 = metrics{1}; m1 = metrics{2};
 
+        G = findgroups(data.patient, data.seizure, data.metric);
+        data.num_finite_dirs = nan(size(data.time));
+        for ii = 1:max(G)
+            mask = G == ii;
+            times = data.time(mask);
+            N = arrayfun(@(tt) sum( abs(times - tt) < win/2 ), times);  % Use a 5 second window
+            data.num_finite_dirs(mask) = N;
+        end
+        field = sprintf('dir_ind_%02d', win);
+        data.(field)(data.num_finite_dirs < win) = nan;  % only look where we get at least 10 samples
+        
         [G, pat, sz] = findgroups(data.patient, data.seizure);
 
         mask =@(mm) strcmpi(data.metric, mm);
 
-        xx = splitapply(@nanmean, data.dir_ind_05(mask(m1)), G(mask(m1)));
-        yy = splitapply(@nanmean, data.dir_ind_05(mask(m2)), G(mask(m2)));
-        F.gscatter_pat(xx, yy, pat);
+        % show min and median
+        xx = splitapply(@(x) quantile(x, [0 .5]), data.dir_ind_10(mask(m1)), G(mask(m1)));
+        yy = splitapply(@(x) quantile(x, [0 .5]), data.dir_ind_10(mask(m2)), G(mask(m2)));
         
-        disagree = F.Disagree;
-        dd = cellfun(@(x) find(strcmpi(x, compose('%s %d', pat, sz))), disagree);
         
-        ax = gca;
-        hold(ax, 'on')
-        plot(ax, xx(dd), yy(dd), 'k*', 'markersize', 6);
-        hold(ax, 'off')
+        sc = F.gscatter_pat(xx(:, 1), yy(:, 1), pat);
+        hold on
+        sc = F.gscatter_pat(xx(:, 2), yy(:, 2), pat);
+        set(sc, 'markerfacecolor', 'none', 'markersize', 4);
+        hold off
+                
+%         disagree = F.Disagree;
+%         dd = cellfun(@(x) find(strcmpi(x, compose('%s %d', pat, sz))), disagree);
+%         
+%         ax = gca;
+%         hold(ax, 'on')
+%         plot(ax, xx(dd, :), yy(dd, :), 'k*', 'markersize', 6);
+%         hold(ax, 'off')
         
         title('Directionality index');
         xlabel(m1)
         ylabel(m2)
+        xlim([0 1]);
+        ylim([0 1]);
         axis square
         legend off
+        ax = gca;
 
-        F.print(F.prefix_better([m1 '_' m2]));
+        F.print(F.prefix_better(sprintf('%s_%s_w%d', m1, m2, win)));
     end
     
     function [yy, ax] = allP_large_shift_times(F, metric, thresh)
@@ -2558,9 +4002,26 @@ legend('pos', 'neg')
         data = F.get_iw_table(0);  % load the iw stats
 %         mask = data.wave_num == data.main_wave;
 %         data = data(mask, :);
-        data.disagree = ismember(compose('%s %d', string(data.patient), data.seizure), F.Disagree);
+        
+        data.disagree = ismember( ...
+            compose('%s %d', string(data.patient), data.seizure), ...
+            F.Disagree.Row ...
+            );
+        
+        % Describe results
+        [G, pat, sz] = findgroups(string(data.patient), data.seizure);
+        Niwc = splitapply(@numel, G, G);
+        res = table(pat, sz, Niwc);
+        disp(res)
+        summary(res)
+        fprintf('%d seizures with at least 1 IWc\n', max(G));
+        fprintf('%d seizures with at least 2 IWc\n', sum(Niwc > 1));
+        
+        
+        
         h = figure('name', 'iw_nchannels', 'position', [0 0 .6*4 1.5] * 2);
         T = tiledlayout(h, 1, 4);
+        
         
         ax = nexttile(T, [1 2]);
         % show all waves in outline
@@ -2568,6 +4029,7 @@ legend('pos', 'neg')
         set(ln, 'markerfacecolor', 'none');
         hold(ax, 'on')
         for ll = ln', ll.ZData = -1*ones(size(ll.XData)); end
+        
 
 
         % show disagrees with asterisks
@@ -2576,6 +4038,7 @@ legend('pos', 'neg')
         set(ln, 'marker', '*', 'color', [0 0 0], 'markersize', 6);
         for ll = ln', ll.ZData = 1*ones(size(ll.XData)); end
 
+        
         % show main wave in color
         [G, pat] = findgroups(data.patient, data.seizure);
         yy = splitapply(@(a, b, c) c(a == b), data.wave_num, data.main_wave, data.nchannels, G);
@@ -2587,6 +4050,7 @@ legend('pos', 'neg')
         title('Nchan')
         ylabel('[#]')
         legend('location', 'westout')
+        
         
         ax = nexttile(T, [1 2]);
         dat = data(data.wave_num == data.main_wave, :);
@@ -2621,7 +4085,7 @@ legend('pos', 'neg')
         
         % rescale very low pvalues
         lo_p = data.p < PCUTOFF;
-        data.p(lo_p) = rescale(data.p(lo_p), PCUTOFF-1, PCUTOFF);
+        data.p(lo_p) = rescale(data.p(lo_p), PCUTOFF-.5, PCUTOFF-.05);
         
         % rescale very high speeds
         hi_speed = data.prop_sp > SPEEDCUTOFF;
@@ -2643,19 +4107,27 @@ legend('pos', 'neg')
             'width', {{'Width', '[mm]', 'linear'}}, ...
             'crossing_time', {{'Crossing time', '[s]', 'linear'}});
 
-        data.disagree = ismember(compose('%s %d', string(data.patient), data.seizure), F.Disagree);
+        data.disagree = ismember( ...
+            compose('%s %d', string(data.patient), data.seizure), ...
+            F.Disagree.Row);
 
         T = tiledlayout(gcf, 1, numel(fields));
         for ff = fields
             ax = nexttile(T);
-            if ff == "nchannels"
-                dat = data; 
-            else
-                dat = data(data.nchannels >= min_electrodes, :); 
-            end
+            dat = data;
+            
+            % Separate mains and secondaries
+            mains = data.wave_num == data.main_wave;
+            xx = double(mains & data.nchannels >= min_electrodes);  % x=0 -> secondary; x=1 -> main
+            yy = dat.(ff);
+            % Summarize mean with STD
+            F.summarize_stat(ff, rmmissing(yy(xx == 1)), [], 'std');
+            F.ttest2_(rmmissing(yy(xx == 0)), rmmissing(yy(xx == 1)), ...
+                'vartype', 'equal');
+            
 
-            % show all waves in outline
-            ln = F.gscatter_pat(dat.(ff), dat.patient);
+            % show secondary waves in outline
+            ln = F.gscatter_pat(xx(~mains), yy(~mains), dat.patient(~mains));
             set(ln, 'markerfacecolor', 'none');
             hold(ax, 'on')
             for ll = ln', ll.ZData = -1*ones(size(ll.XData)); end
@@ -2663,14 +4135,14 @@ legend('pos', 'neg')
 
             % show disagrees with asterisks
             mask = dat.disagree & dat.wave_num == dat.main_wave;
-            ln = F.gscatter_pat(dat.(ff)(mask), dat.patient(mask));
+            ln = F.gscatter_pat(xx, yy(mask), dat.patient(mask));
             set(ln, 'marker', '*', 'color', [0 0 0], 'markersize', 6);
             for ll = ln', ll.ZData = 1*ones(size(ll.XData)); end
 
             % show main wave in color
             [G, pat] = findgroups(dat.patient, dat.seizure);
             yy = splitapply(@(a, b, c) c(a == b), dat.wave_num, dat.main_wave, dat.(ff), G);
-            ln = F.gscatter_pat(yy, pat);             
+            ln = F.gscatter_pat(xx(mains), yy, pat);             
             for ll = ln', ll.ZData = 0*ones(size(ll.XData)); end
             
             if ff == "nchannels"
@@ -2687,6 +4159,9 @@ legend('pos', 'neg')
             set(findobj(T, 'type', 'line'), 'linewidth', 1)
             title(labels.(ff){1})
             ylabel(labels.(ff){2})
+            xlim(quantile(xx, [0 1]) + .5*[-1 1])
+            xticks([0 1])
+            xticklabels(["Exc" "Inc"])
         end
         lgd = findobj(T, 'type', 'legend');
         set(lgd, 'visible', 'off');
@@ -2695,18 +4170,272 @@ legend('pos', 'neg')
         F.print(h, F.prefix_better(''));
     end
     
-    function compare_metrics(F, pat, metrics)
+    function allP_compare_metrics(F, metrics)
+        % Print all to a giant figure
+        if nargin < 2 || isempty(metrics), metrics = F.Metrics; end
+        
+
+        N = numel(F.SeizureInfo.patient);
+        r = 5; c = ceil(N/r);
+        
+        h = figure('name', 'allP_compare_metrics', ...
+            'position', [0 0 c r] .* [0 0 4.5 2], 'visible', 'off');
+        h.Units = 'Normalized';
+        
+        % Get position coordinates (divide the grid)
+        [bottom, left] = ndgrid(1-1/r:-1/r:0, 0:1/c:1-1/c);
+        w = 1/c; ht = 1/r;
+        
+        % add margins
+        left = left + .1*w;
+        bottom = bottom + .1*ht;
+        
+        subplot_pos = @(ii) [left(ii) bottom(ii) .8*w .6*ht];
+        
+        for ii = 1:N
+            pat = F.get_fname(ii);
+            htemp = F.compare_metrics2(pat, metrics, false);
+            lgd = findobj(htemp, 'type', 'legend');
+            if ii == 1, vis = 'on'; else, vis = 'off'; end
+            set(lgd, 'visible', vis, 'location', 'northeast');
+            T = copyobj(htemp.Children, h);
+            set(T, 'position', subplot_pos(ii));
+            close(htemp)
+        end
+        
+        F.print(h, F.prefix_better(sprintf('%s_%s', metrics)));
+        close(h);
+    end
+
+    function allDisagree_compare_metrics(F, metrics)
+        if nargin < 2 || isempty(metrics), metrics = F.Metrics; end
+        
+
+        disagree = F.Disagree;
+        N = numel(disagree);
+        r = 5; c = ceil(N/r);
+        
+        h = figure('name', 'disagrees_compare_fits', ...
+            'position', [0 0 c r] .* [0 0 2 1] * 2);
+        h.Units = 'Normalized';
+        
+        % Get position coordinates (divide the grid)
+        [bottom, left] = ndgrid(1-1/r:-1/r:0, 0:1/c:1-1/c);
+        w = 1/c; ht = 1/r;
+        
+        % add margins
+        left = left + .1*w;
+        bottom = bottom + .1*ht;
+        
+        subplot_pos = @(ii) [left(ii) bottom(ii) .8*w .6*ht];
+        
+        for ii = 1:N
+            pp = disagree{ii};
+            pat = strrep(pp, ' ', '_Seizure');
+            htemp = F.compare_metrics(pat, metrics, false);
+            lgd = findobj(htemp, 'type', 'legend');
+            if ii == 1, vis = 'on'; else, vis = 'off'; end
+            set(lgd, 'visible', vis, 'location', 'northeast');
+            T = copyobj(htemp.Children, h);
+            set(T, 'position', subplot_pos(ii));
+            close(htemp)
+        end
+        
+        F.print(F.prefix_better(sprintf('%s_%s', metrics)));
+    end
+    
+    function h = compare_metrics2(F, pat, metrics, print_flag)
+        % Plot direction rasters from metrics for patient in pat
+        
+        
+        if nargin < 2 || isempty(pat), pat = "c7_Seizure1"; end
+        if isnumeric(pat), pat = string(F.SeizureInfo.name{pat}); end
+        if nargin < 3, metrics = string(F.Metrics(1:2)); end
+        if nargin < 4, print_flag = true; end
+        
+        pat = string(validatestring(pat, F.SeizureInfo.name));
+        sz_num = find(strcmp(pat, F.SeizureInfo.name));
+        
+        h = figure('name', 'compare_fits', 'position', [0 0 3*1.5+1 2]);
+        T = tiledlayout(h, 2, 3, 'TileSpacing', 'compact');
+        
+        if pat == "c7_Seizure1", rotate_by = -pi/2; 
+        elseif contains(pat, "MG49"), rotate_by = pi;
+        else, rotate_by = 0; 
+        end
+            
+        S1 = [1 2];  % times
+        S2 = [2 1];  % pdfs
+        
+        m1 = metrics(1);
+        m2 = metrics(2);
+        
+        fit1 = F.get_wave_fit(F.get_fname(sz_num));
+        fit2 = fit1.(m2);
+        fit1 = fit1.(m1);
+        
+        % Get the diffs
+        if contains(m2, "D")
+            fitD = copy(fit1);
+            fitD.Direction = fit1.diff(fit2);
+        else
+            fitD = copy(fit2);
+            fitD.Direction = fit2.diff(fit1);
+        end
+        fitD.RotateBy = 0;
+        
+        t1 = fit1.time;
+        t2 = fit2.time;
+        tD = fitD.time;
+        
+        fit1.RotateBy = rotate_by;
+        fit2.RotateBy = rotate_by;
+        
+        d1 = fit1.Direction;
+        d2 = fit2.Direction;
+        dD = fitD.Direction;
+        
+        
+        
+        % Direction v. time plots
+        colors = arrayfun(@(mm) F.Style.(mm).color, [m1 m2], 'uni', 0);
+        ax1 = nexttile(T, S1);
+        fit1.plot_dirs_with_ci(ax1, 'color', colors{1}, 'displayname', m1, 'linewidth', 1);
+        hold(ax1, 'on')
+        fit2.plot_dirs_with_ci(ax1, 'color', colors{2}, 'displayname', m2, 'linewidth', 1);
+        scatter(ax1, t1, rad2deg(d1), 2, ones(size(t1)), 'filled');
+        scatter(ax1, t2, rad2deg(d2), 2, 2 * ones(size(t2)), 'filled')
+        hold(ax1, 'off')
+        set(ax1, 'colormap', brighten(cat(1, colors{:}), -.5), ...
+            'xlabel', [], 'xticklabel', []);
+        ylabel('Dirs')
+%         xlabel(ax1, 'Time [s]');
+        
+        % Show the differences
+        ax2 = nexttile(T, S1);
+        fitD.plot_dirs_with_ci(ax2, 'linewidth', 1);
+        hold(ax2, 'on')
+        scatter(ax2, tD, rad2deg(dD), 2, ones(size(tD)), ...
+            'filled', 'displayname', 'Obs');
+        pp = findobj(ax2, 'type', 'patch');
+        ax2.Colormap = pp.FaceColor;
+        hold(ax2, 'off')
+        ln = findobj(ax2, 'type', 'line');
+        pp = findobj(ax2, 'type', 'patch');
+        scD = findobj(ax2, 'type', 'scatter');
+%         legend(ax2, [ln(1) pp(1) sc(1)], 'location', 'eastoutside');
+        ylabel(ax2, 'Diffs');
+        xlabel(ax2, 'Time [s]');       
+        
+        aa = [ax1 ax2];
+        linkaxes(aa, 'x');
+        set(aa, 'ytick', [-180 0 180], 'yaxislocation', 'left', ...
+            'yticklabel', ["-180°" "0°" "180°"], 'title', [])
+        sc = findobj(aa, 'type', 'scatter');
+        set(sc, 'sizedata', 2);
+        
+        % PDF plot
+        ax = nexttile(T, S2);
+        axD = ax;
+%         axD = nexttile(T, S2);
+        [f1, xi] = circ_ksdens(d1);
+        f2 = circ_ksdens(d2, xi);
+        fd = circ_ksdens(dD, xi);
+        
+        if 0  % Get sliding window distributions?
+            
+            % Get fit1 sliding window distributions
+            all_f1 = nan(numel(t1), numel(xi)); %#ok<UNRCH>
+            for ii = 1:numel(t1)
+                mask = abs(t1 - t1(ii)) < WIN/2;
+                if numfinite(d1(mask)) < WIN, continue; end
+                all_f1(ii, :) = circ_ksdens(d1(mask), xi);
+            end
+
+            % Get fit2 sliding window distributions
+            all_f2 = nan(numel(t2), numel(xi));
+            for ii = 1:numel(t2)
+                mask = abs(t2 - t2(ii)) < WIN/2;
+                if numfinite(d2(mask)) < WIN, continue; end
+                all_f2(ii, :) = circ_ksdens(d2(mask), xi);
+            end
+
+            % Get diffs sliding window distributions
+            all_diffs = nan(numel(diff_times), numel(xi));
+            for ii = 1:numel(diff_times)
+                mask = abs(diff_times - diff_times(ii)) < WIN/2;
+                if numfinite(diffs(mask)) < WIN, continue; end
+                all_diffs(ii, :) = circ_ksdens(diffs(mask), xi);
+            end
+        
+            if 0  % Show quantile patches?
+                getQ = @(dat) quantile(dat, [.025 .975]);
+                q1 = getQ(all_f1);
+                q2 = getQ(all_f2);
+                qd = getQ(all_diffs);
+                p1 = patch(ax, rad2deg([xi(:); flipud(xi(:))]), [q1(1, :)'; flipud(q1(2, :)')], 1, ...
+                    'facecolor', F.Style.(m1).color, 'facealpha', .5, 'linestyle', 'none');
+                p2 = patch(ax, rad2deg([xi(:); flipud(xi(:))]), [q2(1, :)'; flipud(q2(2, :)')], 1, ...
+                    'facecolor', F.Style.(m2).color, 'facealpha', .5, 'linestyle', 'none');
+                p3 = patch(axD, rad2deg([xi(:); flipud(xi(:))]), [qd(1, :)'; flipud(qd(2, :)')], 1, ...
+                    'facecolor', .15 * [1 1 1], 'facealpha', .3, 'linestyle', 'none');
+            end
+        
+            f1 = nanmedian(all_f1);
+            f2 = nanmedian(all_f2);
+            fd = nanmedian(all_diffs);
+        end
+        
+        hold([ax, axD], 'on'); 
+        lw = 1;
+        p3 = plot(axD, rad2deg(xi), fd, ':', 'color', .15*[1 1 1], ...
+            'displayname', 'Diffs', 'linewidth', lw); 
+        p1 = plot(ax, rad2deg(xi), f1, 'displayname', m1, ...
+            'color', brighten(F.Style.(m1).color, -.5), 'linewidth', lw);
+        p2 = plot(ax, rad2deg(xi), f2, 'displayname', m2, ...
+            'color', brighten(F.Style.(m2).color, -.5), 'linewidth', lw);
+        hold([ax axD], 'off');
+        legend(ax, [p1 p2 p3 ln(1) pp(1) scD(1)], 'location', 'eastoutside');
+        xticks(ax, -180:90:180);
+        ax.XTickLabel = cellfun(@(tk) sprintf('%s°', tk), ax.XTickLabel, 'uni', 0);
+        xlabel(axD, 'Direction')
+        title(ax, 'PDF');
+        ylim(ax, [0 1.1*max([f1, f2, fd])]);
+%         xticklabels(ax, []);
+        linkaxes([ax axD], 'x');
+        grid(ax, 'on');
+        
+        
+        % Labels
+        title(ax1, F.SeizureInfo.display_names{sz_num}, 'fontsize', 11);
+        
+        if print_flag
+
+            % Print
+            pat = F.SeizureInfo.patient{sz_num};
+            tag = sprintf('%s_%s_%s', pat, m1, m2);
+            F.print(h, F.prefix_better(tag));
+            
+        end
+        
+    end
+
+    function h = compare_metrics(F, pat, metrics, print_flag)
         % Plot direction rasters from metrics for patient in pat
         if nargin < 2 || isempty(pat), pat = "c7_Seizure1"; end
         if isnumeric(pat), pat = string(F.SeizureInfo.name{pat}); end
         if nargin < 3, metrics = string(F.Metrics(1:2)); end
+        if nargin < 4, print_flag = true; end
         
         sz_num = find(strcmpi(pat, F.SeizureInfo.name));
         
-        h = figure('name', 'compare_fits', 'position', [0 0 2 1] * 2);
+        h = figure('name', 'compare_fits', 'position', [0 0 2.5 1] * 2);
         T = tiledlayout(h, 3, 6, 'TileSpacing', 'compact');
         
-        if pat == "c7_Seizure1", rotate_by = -pi/2; else, rotate_by = 0; end
+        if pat == "c7_Seizure1", rotate_by = -pi/2; 
+        elseif contains(pat, "MG49"), rotate_by = pi;
+        else, rotate_by = 0; 
+        end
             
         S1 = [1 3];
         S2 = [3 3];
@@ -2714,23 +4443,34 @@ legend('pos', 'neg')
         m1 = metrics(1);
         m2 = metrics(2);
         
-        fit1 = WaveProp.load(F.get_fname(sz_num));
+        fit1 = F.get_wave_fit(F.get_fname(sz_num));
         fit2 = fit1.(m2);
         fit1 = fit1.(m1);
         
         fit1.RotateBy = rotate_by;
         fit2.RotateBy = rotate_by;
         
+        % Get the diffs
+        if numel(fit1.time) < numel(fit2.time)
+            diffs = fit1.diff(fit2);
+            diff_raster = @(ax) fit1.direction_raster(ax, diffs);
+        else
+            diffs = fit2.diff(fit1);
+            diff_raster = @(ax) fit2.direction_raster(ax, diffs);
+        end
+        
         % Density plot
         ax = nexttile(T, 4, S2);
         [f1, xi] = circ_ksdens(fit1.Direction);
-        f2 = circ_ksdens(fit2.Direction, xi);
+        f2 = circ_ksdens(fit2.Direction);
+        f3 = circ_ksdens(diffs, xi);
         
-        plot(ax, rad2deg(xi), f1, 'displayname', m1, 'color', F.Style.(m1).color);
+        p3 = plot(ax, rad2deg(xi), f3, 'k:', 'displayname', 'Diffs'); 
         hold(ax, 'on'); 
-        plot(ax, rad2deg(xi), f2, 'displayname', m2, 'color', F.Style.(m2).color); 
+        p1 = plot(ax, rad2deg(xi), f1, 'displayname', m1, 'color', F.Style.(m1).color);
+        p2 = plot(ax, rad2deg(xi), f2, 'displayname', m2, 'color', F.Style.(m2).color);
         hold(ax, 'off');
-        legend(ax);
+        legend(ax, [p1 p2 p3], 'location', 'northeastoutside');
         xticks(ax, -180:90:180);
         xlabel(ax, 'Direction [\circ]')
         ylabel(ax, 'PDF');
@@ -2751,11 +4491,7 @@ legend('pos', 'neg')
         title(ax2, '')
         
         ax3 = nexttile(T, S1);
-        if numel(fit1.time) < numel(fit2.time)
-            fit1.direction_raster(ax3, fit1.diff(fit2));
-        else
-            fit2.direction_raster(ax3, fit2.diff(fit1));
-        end
+        diff_raster(ax3);
         ylabel('Diff');
         xlabel('Time [s]');
         title(ax3, '');
@@ -2763,20 +4499,24 @@ legend('pos', 'neg')
         aa = [ax1 ax2 ax3];
         linkaxes(aa, 'x');
         set(aa, 'ytick', [-180 0 180], 'yaxislocation', 'left')
-        
+        sc = findobj(aa, 'type', 'scatter');
+        set(sc, 'sizedata', 2);
         
         % Labels
         title(T, F.SeizureInfo.display_names{sz_num}, 'fontsize', 11);
         
-        % Make a colorwheel
-        pax = fit1.colorwheel;
-        
-        % Print
-        pat = F.SeizureInfo.patient{sz_num};
-        tag = sprintf('%s_%s_%s', pat, m1, m2);
-        F.print(h, F.prefix_better(tag));
-        F.print(pax.Parent, F.prefix_better('colorwheel'));
-        close(pax.Parent);
+        if print_flag
+
+            % Print
+            pat = F.SeizureInfo.patient{sz_num};
+            tag = sprintf('%s_%s_%s', pat, m1, m2);
+            F.print(h, F.prefix_better(tag));
+            
+            % Make a colorwheel
+            pax = fit1.colorwheel;
+            F.print(pax.Parent, F.prefix_better('colorwheel'));
+            close(pax.Parent);
+        end
         
     end
     
@@ -2789,7 +4529,7 @@ legend('pos', 'neg')
         USE_MID = true;  % compute the intervals from the midpoint of the IW (or from the bounds)
         
         % Load the IW and TW data
-        W = WaveProp.load([], F.Metrics);
+        W = F.WaveFits;
         sz = F.SeizureInfo;
         data = table;
         iw_info_all = BVNY.get_iw_main;
@@ -2840,18 +4580,22 @@ legend('pos', 'neg')
                 end
                 
                 
-                [dir, sp] = fit.discharge_directions;
+%                 [dir, sp] = fit.discharge_directions;  % This was an
+%                 attempt at identifying isolated discharges (not relevant
+%                 now that M is tested at unique discharges)
+                dir = fit.Direction;
+                sp = fit.Magnitude;
                 data_temp = table( ...
                     dir, ...
                     fit.time, ...
                     sp, ...
-                    [nan; fit.dtheta_dt], ...
+                    [nan; fit.dtheta], ...
                     fit.directionality_index(1), ...
                     fit.directionality_index(2), ...
                     fit.directionality_index(5), ...
                     fit.directionality_index(10), ...
                     'VariableNames', {'dir', 'time', 'speed', ...
-                    'dtheta_dt', ...
+                    'dtheta', ...
                     'dir_ind_01', ...
                     'dir_ind_02', ...
                     'dir_ind_05', ...
@@ -3011,18 +4755,16 @@ legend('pos', 'neg')
         % candidate IW that recruits at least 40 electrodes 
         
         % Some stats on agreement between methods
-        F.allP_pdf_distance;
-        F.allP_directionality;
+        F.allP_pdf_distance2;
         F.allP_proportion_finite;
         
         % Make examples for one agree patient and one disagree patient
-        F.compare_metrics('c7_Seizure1');
-        F.compare_metrics('c3_Seizure1');
+        for pp = F.ExampleSeizures, F.compare_metrics2(pp); end
         
         % only show stats for seizures where IW was detected on at least 30
         % electrodes. There are some cases where an IW is detected on
         % fewer electrodes but this is less likely to actually be an IW
-        MIN_ELEC = 40;
+        MIN_ELEC = 50;
         F.allP_iw_stats(MIN_ELEC); 
         
 
@@ -3031,15 +4773,9 @@ legend('pos', 'neg')
         % Here we show that there is no clear evidence to support the IW
         % hypothesis, but also not enough against it to reject
         
-        % make the black and white direction v. time with IW plots for each
+        % make the combined direction v. time with IW plots for each
         % patient
-        for pat = patients
-            fprintf('Starting %s\n', pat{:})
-            try F.hist_figs(pat, style); 
-            catch ME, warning('make failed in %s', pat{:}); disp(ME); disp(ME.stack);
-            end
-        end
-        F.save;
+        F.allS_dir_v_time;
         F.dir_dist_by_phase();  % no longer used, but still in Illustrator so keep updating
         F.make_polarhist;  % show the pre-/post-IW polar histograms for each patient and seizure
         
@@ -3047,8 +4783,8 @@ legend('pos', 'neg')
         % inf is the interval surrounding the IW; I chose 40
         % (min_electrodes) since the main wave of most seizures appears on
         % at least 50 (40/50 makes no difference)
-        F.pre_post_direction_stick_plots(inf, MIN_ELEC);  
-        F.pre_post_direction_hist(inf, MIN_ELEC);
+        F.pre_post_direction_stick_plots([], MIN_ELEC);  
+        F.pre_post_direction_hist([], MIN_ELEC);
         
         
         %%% F4: TW/IW CORRELATION %%%
@@ -3066,7 +4802,7 @@ legend('pos', 'neg')
         F.allP_hist2d_tw_v_iw_effectsize('M', 5e-2, MIN_ELEC, 'rho');
         
         % Show how many TW have a strong relationship to the main IW. Only
-        % show these numbers for IW that appear on more than 40 electrodes.
+        % show these numbers for IW that appear on more than 50 electrodes.
         F.allP_quantiles_pval_tw_v_iw('M', 5e-2, MIN_ELEC);
         
         % Show all the waves from c7
@@ -3173,8 +4909,85 @@ legend('pos', 'neg')
 end
 
 methods (Static)
-   [files, names] = txt2files(fname) 
-   style = set_style
+    [files, names] = txt2files(fname) 
+    style = set_style
+    
+    function [hyp, p, ci, stats] = ttest2_(x, y, varargin)
+        % Wrapper for ttest2. Prints some information to stdout
+        [hyp, p, ci, stats] = ttest2(x, y, varargin{:});
+        ci_fun = @(x) 1.96*std(x)/sqrt(numel(x))*[-1 1] + mean(x);
+        mn = @mean;
+        fprintf('Group 1 mean, [95%%CI]: %0.3g, [%0.3g, %0.3g]\n', mn(x), ci_fun(x));
+        fprintf('Group 2 mean, [95%%CI]: %0.3g, [%0.3g, %0.3g]\n', mn(y), ci_fun(y));
+        fprintf('Reject null: %s, p=%0.3g\n', string(logical(hyp)), p);
+        fprintf('Estimated difference in means: [%0.3g, %0.3g]\n', ci);
+    end
+   
+    function summarize_stat(str, xx, method, stat)
+        % methods are '', 'ang', or 'halfang'; stat is 'ci', 'std', 'range'
+        % '': normal
+        % 'ang': circular mean
+        % 'halfang': half normal converted to °
+        % Using stat='ci' means estimating the distribution mean with CI;
+        % using stat='std' means estimating the sample mean with STD; using
+        % stat='range' returns the median and range of the observations
+        % stat='iqr' returns the median and IQR
+        
+        if nargin < 3 || isempty(method), method = ''; end
+        if nargin < 4 || isempty(stat), stat = "iqr"; end
+        method = validatestring(method, {'', 'ang', 'halfang'});
+        stat = validatestring(stat, ["ci", "std", "range", "iqr"]);
+        str = sprintf('%8s', str);  % Align messages
+        
+        switch method
+            case ''
+                if stat == "ci"
+                    fprintf('%s: mean, [95%%CI] = %0.3g, [%0.3g, %0.3g]\n', ...
+                        str, mean(xx), mean(xx) + 2/sqrt(numel(xx))*std(xx) * [-1 1]);
+                elseif stat == "std"
+                    fprintf('%s: mean (STD) = %0.3g (%0.3g)\n', ...
+                        str, mean(xx), std(xx));
+                elseif stat == "range"
+                    fprintf('%s: median [range] = %0.3g [%0.3g, %0.3g]\n', ...
+                        str, median(xx), quantile(xx, [0 1]));
+                elseif stat == "iqr"
+                    fprintf('%s: median [IQR] = %0.3g [%0.3g]\n', ...
+                        str, nanmedian(xx), iqr(xx));
+                end
+            case 'ang'
+                if stat == "ci"
+                    fprintf('%s: circ mean, [95%%CI] = %0.3f°, [%0.3f°, %0.3f°]\n', ...
+                        str, rad2deg(circ_mean(rmmissing(xx))), ...
+                        rad2deg(circ_mean(rmmissing(xx)) + circ_confmean(rmmissing(xx)) * [-1 1]));
+                elseif stat == "std"
+                    fprintf('%s: circ mean (circ var) = %0.3f° (%0.3f)\n', ...
+                        str, rad2deg(circ_mean(rmmissing(xx))), ...
+                        circ_var(rmmissing(xx)));
+                elseif stat == "range"
+                    md = circ_median(xx);
+                    Q = quantile(fix_angle(xx - md), [0 1]);
+                    Q = fix_angle(Q + md);
+                    fprintf('%s: median [range] = %0.3g° [%0.3g°, %0.3g°]\n', ...
+                        str, rad2deg(md), Q);
+                elseif stat == "iqr"
+                    md = circ_median(rmmissing(xx));
+                    Q = quantile(fix_angle(xx - md), [0.25 .75]);
+                    Q = fix_angle(Q + md);
+                    fprintf('%s: median [IQR] = %0.3g° [%0.3g°]\n', ...
+                        str, rad2deg(md), rad2deg(fix_angle(diff(Q))));
+                end
+            case 'halfang'
+                % ... you're never going to use this... not updating
+                sig2mean = @(sigma) sigma * sqrt(2)/sqrt(pi);
+                [sigma, ci] = mle(xx, 'distribution', 'Half Normal');
+                
+                fprintf('%s: halfnorm mean, [95%%CI] = %0.3f°, [%0.3f°, %0.3f°]\n', ...
+                    str, rad2deg(sig2mean(sigma)), ...
+                    rad2deg(sig2mean(ci)));
+        end
+        
+    end
+
    
    function T = get_iw_table(min_electrodes)
        if nargin < 1, min_electrodes = 0; end
@@ -3200,33 +5013,63 @@ methods (Static)
         iw_info = foldercontents2struct('iw_info');
    end
     
-   function [sc] = gscatter_pat(xx, yy, pat, ax)
-        
+   function [sc] = gscatter_pat(ax, xx, yy, pat, varargin)
+        %[sc] = gscatter_pat(ax=gca, xx=[], yy, pat, ::'range', (Nx2)::)
         % only 6 because MG49 only shows up once now and this way colors
         % match with fig0
         cmap = repmat(lines(6), 2, 1);
         lso = 'oooooo^^^^^';
         
         switch nargin
-            case 4
+            
             case 3 
-                if isa(pat, 'matlab.graphics.axis.Axes') %(F, yy, pat0, ax)
-                    ax = pat;
+                pat = [];
+                if ~isa(ax, 'matlab.graphics.axis.Axes') %(xx, yy, pat)
+                    pat = yy;
+                    yy = xx;
+                    xx = ax;
+                    ax = gca;
+                end
+                if ~isnumeric(yy)  %(yy, pat, varargin) | (ax, yy, pat)
+                    varargin = [pat varargin];
                     pat = yy;
                     yy = xx;
                     xx = [];
-                else  % (F, xx, yy, pat0);
-                    ax = gca;
                 end
-            case 2 % (F, yy, pat0)
-                pat = yy;
-                yy = xx;
+            case 2 % (yy, pat) <- (ax, xx)
+                pat = xx;
+                yy = ax;
                 xx = [];
                 ax = gca;
             otherwise
-                error('Expected F.(xx*, yy, pat, ax*). Asterisks denote optional.')
+                if ~isa(ax, 'matlab.graphics.axis.Axes')  % (xx, yy, pat, varargin)
+                    varargin = [pat varargin];
+                    pat = yy;
+                    yy = xx;
+                    xx = ax;
+                    ax = gca;
+                end
+                
+                if ~isnumeric(yy)  % (yy, pat, varargin) | (ax, yy, pat, varargin)
+                    varargin = [pat varargin];
+                    pat = yy;
+                    yy = xx;
+                    xx = [];
+                end
+                
         end
-        assert(iscell(pat) || isstring(pat));
+        assert(iscell(pat) || isstring(pat), ...
+            'Expected F.(ax*, xx*, yy, pat). Asterisks denote optional.');
+        sts = ax.NextPlot;
+        
+        range_ind = false(size(varargin));
+        range_ind(1:2:end) = contains(lower(varargin(1:2:end)), 'range');
+        if any(range_ind)
+            data_range = varargin{find(range_ind) + 1};
+        else
+            data_range = nan(numel(yy), 2);
+        end
+        assert(size(data_range, 1) == numel(yy));
         
         
         % Create mapping and reorder data
@@ -3238,16 +5081,21 @@ methods (Static)
         [G2, so] = sort(G2);
         yy = yy(so);
         pat = pat(so);
+        data_range = data_range(so, :);
         
         % maintain the same colors/lines every time
-        cmap = cmap(unique(G2), :);
-        lso = lso(unique(G2));
+        
 
         if isempty(xx)
             xx = rescale(G2, .8, 1.2, ...
                 'inputmin', 1, 'inputmax', 11);
             XLIM = [.6 1.4];
             XTICK = [];
+            if ~all(isnan(data_range))
+                xx = splitapply(@(x) {x(1)+.15*normalize(1:numel(x), 'center')'}, G2, G2);
+                xx = cat(1, xx{:});
+                XLIM = quantile(xx, [0 1]) + .1*range(xx) * [-1 1];
+            end
         else
             xx = xx(so);
             XLIM = [];
@@ -3256,10 +5104,13 @@ methods (Static)
 
         for ii = 1
 
+            ln = plot(ax, [xx(:), xx(:)]', data_range');
+            hold(ax, 'on');
+            set(ax, 'colororder', cmap(G2, :));
             sc = gscatter(ax, xx, yy, pat, ...
-                cmap, lso, [], 'on');
+                cmap(unique(G2), :), lso(unique(G2)), [], 'on');
             for ss = sc', ss.MarkerFaceColor = ss.Color; end
-            
+            hold(ax, 'off');
             grid on
             box off
             xticks(XTICK);
@@ -3267,6 +5118,7 @@ methods (Static)
             if ~isempty(XLIM), xlim(XLIM); end
             
         end
+        ax.NextPlot = sts;
 
     end
 

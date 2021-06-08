@@ -17,12 +17,14 @@ classdef WaveProp < handle & matlab.mixin.Copyable
         Patient string
         Seizure string
         Position
+        UseLargestCluster = true
         
         GridSize = [10 10]  % Size of the MEA (# of electrodes along each dimension; always [10 10] unless it's a sim)
 		Length = 4  % length of the MEA (always 4 mm, unless it's a sim)
         MMpElectrode = .4  % mm per electrode (again, always 4 unless it's a sim)
         
         TOA  % this is the important one to save (especially for delays method since it takes a long time to compute
+        TOAcube  % converts TOA into a TxXxY array
         t0
 
     end
@@ -98,29 +100,68 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             name = sprintf("%s_Seizure%s", obj.Patient, obj.Seizure);
         end
         
+        function [ci_dir, ci_sp] = direction_ci(M)
+            % Estimate a confidence interval around the estimated direction
+            % by bootstrapping (as in Martinet, 2017)
+            
+            res = M.ResultOfFit;
+            N = size(res, 1);
+            
+            [ci_dir, ci_sp] = deal(nan(N, 2));
+            
+            for ii = 1:N
+                if isnan(res.stats(ii).covb(1)), continue; end
+                samples = mvnrnd(res.beta(ii, 2:3), res.stats(ii).covb(2:3,2:3), 1000);       % generate samples from model.
+                boot_dir = atan2(samples(:,2), samples(:,1));                   % bootstrap direction
+                boot_sp = 1./sqrt(samples(:,1).^2 + samples(:,2).^2);           % bootstrap velocity.
+
+                mn = circ_mean(boot_dir);
+                ci_dir(ii, :) = ...
+                    quantile( ...
+                        angle(exp(1j * (boot_dir - mn))), ...
+                    [0.025, 0.975]) ...
+                    + mn;                    % CI for direction
+                ci_sp(ii, :) = quantile(boot_sp, [0.025, 0.975]);  
+            end
+            ci_dir = angle(exp(1j * (ci_dir - M.RotateBy)));
+        end
+        
         function out = get.ResultOfFit(obj)
             % If fits haven't been run, run them now (fit a plane to each
             % time)
+            
             if isempty(obj.ResultOfFit)
                 inds_ = obj.Inds; % Temporarily set inds to default to only generate fits for actual data
                 obj.Inds = [];
                 
                 
                 % Get the observed TOA
-                toa = obj.use_largest_cluster(obj.TOA);
+                if obj.UseLargestCluster
+                    toa = obj.use_largest_cluster(obj.TOAcube);
+                    toa = toa(:, obj.locs);
+                else
+                    toa = obj.TOA;
+                end
                 Nt = size(obj.TOA, 1);
-                locs_ = obj.locs;
                 
                 % Initialize matrices to store the results and fit a plane
                 % at each time point
                 V = nan(Nt, 2); p_ = nan(Nt, 1); beta = nan(Nt, 3);
+                stats_temp = cell(Nt, 1);
                 for ii = 1:Nt
-                    [V(ii, :), p_(ii), beta(ii, :)] = ...
-                        obj.fit_plane(toa(ii, locs_), obj.Position);
+                    [V(ii, :), p_(ii), beta(ii, :), stats_temp{ii}] = ...
+                        obj.fit_plane(toa(ii, :), obj.Position);
                 end
                 
+                % Clean up stats object
+                mask_ = cellfun(@isstruct, stats_temp);
+                tpl = stats_temp{find(mask_, 1)};
+                for ff = string(fields(tpl))', tpl.(ff)(:) = nan; end
+                stats_temp(~mask_) = {tpl};
+                stats = cat(1, stats_temp{:});
+                
                 % Save the result to a table
-                obj.ResultOfFit = table(V, p_, beta);
+                obj.ResultOfFit = table(V, p_, beta, stats);
                 
                 % Reset inds to whatever they were
                 obj.Inds = inds_;
@@ -128,44 +169,39 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             out = obj.ResultOfFit;
         end
         
-        function set.TOA(obj, value)
-            % Store as 2d matrix
-            if ndims(value) == 3
-                value = value(:, :);
+        function toa = get.TOA(obj)
+            if ndims(obj.TOA) == 3
+                obj.TOA = obj.TOA(:, obj.locs);
             end
-            obj.TOA = value;
+            toa = reshape(obj.TOA, numel(obj.t0), size(obj.Position, 1));
+            toa = toa(obj.Inds, :);
         end
         
-        function res = get.TOA(obj)
+        function res = get.TOAcube(obj)
             % Convert TOA to 3D (and return .Inds)
             
-            m = numel(obj.t0); 
-            n = size(obj.TOA, 2);
+            m = numel(obj.time); 
             toa_size = [m, obj.GridSize];  % result should be TIMExXxY
             
-            if n == prod(obj.GridSize)  % If the data has already been arranged, you're done
-                res = reshape(obj.TOA, toa_size); 
-            else
-                res = nan(toa_size);  % initialize matrix to hold the result
+            res = nan(toa_size);  % initialize matrix to hold the result
 
-                % Get the indices where the TOA data belongs and generate the
-                % resulting TOA
-                xx = repmat(obj.Position(:, 1)', m, 1);
-                yy = repmat(obj.Position(:, 2)', m, 1);
-                tt = repmat((1:m)', 1, n);
+            % Get the indices where the TOA data belongs and generate the
+            % resulting TOA
+            [tt, xx] = ndgrid(1:m, obj.Position(:, 1));
+            [~, yy] = ndgrid(1:m, obj.Position(:, 2));
 
-                locs_ = sub2ind(toa_size, tt(:), xx(:), yy(:));
-                res(locs_) = obj.TOA;
+            locs_ = sub2ind(toa_size, tt(:), xx(:), yy(:));
+            res(locs_) = obj.TOA;
 
-                res = res(obj.Inds, :, :);
-            end
+            
+
         end
         
         function data = get.Data(self)
-            % Wrapper for self.TOA
+            % Wrapper for self.TOAcube
             % renamed Data to TOA to be more clear about what's in here
             
-            data = self.TOA;
+            data = self.TOAcube;
         end
         
         function set.Data(self, value)
@@ -297,25 +333,30 @@ classdef WaveProp < handle & matlab.mixin.Copyable
         end
         
 		function D = get.Direction(M)
-			D = atan2(M.Vy, M.Vx);
             
-            inds_ = M.Inds;
-            M.Inds = [];
-			D(M.mask) = nan;
-            
-            % Remove points where directions show large shifts within 50
-            % ms. (this shouldn't do anything to M and D10 methods, but some
-            % experimental methods [e.g. M10] benefit from this)
-            dir_sm = movmean(exp(1j*D), .05, 'samplepoints', M.t0);  
-            dir_sm(abs(dir_sm) < cos(pi/8)) = nan; % this ensures consecutive angles differ by less than 45°
-            d2 = movmean(dir_sm, .04, 'omitnan', 'samplepoints', M.time);  % waves traveling at 100mm/s should be on the MEA ~40 ms
-            d2(abs(d2) < .9) = nan;  % require strong similarity in directions
-            
-            
-			D = angle(d2) - M.RotateBy;
-			D = angle(exp(1j * D));  % Keep in range [-pi pi]
-            M.Inds = inds_; 
-            D = D(inds_);
+            if isempty(M.Direction)  % this should usually be empty so it pulls from (Vx, Vy) but sometimes I want WaveProp functions on a specific set of directions
+                D = atan2(M.Vy, M.Vx);
+
+                inds_ = M.Inds;
+                M.Inds = [];
+                D(M.mask) = nan;
+
+                % Remove points where directions show large shifts within 50
+                % ms. (this shouldn't do anything to M and D10 methods, but some
+                % experimental methods [e.g. M10] benefit from this)
+                dir_sm = movmean(exp(1j*D), .05, 'samplepoints', M.t0);  
+                dir_sm(abs(dir_sm) < cos(pi/8)) = nan; % this ensures consecutive angles differ by less than 45°
+                d2 = movmean(dir_sm, .04, 'omitnan', 'samplepoints', M.time);  % waves traveling at 100mm/s should be on the MEA ~40 ms
+                d2(abs(d2) < .9) = nan;  % require strong similarity in directions
+
+
+                D = angle(d2) - M.RotateBy;
+                D = angle(exp(1j * D));  % Keep in range [-pi pi]
+                M.Inds = inds_; 
+                D = D(inds_);
+            else
+                D = M.Direction;
+            end
         end
         
 		function M = get.Magnitude(self)
@@ -657,16 +698,31 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             dir = exp(1j * D);
             dir_sm = movmean(dir, win, 'omitnan', 'SamplePoints', tt);
 %             dir_sm = movmean(dir, 2, 'omitnan');
-            [~, locs] = findpeaks( ...
+            [~, locs_] = findpeaks( ...
                 fillmissing(abs(dir_sm), 'constant', 0), tt, ...
                 'minpeakheight', max(cos(thresh/2), .5), ...
                 'minpeakdistance', win);
-            [~, locs_i] = min(abs(tt(:) - locs(:)'));
+            [~, locs_i] = min(abs(tt(:) - locs_(:)'));
             dir_out = deal(nan(size(dir_sm)));
             dir_out(locs_i) = angle(dir_sm(locs_i));
             
             sp_out = movmean(SP, win, 'omitnan', 'SamplePoints', tt);
             sp_out(~isfinite(dir_out)) = nan;
+            
+        end
+        
+        function [mn_est, ci_est] = mov_mean_dir(M, win, times)
+            if nargin < 3, times = M.time; end
+            if nargin < 2 || isempty(win), win = 10; end
+            
+            dir = M.Direction;
+            mask_ = isfinite(dir);
+            
+            mn_est = circ_mov_stat('mean', dir(mask_), times, win, ...
+                'samplepoints', M.time(mask_));
+            ci_est = circ_mov_stat('confmean', dir(mask_), times, win, ...
+                'samplepoints', M.time(mask_));
+            
             
         end
         
@@ -751,7 +807,12 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             dir_sm = angle(dir_sm);
         end
         
-        function diffs = dtheta_dt(M, win, thresh)
+        function out = dtheta_dt(~, ~, ~) %#ok<STOUT>
+            error('Fix caller: call ''dtheta'' instead of ''dtheta_dt''.');
+        end
+        function diffs = dtheta(M, win, thresh)
+            % Smoothes directions over win and then computes dtheta between
+            % consecutive samples 
             if nargin < 2, win = []; end
             if nargin < 3, thresh = []; end
             
@@ -892,7 +953,7 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             
             hold(ax, 'on')
             scatter(ax, M.time, dir/pi * 180, 6, [0 0 0], 'filled');
-            plot(ax, M.time, dir/pi*180, 'k.'); 
+%             plot(ax, M.time, dir/pi*180, 'k.'); 
             hold(ax, 'off');
             
             yticks(-180:90:180);
@@ -916,7 +977,7 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             else
                 dir = M.Direction;
             end
-            [~, cmap] = M.direction_raster(dir, ax);
+            [~, cmap] = M.direction_raster(ax, dir);
             
             title('Direction (\theta)')
             xticklabels(ax, []);
@@ -933,7 +994,7 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             
             
             ax = nexttile(T, k); k = k+1;
-            M.direction_raster('smoothed_direction', ax);
+            M.direction_raster(ax, 'smoothed_direction');
             title('Smoothed \theta')
             xticklabels(ax, []);
             
@@ -952,7 +1013,7 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             
             
             ax = nexttile(T, k); k = k+1;  % dtheta/dt
-            diffs = M.dtheta_dt(win, thresh);
+            diffs = M.dtheta(win, thresh);
             stem(ax, M.time(2:end), rad2deg(diffs), 'k', 'marker', '.');
             mask_ = abs(diffs) > pi/2;
             tt = M.time(2:end);
@@ -978,6 +1039,206 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             set(findobj(h, 'type', 'axes'), ...
                 'xgrid', 'on', 'ygrid', 'on', 'box', 'off');
             title(T, [strrep(M.Name, '_', ' ') ' ' class(M)]);
+        end
+        
+        function [ax, mn, ll, ul] = plot_dirs_with_ci(M, ax, win, units, varargin)
+            % Plots directions with 95%CI using a <win> second sliding
+            % window.
+            % [ax, mn, ll, ul] = plot_dirs_with_ci(M, ax=gca, win=10, units="deg" ::plot args::)
+            
+            if nargin < 2 || isempty(ax), ax = gca; end
+            if nargin < 3 || isempty(win), win = 10; end
+            if nargin < 4 || isempty(units), units = "deg"; end
+            
+            if ~isa(ax, 'matlab.graphics.axis.Axes')  % bump everything forward
+                varargin = [units varargin];
+                units = win;
+                win = ax;
+                ax = gca;
+            end
+            
+            if ~isnumeric(win)  % if win isn't numeric, assume it's omitted and bump again
+                varargin = [units varargin];
+                units = win;
+                win = 10;
+            end
+            
+            try % see if units actually units or part of varargin
+                units = validatestring(units, ["rad" "deg"]);
+            catch ME
+                if isempty(varargin), rethrow(ME);
+                else
+                    varargin = [units varargin];
+                    units = "deg";
+                end
+            end
+            
+            sts = ax.NextPlot;
+            if strcmpi(sts, 'replace'), cla(ax); end  % the patches won't clear the axis first
+            
+            
+            if units == "rad", convert_units = @(x) x; cycle = 2*pi; 
+            else, convert_units = @rad2deg; cycle = 360;
+            end
+            
+            switch class(M)
+                case 'Delays'
+                    mn = M.Direction;
+                    ci = M.direction_ci;
+                    tt = M.time;
+                    
+                    % Unwrap so the plot looks nicer and get the right
+                    % units
+                    ci = convert_units(angle(exp(1j*(ci - mn))));
+                    mn = convert_units(unwrap(mn));
+                    ci = ci + mn;
+                    ul = ci(:, 1); ll = ci(:, 2); 
+                    
+                otherwise
+                    tt = ( M.time(1):.1:M.time(end) )';  % estimate mean and ci at 100 ms intervals
+                    [mn, ci] = M.mov_mean_dir(win, tt);
+                    mn(isnan(ci) & mn == 0) = nan;
+                    
+                    % Fill missing ci values, unwrap the directions, and convert to
+                    % the requested units.
+                    ci = fillmissing(ci, 'constant', pi, 'endvalues', 'none');  % we have no info where ci are nan, so the CI is pi
+                    ci = convert_units(ci);
+                    mn = convert_units(unwrap(mn));
+                    ll = mn - ci;
+                    ul = mn + ci;
+            end
+            
+            
+                        
+            % Plot the mean and 95%CI
+            patch_args = varargin;
+            patch_args(1:2:end) = strrep(lower(patch_args(1:2:end)), 'color', 'facecolor');
+            
+            for offset = [-cycle 0 cycle]
+                mask_ = isfinite(ll + ul);
+                yy = [ll(mask_); flipud(ul(mask_))] + offset;
+                xx = [tt(mask_); flipud(tt(mask_))];
+                pp = patch(ax, xx, yy, 1, 'displayname', '95%CI', ...
+                    'facealpha', .5, 'linestyle', 'none', 'facecolor', [0 0 0], ...
+                    patch_args{:}); %#ok<NASGU>
+            end
+            
+            ax.NextPlot = 'add';
+            plot(ax, tt, mn + [-cycle 0 cycle], 'k', ...
+                'linewidth', 2, 'displayname', 'Mean', varargin{:});
+            
+            
+            % Prettify
+            if units == "deg"
+                ylim(ax, [-180 180]);
+                lbl = cellfun(@(ll) sprintf('%s°', ll), ax.YTickLabel, 'uni', 0);
+                ax.YTickLabel = strrep(lbl, '°°', '°');
+            else
+                ylim(ax, [-pi pi]);
+                intv = pi/3;
+                tks = -3*pi:intv:3*pi;
+                yticks(tks);
+                polar_label(ax, 'y');
+            end
+            title(strrep(M.Name, '_', ' '))
+            xlabel('Time [s]')
+            ylabel('Direction')
+            ax.NextPlot = sts;
+            
+            
+        end
+
+        
+        function [ax, mn, ll, ul] = ZZplot_dirs_with_ci(M, ax, win, varargin) % ZZ'd 5/29/21
+            % Plots directions with 95%CI using a <win> second sliding
+            % window.
+            % [ax, mn, ll, ul] = plot_dirs_with_ci(M, ax=gca, win=10, 'units', "deg", 'data', M.Direction, ::plot args::)
+            
+            default_units = "deg";
+            default_ax = gca;
+            default_win = 10;
+            
+            % Parse inputs
+            switch nargin
+                case 1
+                    ax = default_ax; win = default_win;
+                case 2
+                    if isa(ax, 'matlab.graphics.axis.Axes'); win = default_win;
+                    else, win = ax; ax = default_ax;
+                    end
+                otherwise
+                    if isa(ax, 'matlab.graphics.axis.Axes') 
+                        if ischar(win), varargin = [win varargin]; win = default_win; end
+                    elseif isnumeric(ax), varargin = [win varargin]; win = ax; ax = default_ax;
+                    else, varargin = [ax win varargin]; ax = default_ax; win = default_win;
+                    end
+            end
+            ax_status = ax.NextPlot;
+            
+            % See if units are specified
+            units = false(size(varargin));
+            units(1:2:end) = contains(lower(varargin(1:2:end)), 'unit');
+            if any(units)
+                ind = find(units);
+                uu = varargin{ind + 1};
+                units = validatestring(uu, ["deg" "rad"]);
+                varargin(ind + [0 1]) = [];
+            else
+                units = default_units;
+            end
+            convert_units = @rad2deg; cycle = 360;
+            if units == "rad", convert_units = @(x) x; cycle = 2*pi; end
+            
+            
+            
+            tt = ( M.time(1):.1:M.time(end) )';
+            [mn, ci] = M.mov_mean_dir(win, tt);  % estimate mean and ci at 100 ms intervals
+            nan_ci = isnan(ci);
+            ci = fillmissing(ci, 'constant', pi, 'endvalues', 'none');  % we have no info where ci are nan, so the CI is pi
+            mn(nan_ci & mn == 0) = nan;
+            
+            mn = convert_units(unwrap(mn));
+            ci = convert_units(ci);
+            ll = mn - ci;
+            ul = mn + ci;
+            
+                        
+            % Plot the mean and 95%CI
+            patch_args = varargin;
+            patch_args(1:2:end) = strrep(lower(patch_args(1:2:end)), 'color', 'facecolor');
+            
+            for offset = [-cycle 0 cycle]
+                mask_ = isfinite(ll + ul);
+                yy = [ll(mask_); flipud(ul(mask_))] + offset;
+                xx = [tt(mask_); flipud(tt(mask_))];
+                pp = patch(ax, xx, yy, 1, 'displayname', '95%CI', ...
+                    'facealpha', .5, 'linestyle', 'none', 'facecolor', [0 0 0], ...
+                    patch_args{:}); %#ok<NASGU>
+            end
+            
+            ax.NextPlot = 'add';
+            plot(ax, tt, mn + [-cycle 0 cycle], 'k', ...
+                'linewidth', 2, 'displayname', 'Mean', varargin{:});
+            
+            
+            % Prettify
+            if units == "deg"
+                ylim(ax, [-180 180]);
+                lbl = cellfun(@(ll) sprintf('%s°', ll), ax.YTickLabel, 'uni', 0);
+                ax.YTickLabel = strrep(lbl, '°°', '°');
+            else
+                ylim(ax, [-pi pi]);
+                intv = pi/3;
+                tks = -3*pi:intv:3*pi;
+                yticks(tks);
+                polar_label(ax, 'y');
+            end
+            title(strrep(M.Name, '_', ' '))
+            xlabel('Time [s]')
+            ylabel('Direction')
+            ax.NextPlot = ax_status;
+            
+            
         end
         
 		function ax = plot(obj, varargin)
@@ -1104,8 +1365,10 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             units = 'ms';
             
             % Show the time data
-			scatter(ax, xx, yy, dot_size, val, 'filled', 's', directive{:});
-			set(ax, 'xtick', [], 'ytick', [])
+			sc = scatter(ax, xx, yy, dot_size, val, ...
+                'filled', 's', directive{:});
+            set(ax, 'clim', quantile(sc.CData, [.05, .95]));
+			set(ax, 'xtick', [], 'ytick', []);
             
             % Add the arrow
             hold(ax, 'on')
@@ -1116,7 +1379,7 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             X = grid_center - [vx, vy]/2;  % center the arrow on the array
             qq = quiver(ax, X(1), X(2), vx, vy, s.scale_quiver, ...
                 'LineWidth', 2, ...
-                'MaxHeadSize', .5, 'color', [1 0 0]);
+                'MaxHeadSize', .5, 'color', [0 0 0]);
             
             % Add the alternate arrow (temporary)
 %             v_alt = v_alt*.8*max(grid_size);
@@ -1312,13 +1575,15 @@ classdef WaveProp < handle & matlab.mixin.Copyable
         end
         
 		function d = diff(s, other)
+            i0 = other.Inds;
 			other = other.resample_t0(s.time);
-% 			t_inds = interp1(other.time, 1:length(other.time), s.time, 'nearest', 'extrap');
 			d = angle(exp(1j*(s.Direction - other.Direction)));
+            other.Inds = i0;  % Return inds to what they were (these are handles now. Without this line, this operation changes <other>)
 		end
 		
 		%% Reshaping
 		function [obj, iq] = resample_t0(obj, t_new)
+            
 			iq = interp1(obj.t0, 1:numel(obj.t0), t_new, 'nearest', 'extrap');
 			obj.Inds = iq(:);
 		end	
@@ -1536,7 +1801,7 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 		function [V, p, beta, stats] = fit_plane(data, position)
 			% Fit a 2D plane to the data. Return nan if not enough data or
 			% beta are zero.
-			V = nan(1, 2); p = nan; beta = nan(1, 3);
+			V = nan(1, 2); p = nan; beta = nan(1, 3); stats = nan;
             if numfinite(data(:)) < 4, return; end
             
             % fit the delay vs two-dimensional positions

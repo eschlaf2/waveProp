@@ -1,6 +1,9 @@
 classdef Delays < WaveProp
     
 	properties
+        CI_delays  % confidence intervals surrounding the delays on each electrode
+        CI_dir  % generate conficence intervals for the direction estimates
+        
 		HalfWin = 5
 		FBand = [1 13]
 		MinFreq = 3
@@ -84,9 +87,7 @@ classdef Delays < WaveProp
 						D.Position = mea.(ff);
 					case 'samplingrate'
 						D.SamplingRate = mea.(ff);
-						if isempty(D.Time)
-							D.Time = 1:size(signal, 1)' / mea.(ff);
-                        end
+						if isempty(D.Time), D.Time = 1:size(signal, 1)' / mea.(ff); end
                     case 'patient'
                         D.Patient = mea.(ff);
                     case 'seizure'
@@ -113,13 +114,18 @@ classdef Delays < WaveProp
 				D.compute_coherence(D.window, D.RefTrace, D.params);
 			coh(coh < coh_conf) = nan;
 			[phi, freq_out] = D.mask_phi(coh, phi, freq);
-			delay = D.phi2delay(phi, freq);
+            [delay, delay_ci] = D.regress_delay(phi, freq, D.Type);
+% 			delay = D.phi2delay(phi, freq);
 
             if isempty(delay)
                 delay = nan;
             end
-            D.TOA = -delay;
-            D.Freq = freq_out;
+            
+            % Put time in the first dimension, electrodes in the second
+            % dimension, other stuff in later dimensions
+            D.TOA = reshape(-delay, [1, numel(delay)]);
+            D.Freq = reshape(freq_out, [1 size(freq_out)]);
+            D.CI_delays = reshape(delay_ci, [1 size(delay_ci)]);
 	
         end
         
@@ -188,26 +194,60 @@ classdef Delays < WaveProp
 	
 	methods
 		
-        function freq = get.Freq(D)
-            freq = reshape(D.Freq, [], 2, D.NCh);            
+        function ci = bootstrap_direction_ci(D, Nboot, correction)
+            % Resamples from the CI of the delays on each channel and then
+            % recomputes direction based on the resampled delays.
+            %
+            % This is not a great method, but it's interesting. The CI end
+            % up biased, though, because (I assume) we don't account for the
+            % covariance structure between in the electrodes. I "fixed it"
+            % by subtracting the mean direction from the bootstrap samples
+            % and then re-centering around the reported direction. This is
+            % probably not really what we want to look at which is why I
+            % say it's not a great method. 
+            
+            if nargin < 2 || isempty(Nboot), Nboot = 1000; end
+            if nargin < 3 || isempty(correction), correction = true; end
+            
+            toa_est = D.TOA;
+            delay_ci = D.CI_delays;
+            N = size(delay_ci, 1);
+            Nch = size(toa_est, 2);
+            dir_est = D.Direction;
+            
+            ci = nan(N, 2);
+            for ii = 1:N
+                if isnan(dir_est(ii)), continue; end
+                
+                new_dir = nan(Nboot, 1);
+                for jj = 1:Nboot
+                    
+                    % Get a set of possible TOAs based on CI for each
+                    % channel. 
+                    toa_sample = ...
+                        rand(1, Nch) .* diff(delay_ci(ii, :, :), [], 3) ...
+                        - delay_ci(ii, :, 1);
+                    [V, p_, beta] = D.fit_plane(toa_sample, D.Position);
+                    new_dir(jj) = atan2(V(2), V(1));
+                end
+                
+                % center directions around 0 so quantiles are estimated
+                % correctly.
+                dir0 = circ_mean(new_dir);
+                new_dir = angle(exp(1j* (new_dir - dir0)));  
+                
+                % Without this, ci are not centered around mean. I think is
+                % because bootstrapping using the 95%CI of the delays
+                % doesn't account for covariance between the electrodes.
+                if correction, dir0 = dir_est(ii); end
+                
+                % Compute CI and return to proper baseline
+                ci(ii, :) = quantile( new_dir, [.025, .975]) + dir0;
+                ci(ii, :) = fix_angle(ci(ii, :));  % keep in [-π,π]
+            end
+            
         end
         
-		function [data_win, T] = ZZget_window(D, data)  % ZZ'd 5/10/21
-			t_inds = abs(D.Time - D.t0) <= D.HalfWin;
-			T = range(D.Time(t_inds));
-			data_win = data(t_inds, :);
-		end
-
-		function [delay, freq_out] = ZZget_data(D) % ZZ'd 5/10/21
-			
-			[coh, phi, freq, coh_conf] = ...
-				D.compute_coherence(D.window, D.RefTrace, D.params);
-			coh(coh < coh_conf) = nan;
-			[phi, freq_out] = D.mask_phi(coh, phi, freq);
-			delay = D.phi2delay(phi, freq);
-			
-		end
-		
 		function [phi, freq_out] = mask_phi(D, coh, phi, freq)
 			switch lower(D.MaskBy)
 				case 'longest'
@@ -220,13 +260,14 @@ classdef Delays < WaveProp
 			phi(~mask) = nan;
 			freq = repmat(freq(:), 1, size(phi, 2));
 			freq(~mask) = nan;
-			freq_out = [min(freq); max(freq)];
+			freq_out = [min(freq); max(freq)]';  % return electrodes along the first dimension
         end
         
-		function delay = phi2delay(D, phi, freq)
+		function [delay, delay_ci] = phi2delay(D, phi, freq)
 			switch lower(D.Type)
 				case 'group'
-					delay = D.group_delay(phi, freq);      % compute delays on each electrode based on coherence
+                    [delay, delay_ci] = D.regress_delay(phi, freq);
+% 					delay = D.group_delay(phi, freq);  % compute delays on each electrode based on coherence
 				case 'phase'
 					delay = D.phase_delay(phi, freq);
                 case 'regress'
@@ -247,6 +288,8 @@ classdef Delays < WaveProp
 	%% Static methods
 	methods (Static)
 		
+        
+        
         function obj = loadobj(S)
             if isstruct(S)
                 obj = Delays;
@@ -259,23 +302,37 @@ classdef Delays < WaveProp
                 obj = S;
             end
         end
-        function delay = regress_delay(phi, freq)
+        
+        function [delay, delay_ci] = regress_delay(phi, freq, delay_type)
             % computes group delay be fitting a line to phi(f) and
             % returning slope
 
-            [d1, ~, ~, ~, stats] = arrayfun(@(ii) ...
+            if nargin < 3, delay_type = 'group'; end
+            delay_type = validatestring(delay_type, ["group" "phase"]);
+            
+            
+            [d1, dint, ~, ~, stats] = arrayfun(@(ii) ...
                 regress(phi(:, ii), [ones(size(freq)); freq]'), ...
                 1:size(phi, 2), 'uni', 0);
             d1 = cat(2, d1{:})';
+            dint = permute(cat(3, dint{:}), [3 2 1]);  % put electrode dimension first; then bounds, then variable (intercept and slope). dint(trode, 1, 2) is the lower bound of the slope
             stats = cat(1, stats{:});
-            d1(stats(:, 3) >= .05) = nan;
-            delay = -d1(:, 2) ./ (2*pi);
+            
+            if delay_type == "group", D = [d1(:, 2) dint(:, :, 2)];  % use slope to estimate delay
+            elseif delay_type == "phase", D = [d1(:, 1) dint(:, :, 1)];  % use intercept to estimate delay
+            end
+            
+            pval = stats(:, 3);
+            
+            D(pval >= .05, :) = nan;
+            delay = -D(:, 1) ./ (2*pi);
+            delay_ci = squeeze(-D(:, 2:3) ./ (2*pi));
         end
+        
 		function delay = group_delay(phi, freq)
              % computes group delay by taking mean dphi/df
             df = diff(freq);
 			delay = nanmean(-diff_phase(phi) ./ df(:)) / (2*pi);
-
         end
         
 		function delay = phase_delay(phi, freq)
