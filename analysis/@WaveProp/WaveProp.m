@@ -715,6 +715,9 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             if nargin < 3, times = M.time; end
             if nargin < 2 || isempty(win), win = 10; end
             
+            WNG = warning;
+            warning('off', 'circ_confmean:requirementsNotMet');
+            
             dir = M.Direction;
             mask_ = isfinite(dir);
             
@@ -723,7 +726,7 @@ classdef WaveProp < handle & matlab.mixin.Copyable
             ci_est = circ_mov_stat('confmean', dir(mask_), times, win, ...
                 'samplepoints', M.time(mask_));
             
-            
+            warning(WNG);
         end
         
         function dir_sm = smooth_angular(M, dir, win, thresh)
@@ -1323,11 +1326,12 @@ classdef WaveProp < handle & matlab.mixin.Copyable
 			
         end
         
-		function ax = plot2D(s, varargin)
+		function [ax, tt] = plot2D(s, varargin)
 			% ax = plot2D(obj, tt, ax)
 			[ax, tt, directive] = WaveProp.parse_plot_inputs(varargin{:});
             if ndims(s.Data) == 3
 				[~, which_t] = min(abs(tt - s.time));
+                tt = s.time(which_t);
 				data = squeeze(s.Data(which_t, :, :));
 				vx = s.Vx(which_t);
 				vy = s.Vy(which_t);

@@ -1215,58 +1215,68 @@ classdef (HandleCompatible) MEA < matlab.mixin.Heterogeneous & handle
             
 			temp = nan(max(mea.Position));
             
+            % prep plotting params
+            ax = nexttile(T, 1);
+            axis(ax, 'square');
+            units = ax.Units;
+            set(ax, 'units', 'points');
+            pos = ax.Position;
+            ax.Units = units;
+            pt_width = max(min(pos([3 4])) / 11, 1);
+                
             % prep scatter params
-            if ismember(style, {'scatter', ''})
-                ax = nexttile(T, 1);
-                axis(ax, 'square');
-                units = ax.Units;
-                set(ax, 'units', 'points');
-                pos = ax.Position;
-                ax.Units = units;
-                pt_width = max(min(pos([3 4])) / 11, 1);
-                siz_min = max(.3 * pt_width, 1);  % 1.733);
-                siz_max = (2.5 * pt_width);
-                sd_min = 2;  % show range of 2 sd from mean ...
-                sd_max = max(quantile(abs(data), .999, 'all'), 4);  % to at least 4 sd from mean
-                siz_dat = rescale(abs(data), siz_min, siz_max, ...
-                    'inputmin', sd_min, ...
-                    'inputmax', sd_max).^2;
-                col_dat = single(data > 0) - single(data < 0);
+            switch style
+                case {'scatter', ''}
+                    siz_min = max(.3 * pt_width, 1);  % 1.733);
+                    siz_max = (2.5 * pt_width);
+                    sd_min = 2;  % show range of 2 sd from mean ...
+                    sd_max = max(quantile(abs(data), .999, 'all'), 4);  % to at least 4 sd from mean
+                    siz_dat = rescale(abs(data), sqrt(siz_min), sqrt(siz_max), ...
+                        'inputmin', sd_min, ...
+                        'inputmax', sd_max).^2;
+                    col_dat = single(data > 0) - single(data < 0);
+                    cmap = lines;
+                    clim_ = @(dat) [-2 2];
+                    
+                    % Don't show very small values
+                    mask = abs(data) < sd_min;
+                    data(mask) = nan;
+                    siz_dat(mask) = nan;
+                    col_dat(mask) = nan;
+                    
+                    
+                    
+                case 'raw'
+                    col_dat = data;
+                    siz_dat = pt_width.^2 + zeros(size(data));
+                    cmap = gray;
+                    cmap(cmap(:, 1) > .85, :) = [];  % don't go all the way to white
+                    clim_ = @(dat) quantile(dat, [.1 .95]);
             end
             
             % start plotting
 			for ii = 1:length(inds)
-                nexttile(T, ii);
+                ax = nexttile(T, ii);
+                scatter( ...
+                    mea.Position(:, 1), mea.Position(:, 2), ...  % x, y
+                    siz_dat(ii, :), ...  % size
+                    col_dat(ii, :), ...  % color
+                    'filled', 's');
+                axis square
+                colormap(cmap)
+                set(gca, 'clim', clim_(col_dat(ii, :)));
                 switch style
-                    case {'', 'scatter'}
-                        if ii == 1
-                            % Don't show very small values
-                            mask = abs(data) < sd_min;
-                            data(mask) = nan;
-                            siz_dat(mask) = nan;
-                            col_dat(mask) = nan;
-                        end
-                        
-                        scatter( ...
-                            mea.Position(:, 1), mea.Position(:, 2), ...  % x, y
-                            siz_dat(ii, :), ...  % size
-                            col_dat(ii, :), ...  % color
-                            'filled');
-                        axis square
-                        colormap(lines)
-                        set(gca, 'clim', [-2 2]);
-                    case 'raw'
+                    case 'raw0'
                         temp(mea.locs) = data(ii, :);
                         imagesc(temp, [-1 1]);
-                        
                         colormap gray
-                    otherwise
-                        error('style ''%s'' not recognized.', style)
                 end
                 xticks([]);
                 yticks([]);
-                ax = T.Children;
+                
                 set(ax, 'xlim', [0 11], 'ylim', [0 11], 'box', 'on');
+                lgd = legend(ax, num2str(times(ii)));
+                set(lgd, 'visible', 'off');
 				if ii == 1
 					title(num2str(times(ii)));
 				end

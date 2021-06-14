@@ -4,6 +4,7 @@ classdef fig6 < BVNY & handle
 properties
 %     Metrics = {'M', 'E', 'D1xwh'}
     Metrics = ["M", "D10"]
+    MinIWElectrodes = 50
     Seizures
     H
     PatientByRow = false  % if true, display each row as a patient; else each column is a patient
@@ -14,6 +15,7 @@ properties
     Disagree
     WaveFits
     ExampleSeizures = ["c7_Seizure1" "MG49_Seizure43" "BW09_Seizure2" "CUCX4_Seizure1"]
+
 end
 
 properties
@@ -113,7 +115,7 @@ methods
         num_figs = ceil(height(data) / panes_per_fig);  % max (ros*cols) panes per figure
         for ii = 1:num_figs
             h(ii) = figure('name', sprintf('rho_dir_mismatches_%d', ii)); fullwidth(true); %#ok<AGROW>
-            T(ii) = tiledlayout(h(ii), rows, cols); %#ok<AGROW> % If you use 'flow' here, the scatters will have be the wrong size
+            T(ii) = BVNY.tiledlayout(h(ii), rows, cols); %#ok<AGROW> % If you use 'flow' here, the scatters will have be the wrong size
             title(T(ii), sprintf("Mismatched \\rho-\\phi (%s, %d/%d)", ...
                 metric, height(data), num_found));
         end
@@ -203,6 +205,103 @@ methods
         end
     end
 
+    function h1 = show_complex_wave_examples(F, mea)
+        % Show examples of complex waves in LFP snapshots and in TOA.
+        % Shows a spiral wave and an expanding wave from MG49_43
+        
+        % Assumes that mea will be MG49_Seizure43, but this way you don't
+        % need to reload it every time if it's in the base workspace.
+        if nargin < 2 || isempty(mea), mea = MEA; end
+        assert(strcmpi(mea.Name, 'MG49_Seizure43'));
+        
+        data = F.CompiledData;
+        IW_TIME = data.iw_center(find(data.patient == "MG49" & data.seizure == 43, 1));
+        clear data  % I use this variable name too much... 
+
+        STARTS = [42.925 44.11];  % [spiral expanding]  alts: 43.345 (expanding--TOA are messy bc of 100ms window)
+        STEP = 0.01;
+        N_PANES = .05 / STEP + 1;  % Show 50 ms
+        N_MET = numel(F.Metrics);
+        
+        % Print start times to stdout 
+        starts_str = sprintf('%0.3f   ', STARTS);
+        starts_iw_rel_str = sprintf('%0.3f   ', STARTS - IW_TIME);
+        fprintf('Using start times: %s\n', starts_str);
+        fprintf('           IW rel: %s\n', starts_iw_rel_str);
+        
+        
+        % Make a figure that has N_PANES for the lfp's, and then N_MET more
+        % for the toa plots. The last N_MET panes made by <mea.plot_panels>
+        % will be overwritten by the TOAs
+        h1 = figure('position', [0 0 (N_PANES + N_MET)*1.1 numel(STARTS)+.34]);
+        times_ = @(ii) STARTS(ii) + (0:N_PANES-1+N_MET)*STEP;
+        mea.plot_panels([times_(1) times_(2)], [], [2 N_PANES+N_MET], h1, 'raw');   
+        
+        
+        % Remove titles
+        ax = findobj(h1, 'type', 'axes');
+        set(ax, 'title', []);
+
+
+        % Update titles to show time in ms relative to start times
+        T1 = h1.Children;
+        T1.Padding = 'none';
+        time_labels = times_(1);
+        time_labels = (time_labels - time_labels(1)) * 1e3;  % start at 0 and convert to ms
+        for ii = 1:N_PANES
+            ax = nexttile(T1, ii);
+            title(ax, sprintf('%0.0f ms', time_labels(ii)))
+        end
+        fontsize = ax.Title.FontSize;
+        
+        
+        % Show the TOA patterns corresponding to the lfp panels
+        W = WaveProp.load(mea);
+
+        % Recolor to match TOA method (from F.show_corr_dir_mismatches)
+        color_ =@(metric) F.Style.(metric).color;
+        cmap_ =@(mm) make_diverging_colormap(...
+            [brighten(color_(mm), .9); brighten(color_(mm), -.9)], ...
+            color_(mm), 256);
+        recolor_ = @(ax, mtc) set(ax, 'colormap', cmap_(mtc));
+
+        % Make a function to put plots in the right place
+        plotnum_ =@(tt, mm) ...
+            sub2ind(fliplr(T1.GridSize), ...
+            find(mm == F.Metrics) + N_PANES, tt);
+        
+        for tt = 1:numel(STARTS)  % for each onset time
+            for mm = ["M" "D10"]  % ... and method
+                ii = plotnum_(tt, mm);
+                ax = nexttile(T1, ii);
+                [~, wt] = W.(mm).plot2D(ax, STARTS(tt));   % ... show the TOA pattern
+                
+                % Update titles to reflect IW-relative time
+                wt = wt - IW_TIME;
+                title(ax, sprintf('t = %0.3f', wt))
+                recolor_(ax, mm);
+                axis(ax, 'square');
+                set(ax, 'xlim', [0 11], 'ylim', [0 11], 'box', 'on');
+                ax.Title.FontSize = fontsize; % Match font size from LFP fig
+            end
+        end
+
+        % Prettify
+        delete(findobj(T1, 'type', 'colorbar'));
+        lgd = findobj(T1, 'type', 'legend');
+        set(lgd, 'visible', 'off');
+        qq = findobj(T1, 'type', 'quiver');
+        set(qq, 'visible', 'off');
+
+        % Make better dot sizes
+        dot_size = W.M.get_dot_size(ax) * .98;  % shrink a little for smaller plots
+        sc = findobj(h1, 'type', 'scatter');
+        set(sc, 'sizedata', dot_size, 'marker', 's');
+        
+        F.print(h1, F.prefix_better(''));
+
+    end
+    
     function T = show_all_sig_corr(F, sz_name, metric, pos_or_neg, time_range)
         % Show each significant wavefit/correlation pair for a given
         % seizure number and metric
@@ -265,7 +364,7 @@ methods
         num_figs = ceil(numel(ss) / panes_per_fig);  % max (ros*cols) panes per figure
         for ii = 1:num_figs
             h(ii) = figure('name', sprintf('rho_v_dir_%s_%d', pos_or_neg, ii)); fullwidth(true); %#ok<AGROW>
-            T(ii) = tiledlayout(h(ii), rows, cols); %#ok<AGROW> % If you use 'flow' here, the scatters will have be the wrong size
+            T(ii) = BVNY.tiledlayout(h(ii), rows, cols); %#ok<AGROW> % If you use 'flow' here, the scatters will have be the wrong size
             title(T(ii), sprintf("%s %s", F.SeizureInfo.display_names{sz_num}, pos_or_neg));
 %             uu = h.Units; h.Units = 'inches'; width = h.Position(3)/h.Position(4); h.Units = uu;
         end
@@ -308,7 +407,7 @@ methods
         for ss = sz_num(:)'
             if ss ~= 0, mea = MEA(ss); end
             h = figure('name', mea.Name); fullwidth(true);
-            T = tiledlayout(h, r, c);
+            T = BVNY.tiledlayout(h, r, c);
             title(T, strrep(mea.Name, '_', ' '));
             iw = mea.IW;
             iw.MaxTemplates = c;
@@ -332,6 +431,7 @@ methods
         warning(S)
 
     end
+    
     function plot_clusters(F, sz_num)
         sz = F.SeizureInfo;
         if nargin < 2, sz_num = 1:numel(sz.patient); end
@@ -358,6 +458,7 @@ methods
             
         end
     end
+    
     function distance_scatters(F, sz_num, method)
         % Shows the distance (correlation distance) between discharge
         % patterns and IW patterns
@@ -397,7 +498,7 @@ methods
             
             try  % tired of re-running; catch error and rerun later
             h2 = figure('name', sprintf('IW_%s_%s', out.method, mea.Name)); fullwidth(true);
-            T2 = tiledlayout(h2, 5, 4);
+            T2 = BVNY.tiledlayout(h2, 5, 4);
             
             % if there are no IW, print the blank figure and skip the rest
             if isempty(out.template), nexttile(T2); title('No IW'); print_(h2); continue; end  
@@ -649,6 +750,7 @@ methods
         
         RES = 64;
         XI = linspace(-pi, pi, RES + 1);
+        EDGES = (-.5:numel(XI)) * diff(XI(1:2)) + XI(1);
         ANGULAR_LAGS = diff(XI(1:2)) .* (-numel(XI)+1:numel(XI));
         MTC = F.Metrics;
         WIN = 10;  % number of seconds in sliding window
@@ -786,7 +888,7 @@ methods
                 
                 
                 
-                circ_pdf = @(tt) circ_ksdens(diffs(t_win(tt)), XI);
+                circ_pdf = @(tt) histcounts(diffs(t_win(tt)), EDGES, 'norm', 'prob');
                 sample_pdfs = arrayfun(@(tt) circ_pdf(tt), test_times, 'uni', 0);
                 sample_pdfs = cellfun(@(s) s / sum(s), sample_pdfs, 'uni', 0);  % normalize
                 mov_kappa = arrayfun(@(tt) circ_kappa(diffs(t_win(tt))), test_times);
@@ -803,8 +905,8 @@ methods
                 vm_pdf = circ_vmpdf(XI, stats.mean, kappa_diffs(ii, jj));  % kappa);
 %                 vm_pdf = circ_vmpdf(xi, 0, 1);  % kappa);
                 vm_pdf = vm_pdf / sum(vm_pdf);  % normalize to sum to 1
-                pdfD = circ_ksdens(diffs, XI)';
-                pdfD = pdfD / sum(pdfD);  % normalize to sum to 1
+                pdfD = histcounts(diffs, EDGES, 'norm', 'prob')';
+%                 pdfD = pdfD / sum(pdfD);  % normalize to sum to 1
                 
                 Dkl(ii, jj) = kl_dist(pdfD, vm_pdf);
                 mean_diffs(ii, jj) = stats.mean;
@@ -1178,6 +1280,13 @@ methods
         F.print(h, F.prefix_better(''));
     end
     
+    function agree = agree_fun(~, xcorr_lag, pdf_kstat)
+        % agree_fun(~, xcorr_lag, pdf_kstat)
+        %
+        % agree = abs(xcorr_lag) < 60 & pdf_kstat < .4;
+        agree = abs(xcorr_lag) < 60 & pdf_kstat < .4;
+    end
+    
     function sub = FitDiffs_sub(F)
         out = F.FitDiffs;
         sub = out(:, ["pat" "sz"]);
@@ -1187,36 +1296,30 @@ methods
         sub.variance = out.variance;
         sub.xcorr_lag = rad2deg(out.pdf_xcorr_angular_lag);
         sub.xcorr_cc = out.pdf_xcorr_coeff;
-
+        sub.agree = F.agree_fun(sub.xcorr_lag, sub.pdf_kstat);
     end
     
     function disagree = get.Disagree(F)
         out = F.FitDiffs_sub;
         
-%         agree_fun = @() ( ...
-%             abs(out.Dmean_d) < 60 ...
-%             & out.pdf_kstat < .4 ...  % distributions match
-%             );
-        agree_fun = @() ( ...
-            abs(out.xcorr_lag) < 60 ...
-            & out.pdf_kstat < .4 ...  % distributions match
-            );
-%         agree_fun = @() (...
-%             abs(out.xcorr_lag) < 60 ...
-%             & out.xcorr_cc > 0 ...  % this is doing nothing...
-%             );
-        
-        out.agree = agree_fun();
         out.Row = compose('%s %d', out.pat, out.sz);
         
-        show_mads = ["Dmean_d" "pdf_kstat"];
+        show_mads = ["xcorr_lag" "pdf_kstat"];
         c=-1/(sqrt(2)*erfcinv(3/2));  % scale factor for scaled mad
         scaled_mad = @(dat) c * nanmedian(abs(dat - nanmedian(dat)));
         
+        % Show outlier threshold (3 scaled MAD)
         fprintf('Disagree:\n');
         fprintf('3 scaled MAD:\n');
         arrayfun(@(ff) fprintf('%15s: %0.3g\n', ff, 3*scaled_mad(out.(ff))), show_mads);
-        disp(agree_fun)
+        
+        % Compare bias and variance in disagree seizures
+        fprintf('Group 1 = Agree; Group 2 = Disagree\n');
+        fprintf('\t Bias\n')
+        F.ttest2_(out.bias_d(out.agree, 1), out.bias_d(~out.agree, 1));
+        fprintf('\t Variance\n')
+        F.ttest2_(out.variance(out.agree, 1), out.variance(~out.agree, 1));
+
         disagree = out(~out.agree, :);
 
     end
@@ -1254,8 +1357,8 @@ methods
                 
                 % Summarize results
                 disp(ax.Title.String);
-                F.summarize_stat(ax.XLabel.String, xx, '', which_stat);
-                F.summarize_stat(ax.YLabel.String, yy, '', which_stat);
+                F.summarize_stat(ax.XLabel.String, xx, which_stat);
+                F.summarize_stat(ax.YLabel.String, yy, which_stat);
                 
             case "kstat"
                 % Show difference of means
@@ -1270,8 +1373,8 @@ methods
                 
                 % Summarize results
                 disp(ax.Title.String);
-                F.summarize_stat(ax.XLabel.String, deg2rad(xx), 'ang', which_stat);
-                F.summarize_stat(ax.YLabel.String, yy, '', which_stat);
+                F.summarize_stat(ax.XLabel.String, deg2rad(xx), sprintf('ang_%s', which_stat));
+                F.summarize_stat(ax.YLabel.String, yy, which_stat);
                 
             case "MI"
                 % Show difference of means
@@ -1286,8 +1389,8 @@ methods
                 
                 % Summarize results
                 disp(ax.Title.String);
-                F.summarize_stat(ax.XLabel.String, deg2rad(xx), 'ang', which_stat);
-                F.summarize_stat(ax.YLabel.String, yy, '', which_stat);
+                F.summarize_stat(ax.XLabel.String, deg2rad(xx), sprintf('ang_%s', which_stat));
+                F.summarize_stat(ax.YLabel.String, yy, which_stat);
                 
             case "corr"
                 % Show difference of means
@@ -1302,8 +1405,8 @@ methods
                 
                 % Summarize results
                 disp(ax.Title.String);
-                F.summarize_stat(ax.XLabel.String, deg2rad(xx), 'ang', which_stat);
-                F.summarize_stat(ax.YLabel.String, yy, '', which_stat);
+                F.summarize_stat(ax.XLabel.String, deg2rad(xx), sprintf('ang_%s', which_stat));
+                F.summarize_stat(ax.YLabel.String, yy, which_stat);
         
         end
         
@@ -1509,7 +1612,7 @@ methods
     
         
     function ax = show_stat_with_range(F, ax, stat, units)
-        % ax = show_stat_with_range(F, ax=gca, stat='bias')
+        % ax = show_stat_with_range(F, ax=gca, stat='bias', units="")
         % Shows a stat for each seizure (e.g. bias, variance, cc) with its
         % range of observations from each 10s sliding window. Median is
         % shown with a marker; the line behind shows Q[0.05, 0.95])
@@ -1550,8 +1653,10 @@ methods
                 hold(ax, 'off')
                 if units == "deg"
                     fprintf('%d seizures with max bias > 60°.\n', sum(abs(y_range(:, 2)) > 60));
+                    fprintf('%d seizures with median bias < 60°.\n', sum(yy < 60));
                 else
                     fprintf('%d seizures with max bias > π/3.\n', sum(abs(y_range(:, 2)) > pi/3));
+                    fprintf('%d seizures with median bias < π/3.\n', sum(yy < pi/3));
                 end
             case 'Variance'
                 hold(ax, 'on')
@@ -1560,8 +1665,10 @@ methods
                 hold(ax, 'off')
                 if units == "deg"
                     fprintf('%d seizures with min var > 60°.\n', sum(abs(y_range(:, 1)) > 60));
+                    fprintf('%d seizures with median var < 60°.\n', sum(yy < 60));
                 else
-                    fprintf('%d seizures with min var > π/3.\n', sum(abs(y_range(:, 1)) > pi/3));
+                    fprintf('%d seizures with min var > 0.5.\n', sum(abs(y_range(:, 1)) > 0.5));
+                    fprintf('%d seizures with median var < 0.5.\n', sum(yy < 0.5));
                 end
             case 'STD'
                 hold(ax, 'on')
@@ -1616,9 +1723,9 @@ methods
                     ylim(ax, [0 1]);
                     ylabel(ax, ax.YLabel.String)
                     
-                    F.summarize_stat([stat ' (med)'], (yy), '');
-                    F.summarize_stat([stat ' (min)'], (y_range(:, 1)), '');
-                    F.summarize_stat([stat ' (max)'], (y_range(:, 2)), '');
+                    F.summarize_stat([stat ' (med)'], (yy));
+                    F.summarize_stat([stat ' (min)'], (y_range(:, 1)));
+                    F.summarize_stat([stat ' (max)'], (y_range(:, 2)));
                 end
                 
                 
@@ -1651,12 +1758,11 @@ methods
     function allP_pdf_distance2(F)
         
 
-        Nax = 16;  % 14 is ideal for a row of plots
-%         r = 3; c = ceil(Nax/r);
+        Nax = 16;  % Manage by hand to match the number of tiles
         h = figure('name', 'pdf_distance', 'units', 'inches', ...
             'position', [0 0 Nax+1 3.25] * .67);  
         
-        Ts = tiledlayout(h, 1, Nax, 'tilespacing', 'none');
+        Ts = BVNY.tiledlayout(h, 1, Nax, 'tilespacing', 'none');
         
         
         % Show comparison of distributions
@@ -1850,7 +1956,7 @@ methods
             'position', [0 0 1.5*(numel(fields)+1) 3] * .67);        
         
 
-        Ts = tiledlayout(h, 1, numel(fields));
+        Ts = BVNY.tiledlayout(h, 1, numel(fields));
         for ii = 1:numel(fields)
 
             yy = out.(fields{ii});
@@ -1903,7 +2009,7 @@ methods
         Nch = structfun(@(s) numfinite(s.template.template(s.main_wave, :)), iw_all);
         mask = Nch >= min_electrodes;
         h = figure('name', 'iw_templates'); fullwidth(true);
-        T = tiledlayout(h, 4, 8);
+        T = BVNY.tiledlayout(h, 4, 8);
         
         fields = fieldnames(iw_all);
         [px, py] = ndgrid(1:10, 1:10);
@@ -1972,7 +2078,7 @@ methods
         Nch = structfun(@(s) numfinite(s.template.template(s.main_wave, :)), iw_all);
         mask = Nch >= min_electrodes;
         h = figure('name', 'iw_templates'); fullwidth(true);
-        T = tiledlayout(h, 'flow');
+        T = BVNY.tiledlayout(h, 'flow');
         
         fields = fieldnames(iw_all);
         for ff = string(fields(mask)')
@@ -2066,7 +2172,7 @@ methods
         
         h = figure('name', 'dir raster original v first 20', ...
             'position', [0 0 2 numel(sz_num)]*1);
-        T = tiledlayout(h, numel(sz_num), 1);
+        T = BVNY.tiledlayout(h, numel(sz_num), 1);
         
         for ss = sz_num(:)'
             
@@ -2122,7 +2228,7 @@ methods
         h = figure('name', 'dir scatter original v first 20', ...
             'position', [0 0 2*numel(metrics) numel(sz_num)]*1, ...
             'resize', 'off');
-        T = tiledlayout(h, numel(sz_num), numel(metrics), 'padding', 'none');
+        T = BVNY.tiledlayout(h, numel(sz_num), numel(metrics), 'padding', 'none');
         
         cmap = make_diverging_colormap([1 0 0; 1 0 0], [1 1 1], 256);
         color = @(mm) F.Style.(mm).color;
@@ -2210,13 +2316,14 @@ methods
     function sc = show_dir_v_time_iw_electrodes(F, sz_num, metric)
         % Compare directions using all electrodes and IW-only electrodes
         
-        sz_num = 9;  % c7
-        metric = 'M';
-        metrics = {metric, [metric 'iw']};
+        if nargin < 2 || isempty(sz_num), sz_num = 9; end  % sz_num 9 is c7
+        if nargin < 3 || isempty(metric), metric = 'M'; end
+        metric = string(metric);
+        metrics = [metric, sprintf('%siw', metric)];
         
         
         h = figure('name', 'dir scatter original v iw', 'position', [0 0 2*numel(sz_num) numel(sz_num)]*1);
-        T = tiledlayout(h, 1, numel(sz_num));
+        T = BVNY.tiledlayout(h, 1, numel(sz_num));
         
         % Get the IW info
         [iw, mw] = BVNY.get_iw_info(F.get_fname(sz_num));
@@ -2237,7 +2344,136 @@ methods
         sc = get(ax, 'children');
         
     end
+    
     function dirs = get.SlidingDirs(F)
+        % Computes the estimated mode direction in sliding MEAN_WIN=5s
+        % windows (OVERLAP=4s). Returns a structure with the estimated
+        % modes and angular variance for each TOA method in F.Metrics. Used
+        % to show the max shift and to count the large shifts to better to
+        % compute and store.
+        
+        % If stored, get value and return
+        if ~isempty(F.SlidingDirs), dirs = F.SlidingDirs; return; end
+        
+        WIN = 5;
+        OVERLAP = 4;
+        STEP = WIN - OVERLAP;
+        
+        MIN_SAMPLES = max(WIN, 10); % require 1 sample per second
+        ANGVAR_MAX = containers.Map(["M", "D10"], [.7 .05]);  % .5 is 60° of variance (i.e. 60° on either side of mean), so this is a little higher
+
+        
+        data = F.CompiledData;
+        data = data(isfinite(data.dir), :);  % only use samples where phi is detected
+        
+        % Useful functions
+        test_times_ =@(samp_times) ceil(samp_times(1)):STEP:floor(samp_times(end));  
+        cellfun_ = @(varargin) cellfun(varargin{:}, 'uni', 0);
+
+        
+        % Compute everything groupwise (grouped by seizure and metric)
+        [G, pat, sz, mtc] = findgroups(data.patient, data.seizure, data.metric);
+        dir = splitapply(@(dir) {dir}, data.dir, G);
+        samp_times = splitapply(@(time) {time}, data.time, G);
+        iw_center = splitapply(@(iwc) iwc(1), data.iw_center, G);
+        iw_angle = splitapply(@(iwa) iwa(1), data.iw_angle, G);
+
+        % Get test_times for each group and initialize the rest of the computed vars
+        test_times = cellfun_(@(s_times) test_times_(s_times)', samp_times);
+        [ang_var, ang_mode, Nobs, shifts] = ...
+            deal(cellfun_(@(t_times) nan(size(t_times)), test_times));
+        % shifts = cellfun_(@(t_times) nan(size(t_times)), test_times);
+
+        for ii = 1:max(G)
+            
+            % Get sample times in the interval surrounding tt
+            inds_ = @(tt) abs(samp_times{ii} - tt) <= WIN/2;  
+
+            % Only compute measures where there are enough samples (if you try to
+            % compute where there are no samples you will get an error)
+            Nobs{ii} = arrayfun(@(tt) sum(inds_(tt)), test_times{ii});
+            time_mask = Nobs{ii} >= MIN_SAMPLES;
+            [~, ang_var{ii}(time_mask)] = arrayfun(@(tt) ...
+                circ_var(dir{ii}(inds_(tt))), test_times{ii}(time_mask));
+
+            % Update time_mask to include points where variance is too high
+            time_mask = Nobs{ii} >= MIN_SAMPLES ...
+                & ang_var{ii} <= ANGVAR_MAX(mtc(ii));
+
+            ang_mode{ii}(time_mask) = arrayfun(@(tt) ...
+                circ_mode(dir{ii}(inds_(tt))), test_times{ii}(time_mask));
+
+            % Find stable periods and shifts
+            isstable = isfinite(ang_mode{ii});
+            new_stable = [isstable(1); diff(isstable) > 0];
+            new_unstable = [diff(isstable) < 0; isstable(end)];
+            assert(sum(new_stable) == sum(new_unstable));  % Make sure this is doing what you think it's doing
+            stable_starts = ang_mode{ii}(new_stable);
+            stable_ends = ang_mode{ii}(new_unstable);
+            shifts_ = fix_angle(stable_starts(2:end) - stable_ends(1:end-1));
+            shift_inds = find(new_stable);
+            shifts{ii}(shift_inds(2:end)) = shifts_;
+            
+        end
+    
+        % At this point you should have a cell with the computed measures
+        % for each group.
+        
+        % Do something with singletons? (See d2021_06_11.m)
+        
+        % Number the phases
+        phase_num = cellfun_(@(mode) double(isfinite(mode)), ang_mode);
+        for ii = 1:numel(phase_num)
+            S = phase_num{ii};
+            if S(1) == 0  % if first phase starts unstable, find the next unstable start
+                starts = [1; find(diff(S) < 0) + 1; numel(S)+1];
+            else % ... else find the next stable start
+                starts = [1; find(diff(S) > 0) + 1; numel(S)+1];
+            end
+
+            for jj = 1:numel(starts)-1
+                inds = starts(jj):starts(jj+1)-1;
+                S(inds) = jj;
+            end
+            phase_num{ii} = S;
+        end
+        
+        
+        
+        % Return a table of everything similar to CompiledData
+        % Convert all table variables to vectors
+        Gind = arrayfun(@(ii) repmat(ii, numel(test_times{ii}), 1), ...
+            1:length(test_times), 'uni', 0);
+        Gind = cat(1, Gind{:});
+        patient = pat(Gind);
+        seizure = sz(Gind);
+        metric = mtc(Gind);
+        iw_center = iw_center(Gind);
+        iw_angle = iw_angle(Gind);
+        time = cat(1, test_times{:});
+        mode = cat(1, ang_mode{:});
+        ang_var = cat(1, ang_var{:});
+        intervalN = cat(1, Nobs{:});
+        shifts = cat(1, shifts{:});
+        isstable = isfinite(mode);
+                
+        
+        % Put it all together
+        dirs = table(patient, seizure, metric, time, mode, ...
+            ang_var, intervalN, shifts, isstable, iw_center, iw_angle);
+        
+        % Compute and return the duration of each phase
+        G = findgroups(dirs.patient, dirs.seizure, dirs.metric, dirs.phase_num, dirs.isstable);
+        durs = splitapply(@(time) numel(time) * diff(time(1:2)), dirs.time, G);
+        dirs.duration_of_phase = durs(G);
+        
+        dirs.Properties.UserData = struct(...
+            'Win', WIN, 'Overlap', OVERLAP, 'max_var_map', ANGVAR_MAX);
+        F.SlidingDirs = dirs;
+        
+    end
+    
+    function dirs = ZZget.SlidingDirs(F)  % ZZ'd 6/13/21
         % Computes the estimated mean direction in sliding MEAN_WIN=10s windows
         % (OVERLAP=9.9s).
         % Returns a structure with the estimated means with CI for each TOA
@@ -2250,6 +2486,7 @@ methods
         
         MEAN_WIN = 10;
         SHIFT_WIN = 10;
+        DDT_WIN = 2;
         OVERLAP = 9.9;
         STEP_ = MEAN_WIN - OVERLAP;
         
@@ -2261,36 +2498,93 @@ methods
         % Compute everything groupwise (grouped by seizure and metric)
         [G, pat, sz, mtc] = findgroups(data.patient, data.seizure, data.metric);
         
-        wng = warning;
         warning('off', 'circ_confmean:requirementsNotMet');
         
         dirs = splitapply(@(x) {x}, data.dir, G);
         sample_times = splitapply(@(t) {t}, data.time, G);
         test_times = cellfun(@(t) (t(1):STEP_:t(end))', sample_times, 'uni', 0);
 %         test_times = sample_times;
-        dir_mn = cellfun(@(dirs, test_t, samp_t) ...  % get moving circular mean on 10 s windows
-            (circ_mov_stat('mean', dirs, test_t, MEAN_WIN, 'samplepoints', samp_t)), ...
-            dirs, test_times, sample_times, 'uni', 0);
-        dir_ci = cellfun(@(dirs, test_t, samp_t) ...  % get moving circular mean on 10 s windows
-            (circ_mov_stat('confmean', dirs, test_t, MEAN_WIN, 'samplepoints', samp_t)), ...
-            dirs, test_times, sample_times, 'uni', 0);
-        N = cellfun( ...  % number of sample points in the interval
-            @(samp_t, test_t) sum(abs(samp_t(:) - test_t(:)') <= MEAN_WIN/2), ...
-            sample_times, test_times, 'uni', 0);
+
+        [dir_mn, dir_ci, N] = deal(cell(max(G), 1));
+        for ii = 1:max(G)
+            % D10 already incorporates 10s worth of information so do not
+            % treat these as instantaneous samples
+            if mtc(ii) == "D10"
+                dir_mn{ii} = interp1(sample_times{ii}, dirs{ii}, test_times{ii}, 'nearest');
+%                 dir_ci{ii} = nan(size(dir_mn{ii}));  % The CI aren't used right now, but you'll have to fill this in if you end up using them
+                dir_ci{ii} = circ_mov_stat('confmean', dirs{ii}, ...
+                    test_times{ii}, MEAN_WIN, ...
+                    'samplepoints', sample_times{ii});
+                N{ii} = nan(size(dir_mn{ii}));  % Not relevant for D10 method
+            else
+                dir_mn{ii} = circ_mov_stat('mean', dirs{ii}, ...
+                    test_times{ii}, MEAN_WIN, ...
+                    'samplepoints', sample_times{ii});
+                dir_ci{ii} = circ_mov_stat('confmean', dirs{ii}, ...
+                    test_times{ii}, MEAN_WIN, ...
+                    'samplepoints', sample_times{ii});
+                N{ii} = sum(abs(sample_times{ii} - test_times{ii}') <= MEAN_WIN/2)';
+            end
+        end
+        % cellfuns are pretty, but need to treat D10 differently. Make sure
+        % the above works and then remove this (6/7/21) 
+%         dir_mn = cellfun(@(dirs, test_t, samp_t) ...  % get moving circular mean on 10 s windows
+%             (circ_mov_stat('mean', dirs, test_t, MEAN_WIN, 'samplepoints', samp_t)), ...
+%             dirs, test_times, sample_times, 'uni', 0);
+%         dir_ci = cellfun(@(dirs, test_t, samp_t) ...  % get moving circular mean on 10 s windows
+%             (circ_mov_stat('confmean', dirs, test_t, MEAN_WIN, 'samplepoints', samp_t)), ...
+%             dirs, test_times, sample_times, 'uni', 0);
+%         N = cellfun( ...  % number of sample points in the interval
+%             @(samp_t, test_t) sum(abs(samp_t(:) - test_t(:)') <= MEAN_WIN/2), ...
+%             sample_times, test_times, 'uni', 0);
+
+        % Compute mean and ci of dphi/dt
+        ddt =@(dir, time) [0; fix_angle(diff(dir))./diff(time)];
+        test_t = @(time) (time(1):STEP_:time(end))';
+        movmean_ = @(dir, test_t, samp_t) arrayfun(@(test_t) ...
+            nanmean(dir(abs(samp_t - test_t) <= DDT_WIN/2)), ...
+            test_t);
+        ci_ = @(X) 1.96*nanstd(X)/sqrt(numfinite(X));
+        movci_ = @(dir, test_t, samp_t) arrayfun(@(test_t) ...
+            ci_(dir(abs(samp_t - test_t) <= DDT_WIN/2)), ...
+            test_t);
+        
+        % Assume normal rather than circular distributions
+        dphi_dt_mn = splitapply(@(dir, samp_t) { ...
+                movmean_(ddt(dir, samp_t), test_t(samp_t), samp_t) ...
+            }, data.dir, data.time, G);
+        dphi_dt_ci = splitapply(@(dir, samp_t) { ...
+                movci_(ddt(dir, samp_t), test_t(samp_t), samp_t) ...
+            }, data.dir, data.time, G);
+        
+%         dphi_dt_mn = splitapply(@(dir, samp_t) {...
+%             circ_mov_stat('mean', dphi_dt(dir, samp_t), test_t(samp_t), MEAN_WIN, ...
+%             'samplepoints', samp_t)/STEP_ ...
+%             }, data.dir, data.time, G);
+%         dphi_dt_ci = splitapply(@(dir, samp_t) {...
+%             circ_mov_stat('confmean', dphi_dt(dir, samp_t), test_t(samp_t), MEAN_WIN, ...
+%             'samplepoints', samp_t)/STEP_ ...
+%             }, data.dir, data.time, G);
+
         for ii = 1:numel(N)
-            mask_ = N{ii} < MEAN_WIN/2;
-            dir_mn{ii}(mask_) = nan;
-            dir_ci{ii}(mask_) = nan;
+            dir_mn{ii}(N{ii} < MEAN_WIN) = nan;
+            dir_ci{ii}(N{ii} < MEAN_WIN) = nan;
+            dphi_dt_mn{ii}(N{ii} < DDT_WIN) = nan;
+            dphi_dt_ci{ii}(N{ii} < DDT_WIN) = nan;
         end
         
+                
         % Get the max shift occuring within a SHIFT_WIN s interval centered at
         % each time
         filter_times = @(tt) double(abs(tt - tt') <= SHIFT_WIN/2);  % Creates a diagonal matrix with ones indicating nearby times 
         angle_diff = @(mn) abs(fix_angle(mn - mn'));  % Creates a diagonal matrix of pairwise angular distances
+        maxdiag = @(X) arrayfun(@(ii) ...  % computes max along anti-diagonals
+            max(diag(flipud(X), ii)), ...
+            -(size(X, 1) - 1):2:size(X, 1)-1 );
+        
         shifts = cellfun( @(mn, t) ...
-            max( ...  
-                angle_diff(mn) .* filter_times(t), ...  
-            [], 2), dir_mn, test_times, 'uni', 0);
+            maxdiag( angle_diff(mn) .* filter_times(t) )', ...  
+            dir_mn, test_times, 'uni', 0);
         
         
         % I think return a table of everything similar to CompiledData
@@ -2304,23 +2598,68 @@ methods
         time = cat(1, test_times{:});
         mean = cat(1, dir_mn{:});
         ci = cat(1, dir_ci{:});
-        intervalN = cat(2, N{:})';
+        intervalN = cat(1, N{:});
         shifts = cat(1, shifts{:});
+        dphi_dt_mn = cat(1, dphi_dt_mn{:});
+        dphi_dt_ci = cat(1, dphi_dt_ci{:});
         
-        % Put it all together ]
-        dirs = table(patient, seizure, metric, time, mean, ci, intervalN, shifts);
+        
+        % Put it all together 
+        dirs = table(patient, seizure, metric, time, mean, ci, ...
+            intervalN, shifts, dphi_dt_mn, dphi_dt_ci);
         
         dirs.Properties.UserData = struct(...
             'MeanWin', MEAN_WIN, 'ShiftWin', SHIFT_WIN, 'Overlap', OVERLAP);
         F.SlidingDirs = dirs;
         
                 
-        warning(wng)
+        warning('on', 'circ_confmean:requirementsNotMet');
         
     end
     
-    
     function ax = show_max_shift(F, ax)
+        % ax = show_max_shift(F, ax=gca) 
+        %
+        % Shows the largest angular difference (in degrees) between any
+        % pair of consecutive modes (modes computed in <F.SlidingDirs>)
+        
+        
+                
+        if nargin < 2 || isempty(ax), ax = gca; end
+                
+        data = F.SlidingDirs;
+        data = data(data.isstable, :);
+        [G, pat, sz, mtc] = findgroups(data.patient, data.seizure, data.metric);
+        
+        
+        shift_max = splitapply(@(mode) max(abs(diff_phase(mode))), data.mode, G);
+        
+        xx = arrayfun(@(mtc) find(mtc == F.Metrics), mtc);
+        yy = rad2deg(shift_max);
+        
+        ln = F.gscatter_pat(ax, xx, yy, pat, 'seizure', sz);
+        set(ln, 'linewidth', .5, 'markersize', 4);
+
+        title('Max shift')
+        xlabel('')
+        xlim([0.5 2.5]);
+        xticklabels(F.Metrics);
+        xticks([1 2]);
+        ylabel('Magnitude (°)');
+        ylim([-20 200]); yticks(0:30:180); 
+        box off
+        axis square
+        % Summarize results
+        disp(ax.Title.String);
+        for ii = 1:2
+            mm = F.Metrics(ii);
+            F.summarize_stat(mm, deg2rad(yy(mtc == mm)), 'ang');
+        end
+        
+       
+    end
+    
+    function ax = ZZshow_max_shift(F, ax)  % ZZ'd 6/14/21
         % ax = show_max_shift(F, ax=gca)
         % Shows the largest shift (in degrees) detected by each method over
         % any 10 second window. 
@@ -2383,78 +2722,7 @@ methods
         
        
     end
-    
-    function ax = ZZshow_max_shift(F, ax)  % ZZ'd 5/29/21
-        % ax = show_max_shift(F, ax=gca)
-        % Shows the largest shift (in degrees) detected by each method over
-        % any 10 second window. 
-        % First computes circular moving mean over 10s windows, then finds
-        % the max range (again, sliding 10s windows)
-        % Assumes only two methods.
         
-        WIN = 10;
-        OVERLAP = 9.9;
-        STEP_ = WIN - OVERLAP;
-        
-        if nargin < 2 || isempty(ax), ax = gca; end
-        
-        
-        data = F.CompiledData;
-        data = data(isfinite(data.dir), :);  % only use samples where phi is detected
-        [G, pat, ~, mtc] = findgroups(data.patient, data.seizure, data.metric);
-        
-        dirs = splitapply(@(x) {x}, data.dir, G);
-        sample_times = splitapply(@(t) {t}, data.time, G);
-        test_times = cellfun(@(t) t(1):STEP_:t(end), sample_times, 'uni', 0);
-%         test_times = sample_times;
-        dir_mn = cellfun(@(dirs, test_t, samp_t) ...
-            (circ_mov_stat('mean', dirs, test_t, WIN, 'samplepoints', samp_t)), ... % get moving circular mean on 10 s windows
-            dirs, test_times, sample_times, 'uni', 0);
-        dir_ci = cellfun(@(dirs, test_t, samp_t) ...
-            (circ_mov_stat('confmean', dirs, test_t, WIN, 'samplepoints', samp_t)), ... % get moving circular mean on 10 s windows
-            dirs, test_times, sample_times, 'uni', 0);
-        N = cellfun( ...
-            @(samp_t, test_t) sum(abs(samp_t(:) - test_t(:)') <= WIN/2), ...  % number of sample points in the interval
-            sample_times, test_times, 'uni', 0);
-        for ii = 1:numel(N)
-            mask_ = N{ii} < WIN/2;
-            dir_mn{ii}(mask_) = nan;
-            dir_ci{ii}(mask_) = nan;
-        end
-        
-        shift_max = cellfun(@(x, times) ...
-            max(abs(angle(exp(1j * (x - x')))) ...  % Get the largest angular shift
-                .* double(abs(times - times') <= WIN/2), ...  % ... within WIN/2 s
-            [], 'all'), ...
-            dir_mn, test_times);
-        
-        isM1 = contains(F.Metrics, "M");  % Put M on the x-axis
-        m1 = F.Metrics(isM1); m2 = F.Metrics(~isM1);
-        assert(all(pat(mtc == m1) == pat(mtc == m2)));  % Make sure patient labels are the same for each metric
-        
-        % Make the plot
-        xx = rad2deg(shift_max(mtc == m1));
-        yy = rad2deg(shift_max(mtc == m2));
-        plot([-20 200], [-20 200], '--', 'color', .5*[1 1 1]);
-        hold on
-        F.gscatter_pat(ax, xx, yy, pat(mtc == m1));
-        hold off
-        title('Max shift (\circ)')
-        xlabel(m1)
-        ylabel(m2)
-        xlim([-20 200]); xticks(0:30:180); 
-        ylim([-20 200]); yticks(0:30:180); 
-        box off
-        axis square
-        % Summarize results
-        disp(ax.Title.String);
-        F.summarize_stat(ax.XLabel.String, deg2rad(xx), 'ang');
-        F.summarize_stat(ax.YLabel.String, deg2rad(yy), 'ang');
-        
-    end
-
-    
-    
     function h = allS_dir_v_time(F, min_electrodes)
         % Shows the direction v time for each seizure using each method
         % sc = allS_dir_v_time(F, min_electrodes=50)
@@ -2482,7 +2750,7 @@ methods
         
         % Create the figure and tiled layout
         h = figure('name', 'dir_v_time', 'position', [0 0 2*c 1.25*r]);
-        T = tiledlayout(h, r, c, 'tilespacing', 'compact', 'padding', 'none');
+        T = BVNY.tiledlayout(h, r, c, 'tilespacing', 'compact', 'padding', 'none');
         lw = .5;
 %         gray_ = .85*[1 1 1];
 
@@ -2571,7 +2839,7 @@ methods
         
         % Create the figure and tiled layout
         h = figure('name', 'dir_v_time', 'position', [0 0 3 r]);
-        T = tiledlayout(h, r, 1);
+        T = BVNY.tiledlayout(h, r, 1);
         iw_yline = @(yval, color) yline(yval, 'color', color);
         onset_xline = @(xval, color) xline(xval, 'color', color);
         lw = .5;
@@ -2626,6 +2894,185 @@ methods
 
     end
 
+    function h = oneS_corr_v_time(F, seizure, thresh)
+        % Shows the correlation v time for each patient (different seizures
+        % identified by color)
+        % sc = allP_corr_v_time(F, metric='M', thresh=5e-2, min_electrodes=0)
+        if nargin < 2 || isempty(seizure), seizure = 'MG49_43'; end
+        if nargin < 4 || isempty(thresh), thresh = 5e-2; end
+        
+        seizure = strsplit(seizure, {'Seizure', '_', ' '});
+        pat = seizure{1}; seizure = str2double(seizure{2});
+        
+        % Create ksdensity local fun
+        XI = linspace(-1, 1, 100);
+        ksdensity_ = @(xx) ksdensity(xx, XI, ...
+            'bandwidth', .1, 'boundarycorrection', 'log', ...
+            'support', [-1 1]);
+
+        % Get the data
+        data = F.CompiledData;
+        mask = strcmp(data.patient, pat) ...  % mask by patient,
+            & data.seizure == seizure ...  % ... seizure,
+            & isfinite(data.rho) ...  % ... finite rho (corr coeff; if this isn't finite, it's because the number of electrodes in the discharge was < F.MinFinite)
+            & data.nchannels >= F.MinIWElectrodes;  % ... and # electrodes recruited to IW
+        data = data(mask, :);
+
+        % Group by metric
+        G = arrayfun(@(mm) find(mm == F.Metrics), data.metric);  % retain order of metrics
+        r = 1;
+        
+        
+        % Create the figure and tiled layout
+        h = figure('name', 'corr_v_time', 'position', [0 0 5.5 r*1.5]);
+        T = BVNY.tiledlayout(h, r, 4);
+        
+
+        % For each metric plot the rho value for each discharge time.
+        color_ = @(mm) F.Style.(mm).color;
+        
+            
+        % Show all discharges with small dots
+        ax_sc = nexttile(T, 2, [1 3]); 
+        set(ax_sc, 'tag', 'scatter', 'nextplot', 'replacechildren');
+        xx = data.rho_time_offset;
+        yy = data.rho;
+        mm = data.metric;  % color by seizure
+        hold(ax_sc, 'on');
+        splitapply(@(xx, yy, cc) ...
+            plot(ax_sc, xx, yy, '.', 'markersize', 1, ...
+            'color', mean([color_(cc(1)); .85*[1 1 1] ])), ...  % gray out and lighten the color
+            xx, yy, mm, G);
+
+        % highlight significant rho with larger dots
+        mask = data.rho_pval < thresh;
+        splitapply(@(xx, yy, cc) ...
+            plot(ax_sc, xx, yy, '.', ...
+            'markersize', 4, 'color', color_(cc(1)), ...
+            'displayname', cc(1), 'tag', 'legend'), ...
+            xx(mask), yy(mask), mm(mask), G(mask));
+
+        % prettify
+        ylim([-1.1 1.1]);
+        yticks([-1 0 1]);
+        title(sprintf('%s %d', pat, seizure))
+        xline(0)
+        hold off
+        grid on
+        ylabel('\rho');
+        
+        % Get PDF of rho values
+        ax_hist = nexttile(T, 1, [1 1]); 
+        set(ax_hist, 'tag', 'hist', 'nextplot', 'replacechildren');
+        pdf = splitapply(@(rho) ksdensity_(rho), yy, G);
+        ln = plot(ax_hist, XI, pdf');
+        ylabel(ax_hist, 'PDF');
+        cmap = cell2mat(arrayfun(@(mm) color_(mm), F.Metrics, 'uni', 0)');
+        set(ax_hist, 'colororder', cmap)
+        
+        % prettify
+        xlabel(ax_sc, 'Time [s]')
+        xlabel(ax_hist, '\rho');
+        linkaxes(findobj(h, 'tag', 'scatter'), 'x')
+        
+        legend(ax_sc, ln, F.Metrics, 'location', 'eastout');
+
+        % Print
+        F.print(h, F.prefix_better(sprintf('%s_%d', pat, seizure)));
+
+    end
+
+    function h = oneP_corr_v_time(F, patient, thresh)
+        % Shows the correlation v time for each patient (different seizures
+        % identified by color)
+        % sc = allP_corr_v_time(F, metric='M', thresh=5e-2, min_electrodes=0)
+        if nargin < 2 || isempty(patient), patient = 'MG49'; end
+        if nargin < 3 || isempty(thresh), thresh = 5e-2; end
+        
+        % Create ksdensity local fun
+        XI = linspace(-1, 1, 100);
+        ksdensity_ = @(xx) ksdensity(xx, XI, ...
+            'bandwidth', .1, 'boundarycorrection', 'log', ...
+            'support', [-1 1]);
+
+        % Get the data
+        data = F.CompiledData;
+        mask = strcmp(data.patient, patient) ...  % mask by patient,
+            & isfinite(data.rho) ...  % ... finite rho (corr coeff; if this isn't finite, it's because the number of electrodes in the discharge was < F.MinFinite)
+            & data.nchannels >= F.MinIWElectrodes;  % ... and # electrodes recruited to IW
+        data = data(mask, :);
+
+        % Group by metric
+        G = arrayfun(@(mm) find(mm == F.Metrics), data.metric);  % retain order of metrics
+        mtc = F.Metrics;
+        r = numel(unique(mtc));
+        
+        
+        % Create the figure and tiled layout
+        h = figure('name', 'corr_v_time', 'position', [0 0 4.5 r]);
+        T = BVNY.tiledlayout(h, r, 4);
+        
+
+        % For each metric create a scatter plot of the rho value for each
+        % discharge time. Use different colors for each seizure
+        Nseiz = numel(unique(data.seizure));
+        cmap_ =@(mm) make_diverging_colormap( ...
+            [.5 .5 .5; brighten(F.Style.(mm).color, -.85)], ...
+            F.Style.(mm).color, Nseiz);
+        
+        for ii = 1:numel(mtc)
+            cmap = cmap_(mtc(ii));
+            
+            % Show all discharges with small dots
+            ax_sc = nexttile(T, [1 3]); 
+            set(ax_sc, 'tag', 'scatter', 'nextplot', 'replacechildren');
+            xx = data.rho_time_offset(G == ii);
+            yy = data.rho(G == ii);
+            cc = findgroups(data.seizure(G == ii));  % color by seizure
+            hold(ax_sc, 'on');
+            splitapply(@(xx, yy, cc) ...
+                plot(ax_sc, xx, yy, '.', ...
+                'markersize', 1, 'color', cmap(cc(1), :)), ...
+                xx, yy, cc, cc);
+            
+            % highlight significant rho with larger dots
+            mask = data.rho_pval(G == ii) < thresh;
+            splitapply(@(xx, yy, cc) ...
+                plot(ax_sc, xx, yy, '.', ...
+                'markersize', 4, 'color', cmap(cc(1), :), 'tag', 'legend'), ...
+                xx(mask), yy(mask), cc(mask), cc(mask));
+            
+            % prettify
+            ylim([-1 1]);
+            if ii == 1
+                title(patient)
+            end
+            xline(0)
+            hold off
+            grid on
+            ylabel(sprintf('\\rho (%s)', mtc(ii)));
+            
+            % Get PDF of rho values
+            ax_hist = nexttile(T, [1 1]); 
+            set(ax_hist, 'tag', 'hist', 'nextplot', 'replacechildren');
+            pdf = splitapply(@(rho) ksdensity_(rho), yy, cc);
+            plot(ax_hist, XI, pdf');
+            ylabel(ax_hist, 'PDF');
+            set(ax_hist, 'colororder', cmap)
+            
+        end
+        
+        % prettify
+        xlabel(ax_sc, 'Time [s]')
+        xlabel(ax_hist, '\rho');
+        set(findobj(h, 'tag', 'hist'), 'yaxislocation', 'right');
+        linkaxes(findobj(h, 'tag', 'scatter'), 'x')
+        
+        % Print
+        F.print(h, F.prefix_better(patient));
+
+    end
+    
     
     function sc = allP_corr_v_time(F, metric, thresh, min_electrodes)
         % Shows the correlation v time for each patient (different seizures
@@ -2654,7 +3101,7 @@ methods
         
         % Create the figure and tiled layout
         h = figure('name', 'corr_v_time', 'position', [0 0 4.5 r]);
-        T = tiledlayout(h, r, 4);
+        T = BVNY.tiledlayout(h, r, 4);
         
 
         % For each patient create a scatter plot of the rho value for each
@@ -2670,7 +3117,7 @@ methods
             sc = scatter(ax_sc, xx, yy, 1, cc, 'filled');
             ax_sc.Colormap = hsv(max(cc));
 
-            % highlight significant rho in color
+            % highlight significant rho with larger dots
             hold on
             mask = data.rho_pval(G == ii) < thresh;
             sc = scatter(ax_sc, xx(mask), yy(mask), 4, cc(mask), 'filled');
@@ -2703,7 +3150,389 @@ methods
 
     end
     
-    function dataR = allP_hist2d_tw_v_iw_effectsize(F, metric, thresh, min_electrodes, rho_or_dir)
+    function allP_alignment_preference_plot(F, ax, varargin)
+        % allP_alignment_preference_plot(F, varargin)
+        %
+        % Creates the plot showing the "proportion differential" between
+        % IW-aligned proportion and IW-reversed proportion.
+        %
+        % varargin can be the output of <allP_hist2d_tw_v_iw_effectsize> (a
+        % 3d array) or it can be the arguments to
+        % <allP_hist2d_tw_v_iw_effectsize>.
+        
+        if nargin < 2, ax = gca; 
+        elseif ~isaxes(ax), varargin = [ax varargin]; ax = gca;
+        end
+        
+        if nargin < 2 || isempty(varargin{1}) || ~istable(varargin{1})
+            res = F.allP_hist2d_tw_v_iw_effectsize(varargin{:});
+        else  % F.allP_alignment_preference_plot(dataR)
+            res = varargin{1};
+        end
+        
+        times = res.times;
+        alignment_pref = res.aligned(:, 1) - res.reversed(:, 1);
+        cmap = lines(2);
+        style_ = containers.Map([1; -1], {  ...
+            struct('color', cmap(1, :), 'displayname', 'Aligned'); ...
+            struct('color', cmap(2, :), 'displayname', 'Reversed') ...
+            });
+        
+        interp_ = @(xx) interp(xx, 1);  % interp for pretty 
+        cla(ax); hold(ax, 'on');
+        ln = arrayfun(@(sgn) ...
+            plot3(ax, interp_(times)' + [0; 0], abs(interp_(alignment_pref))' .* [0; 1], ...
+            (sgn * sign(interp_(alignment_pref)))' .* [1;1], style_(sgn)), [1 -1], 'uni', 0);
+        sig_mask = ...
+            res.aligned(:, 2) - res.reversed(:, 3) > 0  ...
+            | res.reversed(:, 2) - res.aligned(:, 3) > 0; 
+        ln_sig = plot(ax, times(sig_mask), abs(alignment_pref(sig_mask)), ...
+            'r.', 'zdata', 2*ones(sum(sig_mask), 1), 'displayname', 'p < 0.05');
+        hold(ax, 'off');
+        view(ax, 2);
+        
+        legend(ax, [ln{1}(1), ln{2}(1), ln_sig]);
+        
+        
+        
+    end
+    
+    function [res, dataR] = allP_hist2d_tw_v_iw_effectsize(F, ...
+            metric, thresh, min_electrodes, rho_or_dir)  
+        % [res, dataR] = allP_hist2d_tw_v_iw_effectsize(F, ...
+        %       metric="M", thresh=5e-2, min_electrodes=F.MinIWElectrodes, ...
+        %       rho_or_dir='dir')
+        % 
+        % Shows an estimate of the proportion of discharges that are
+        % IW-aligned (reversed) through time. For <rho_or_dir="rho">, we
+        % define IW-aligned (reversed) as rho > 0.3 (rho < -0.3). For
+        % <rho_or_dir="dir">, we define IW-aligned (reversed) as |dir_rel|
+        % < 60° (|dir_rel| > 120°)
+        % 
+        % For t in [seizure_onset:STEP=2:seizure_termination], resample
+        % from the set of discharges in a 4 second (2*HALFWIN) window
+        % centered at t and observed in seizures where an IW is detected on
+        % at least <min_electrodes>.
+
+        % Definitions of alignment/reversal
+        RHO_LIMS = [0 0];  % Setting to zero any rho where p>=0.05
+        DIR_LIMS = [pi/3 2*pi/3];  % in radians
+        Nouter = 1e4;
+        HALFWIN = 2.5;
+        STEP = 1;  % Trying step = 1... Looked fine with step = 2, though
+        ALPHA = .05; % Show CI to this level
+        ADD_NOISE = false;  % I thought adding noise was standard, but it seems not.
+        
+        
+        if nargin < 2 || isempty(metric), metric = "M"; end
+        if nargin < 3 || isempty(thresh), thresh = 5e-2; end
+        if nargin < 4 || isempty(min_electrodes), min_electrodes = F.MinIWElectrodes; end
+        if nargin < 5 || isempty(rho_or_dir), rho_or_dir = 'dir'; end
+        rho_or_dir = validatestring(rho_or_dir, ["rho" "dir"]);
+        metric = string(metric);
+
+        % Prep the figure
+        rows = 4;
+        h = figure('name', sprintf('align_pref_%s', rho_or_dir), ...
+            'position', [0 0 2 1.75*rows/3] * 2.5);
+        T = BVNY.tiledlayout(h, 4, 1);
+                
+        
+        if rho_or_dir == "rho"
+            dnames = [...
+                sprintf("\\rho > %0.1f", RHO_LIMS(2)) ...
+                sprintf("\\rho < %0.1f", RHO_LIMS(1)) ...
+                ];
+        else
+            dnames = [ ...
+                sprintf("\\phi < %0.0f\\circ", rad2deg(DIR_LIMS(1))) ...
+                sprintf("\\phi > %0.0f\\circ", rad2deg(DIR_LIMS(2))) ...
+                ];
+        end
+        
+        % Get the data and limit to requested metric and IW min electrodes
+        data = F.CompiledData;
+        mask = strcmp(data.metric, metric) ...
+            & data.nchannels > min_electrodes;
+        data = data(mask, :);
+        
+        
+        % Use direction or correlation
+        if rho_or_dir == "rho"
+            
+            % Set data to 0 if p >=0.05; otherwise set to sign(rho)
+            if all(RHO_LIMS == [0 0])  % look for stat sig rho
+                data.values = sign(data.rho) .* double(data.rho_pval < thresh);
+            else
+                data.values = data.rho;
+            end
+            data.time_iw = data.rho_time_offset;
+            sigma_ =@(val) nanstd(val) / 4; %#ok<NASGU>
+            add_noise_ =@(X, sigma) cellfun( ...
+                @(x, sig) x + randn(size(x)) * sig, ...
+                X, sigma', 'uni', 0); %#ok<NASGU>
+            
+        else  % rho_or_dir == "dir"
+            dir = fix_angle(data.dir - data.iw_angle);
+            data.values = dir;
+            data.time_iw = data.time - data.iw_center;
+
+%             sigma_ =@(val) circ_kappa(rmmissing(val))*2;
+%             add_noise_ =@(X, sigma) cellfun( ...
+%                 @(x, sig) fix_angle(x + circ_vmrnd(0, sig, numel(x))), ...  % Using vmrnd here really slows this down. Consider just adding normal(0, pi/?)
+%                 X, sigma', 'uni', 0);
+            sigma_ =@(val) pi/8;   %#ok<NASGU>
+            add_noise_ =@(X, sigma) cellfun( ...
+                @(x, sig) fix_angle(x + sig*randn(size(x))), ...  % This is not strictly correct, but with low sigma, it's a good approximation
+                X, sigma', 'uni', 0); %#ok<NASGU>
+        end
+        
+        
+        
+        % Gather observations from each time bin in each patient
+        test_times = ceil(min(data.time_iw)):STEP:floor(max(data.time_iw));
+        G = findgroups(data.patient);
+        all_vals = cell(numel(test_times), max(G));
+        for tt = 1:numel(test_times)
+            for pp = 1:max(G)
+                all_vals{tt, pp} = data.values( ...
+                    G == pp ...
+                    & abs(data.time_iw - test_times(tt)) <= HALFWIN);
+            end
+        end
+        
+        % Get the number of observations in each time bin from each
+        % patient. Require at least MIN_OBS in at least
+        % MIN_PAT patients.
+        MIN_OBS = (2*HALFWIN);
+        MIN_PAT = 3;
+        NN = cellfun(@numel, all_vals);
+        bad_bins = sum(NN >= MIN_OBS, 2) < MIN_PAT;  
+        test_times(bad_bins) = [];
+        NN(bad_bins, :) = [];
+        all_vals(bad_bins, :) = [];
+        all_vals(NN < MIN_OBS) = {[]};
+        NN(NN < MIN_OBS) = nan;
+        Nsamps = min(NN, [], 2);  % Pull the minimum (non-zero number of observations from any patient
+%         Nsamps = MIN_OBS * ones(size(Nsamps));
+        
+        % Reshape into column
+        Npat = size(all_vals, 2);
+        test_times = repmat(test_times(:), 1, Npat);
+        Nsamps = repmat(Nsamps(:), 1, Npat);
+        all_vals = all_vals(:);
+        mask_ = cellfun(@isempty, all_vals);
+        all_vals(mask_) = [];
+        Nsamps(mask_) = [];
+        test_times(mask_) = [];
+        [time_inds, utest_times] = findgroups(test_times);
+        if ADD_NOISE
+            sigma = cellfun(@(vals) sigma_(vals), all_vals, 'uni', 0); %#ok<UNRCH>
+        end
+        
+        % Define resampling function
+        Nrows = numel(all_vals);
+        resample_ =@() arrayfun(@(ii, N) ...
+            all_vals{ii}(randi(numel(all_vals{ii}), N, 1)), ...
+            1:Nrows, Nsamps, 'uni', 0);
+        
+        
+        % Initialize matrix to store the results; resample
+        dataR = nan(Nrows, 3, Nouter);
+        for ii = 1:Nouter
+            spl = resample_();
+            
+            if ADD_NOISE
+                spl = add_noise_(spl, sigma);  %#ok<UNRCH>
+            end
+            
+            switch rho_or_dir
+                case "rho"
+                    npos = cellfun(@(x) sum(x > RHO_LIMS(1)), spl);
+                    nneg = cellfun(@(x) sum(x < RHO_LIMS(2)), spl);
+                    nall = cellfun(@numel, spl);
+                case "dir"
+                    npos = cellfun(@(x) sum(abs(fix_angle(x)) < DIR_LIMS(1)), spl);
+                    nneg = cellfun(@(x) sum(abs(fix_angle(x)) > DIR_LIMS(2)), spl);
+                    nall = cellfun(@numel, spl);
+            end
+            
+            dataR(:, :, ii) = [npos; nneg; nall]';
+        end
+        
+        % Combine counts from each patient and compute proportions for each
+        % trial
+        dataRc = splitapply(@sum, dataR, time_inds(:));
+        proportions = dataRc(:, [1 2], :) ./ dataRc(:, 3, :);
+
+        
+        % Find time points where there are too many nans (i.e. more than
+        % ptest so we can't get CI)
+        pct_finite = mean(isfinite(proportions), 3);
+        mask = pct_finite < 1-ALPHA;
+        
+        Q = quantile(proportions, [ALPHA/2 1-ALPHA/2], 3);
+        Qlo = Q(:, :, 1); Qlo(mask) = nan;
+        Qhi = Q(:, :, 2); Qhi(mask) = nan;
+
+        md = nanmedian(proportions, 3); md(mask) = nan; %#ok<NASGU>
+        mn = nanmean(proportions, 3); mn(mask) = nan;
+        sd = nanstd(proportions, [], 3); sd(mask) = nan; %#ok<NASGU>
+        
+        % Create the table that will be returned
+        aligned = [mn(:, 1) Qlo(:, 1), Qhi(:, 1)];
+        reversed = [mn(:, 2) Qlo(:, 2), Qhi(:, 2)];
+        times = utest_times(:);
+        res = table(aligned, reversed, times);
+
+        
+        % *** Show the result ***
+        interp_ = @(x) interp(x, 5);  % interp for pretty
+        fill_ = @(x) fillmissing(x, 'linear', 'endvalues', 'none');
+        fillQ_ = @(x, val) fillmissing(x, 'constant', val, 'endvalues', 'none');
+        
+        tbinsI = interp_(utest_times);
+        
+        
+        % Show median and 95CI
+        mnI = [interp_(fill_(mn(:, 1))) interp_(fill_(mn(:, 2)))];
+        QloI = [interp_(fillQ_(Qlo(:, 1), 0)) interp_(fillQ_(Qlo(:, 2), 0))];
+        QhiI = [interp_(fillQ_(Qhi(:, 1), 1)) interp_(fillQ_(Qhi(:, 2), 1))];
+        
+        tt = [tbinsI fliplr(tbinsI)]';
+
+        
+        m0 = strsplit(metric, 'sub');
+        color = F.Style.(m0(1)).color;
+        gray_ = .5 * [1 1 1];
+        for jj = 1:2  % Show corr and anti corr proportions
+
+            % Show the CI
+            ax = nexttile(T, jj);
+            
+%             yy = fill_(mnI(:, jj) + 3*[-1 1] .* sdI(:, jj));  % sd limits
+            yy = [QloI(:, jj) QhiI(:, jj)];  % quantile limits
+            
+            yyF = [yy(:, 1); flipud(yy(:, 2))];
+            mask = isfinite(yyF);
+            temp = fill(ax, tt(mask), yyF(mask), 1, ...
+                'facecolor', color, 'facealpha', .5, 'linestyle', 'none'); %#ok<NASGU>
+
+            % highlight where lower bound is above 0
+            hold(ax, 'on');
+            mask = yy(:, 1) > 0;
+            temp = area(ax, tbinsI(mask), yy(mask, 1), ...
+                'facecolor', gray_, 'linestyle', 'none', 'facealpha', .5); %#ok<NASGU>
+
+            % Show the mean
+            plot(ax, tbinsI, mnI(:, jj), 'color', color, ...
+                'linewidth', 2, 'displayname', dnames(jj))
+            hold(ax, 'off');
+
+            % highlight IW time 
+            xline(ax, 0)
+
+            % Prettify
+            grid(ax, 'on')
+            axis(ax, 'tight');
+            title(ax, dnames(jj));
+
+        end
+        
+        %%% Compare the corr/anticorr distributions
+        childs = get(findobj(T, 'type', 'axes'), 'children');
+        ax_both = nexttile(T, 3);
+        ax = ax_both;
+        
+        % Shade regions where distributions differ
+        if 0  % Try without this (6/14/21)
+        xx = tbinsI'; %#ok<UNRCH>
+        mask = QhiI(:, 2) <= QloI(:, 1) | QhiI(:, 1) <= QloI(:, 2);
+        ylo = min(QhiI, [], 2); yhi = max(QloI, [], 2);
+        ylo(~mask) = yhi(~mask); 
+        yy = [ylo; flipud(yhi)];
+        xx = [xx; flipud(xx)];
+        xx(isnan(yy)) = [];
+        yy(isnan(yy)) = [];
+        
+        pp = patch(ax, xx, yy, 1, 'facecolor', [0 0 0], ...  % Using the gray face color is too hard to see
+            'facealpha', .8, 'linestyle', 'none', 'displayname', 'Pref'); 
+        end
+        
+        % Copy the objects in the first two axes into the third axis
+        cc = cellfun(@(cc) copyobj(cc, ax), childs, 'uni', 0); %#ok<NASGU>
+        delete(findobj(ax, 'type', 'area'));
+        patches = findobj(ax, 'type', 'patch');  % these are the CI
+        lns = findobj(ax, 'type', 'line');  % these are the medians
+        cl = findobj(ax, 'type', 'constantline');  % delete one of the constant lines
+        delete(cl(1));
+        
+        % Darken the patch in back
+        darker_ = brighten(color, -.75);  % Darken the color
+        set(patches(2), 'facecolor', darker_);
+        set(lns(2), 'color', darker_);
+        ax.XLim = T.Children(2).XLim;
+        
+        % Add a title
+        title(ax, metric);
+        xlabel(ax, 'Time [s]');
+        ylabel(T, 'Proportion');
+        
+        % Link the y-axes in the first three plots
+        linkaxes(findobj(T, 'type', 'axes'), 'y');
+        set(ax, 'ylim', [0 .7]);
+        
+        % Add some legends
+        lgd = legend(ax(end), {'95%CI', 'CI>0', 'mean'}); %#ok<NASGU>
+        % Add legend to Pref plot and clean
+%         lgd = legend(ax_both, [lns; pp]);   %#ok<NASGU>
+        lgd = legend(ax_both, lns);   %#ok<NASGU>
+        
+        
+        % Show preference magnitude in the next tile
+        ax = nexttile(T, 4);
+        F.allP_alignment_preference_plot(ax, res);
+        ln = findobj(ax, 'type', 'line');
+        for ll = ln'
+            if strcmpi(ll.DisplayName, 'aligned'), ll.Color = color;
+            elseif strcmpi(ll.DisplayName, 'reversed'), ll.Color = .15 * [1 1 1]; % the <darker_> color is hard to distinguish with fine lines
+            end
+        end
+        ax.YLim(1) = 0;
+        xlabel(ax, 'Time [s]');
+        
+        % Link the x-axes in all plots
+        ax = findobj(T, 'type', 'axes');
+        linkaxes(ax, 'x');
+        set(ax, 'box', 'on', 'xlim', [-25 65]);  % Match the limits from both methods
+        
+        % Put all legends in the same location
+        set(findobj(T, 'type', 'legend'), 'location', 'eastout');
+        
+        % Summary statement
+        fields = ["pos" "neg"];
+        for jj = 1:2
+            [~, loc] = max(QloI(:, jj));
+            rho_at_t.(fields(jj)) = mnI(loc, jj);
+            peak_t.(fields(jj)) = tbinsI(loc);
+            rho_ci_at_t.(fields(jj)) = [QloI(loc, jj) QhiI(loc, jj)];
+        end
+        
+        fprintf([ ...
+            'The highest proportion of ALIGNED discharges occurs at\n' ...
+            't=%0.2f s (prop = %0.2f, [%0.2f, %0.2f]; mean, 95%%CI).\n' ...
+            'The highest proportion of REVERSED discharges occurs at\n' ...
+            't=%0.2f s (prop = %0.2f, [%0.2f, %0.2f]; mean, 95%%CI)\n' ...
+            ], ...
+            peak_t.pos, rho_at_t.pos, rho_ci_at_t.pos, ...
+            peak_t.neg, rho_at_t.neg, rho_ci_at_t.neg)
+    
+
+        % print result
+        F.print(h, F.prefix_better(sprintf('%s_%s', metric, rho_or_dir)));
+    end
+
+    function dataR = ZZallP_hist2d_tw_v_iw_effectsize(F, metric, thresh, min_electrodes, rho_or_dir)  % ZZ'd 6/8/21 
         % dataR = allP_hist2d_tw_v_iw_effectsize(F, ...
         %       metric="M", thresh=5e-2, min_electrodes=50, rho_or_dir='dir')
         % 
@@ -2739,6 +3568,16 @@ methods
         mask = strcmp(data.metric, metric) ...
             & data.nchannels > min_electrodes;
         data = data(mask, :);
+        data.time_iw = data.time - data.iw_center;
+        
+        % Require at least 3 patients in each time period
+        G = findgroups(data.patient);
+        min_time = splitapply(@min, data.time_iw, G);
+        max_time = splitapply(@max, data.time_iw, G);
+        min_time = sort(min_time, 'ascend');
+        max_time = sort(max_time, 'descend');
+        mask = data.time_iw > min_time(3) & data.time_iw < max_time(3);
+        data = data(mask, :);
         
         
         % Use direction instead of correlation
@@ -2748,9 +3587,9 @@ methods
         else  % rho_or_dir == "dir"
             % remove non-finite directions (i.e. where direction could not be estimated)
 %             data = data(isfinite(data.dir), :);  
-            dir = angle(exp(1j*(data.dir - data.iw_angle)));
-            phi = double(abs(dir) <= pi/2) - double(abs(dir) > pi/2);
-            sample_times = data.time - data.iw_center;
+            dir = fix_angle(data.dir - data.iw_angle);
+            phi = double(abs(dir) < pi/2) - double(abs(dir) > pi/2);
+            sample_times = data.time_iw;
         end
         
         % Group data by patient; get indices;
@@ -2760,11 +3599,11 @@ methods
         N = min(splitapply(@numel, G, G));
         
         trange = quantile(sample_times, [0 1]);
-        tbins = linspace(trange(1), trange(2), diff(trange)/STEP + 1);  % Divide times into ~2s intervals
+        tbins = linspace(trange(1), trange(2), diff(trange)/STEP + 1);  % Sample at ~2s intervals
 
         
         % Create a function to add noise (I set this arbitrarily...) 
-        noise_for = @(inds) 1 * randn(size(inds)); 
+        noise_for = @(inds) 1 * randn(size(inds)) - .5; 
 
         % Get the relevant indices of data for each patient (i.e. those of
         % all times and those of sig times)
@@ -2774,7 +3613,7 @@ methods
         dataR = nan(numel(tbins), 3, Nouter);
         for ii = 1:Nouter
 
-            % Get resampled indices (bootstrap Ninner times from each patient)
+            % Get resampled indices 
             subs = cellfun(@(x) randi(numel(x), 1, N), Iall, 'uni', 0);  % random resampling of indices
             IR = cell2mat(cellfun(@(x, s) x(s), Iall, subs, 'uni', 0));  % resampled indices
 
@@ -2803,7 +3642,7 @@ methods
         
 
         % *** Show the result ***
-        T = tiledlayout(h, 3, 1);
+        T = BVNY.tiledlayout(h, 3, 1);
         interp_ = @(x) interp(x, 5);  % interp for pretty
         fill_ = @(x) fillmissing(x, 'linear', 'endvalues', 'none');
         fillQ_ = @(x, val) fillmissing(x, 'constant', val, 'endvalues', 'none');
@@ -2812,7 +3651,7 @@ methods
         
         
         % Show median and 95CI
-        mnI = [interp_(fill_(md(:, 1))) interp_(fill_(md(:, 2)))];
+        mnI = [interp_(fill_(mn(:, 1))) interp_(fill_(mn(:, 2)))];
         QloI = [interp_(fillQ_(Qlo(:, 1), 0)) interp_(fillQ_(Qlo(:, 2), 0))];
         QhiI = [interp_(fillQ_(Qhi(:, 1), 1)) interp_(fillQ_(Qhi(:, 2), 1))];
         
@@ -2895,14 +3734,13 @@ methods
 
         
 %         if rho_or_dir == "rho", ylim(ax, [0 1]); else, ylim(ax, [0 .5]); end
-%         xlim(ax, [-30 50]);  % Nothing significant beyond this
         xlabel(ax, 'Time [s]');
         ylabel(T, 'Proportion');
         
         ax = findobj(T, 'type', 'axes');
         linkaxes(ax, 'xy');
         set(ax, 'box', 'on', 'ylim', [0 1]);
-        lgd = legend(ax(2), {'95%CI', 'CI>0', 'median'}, 'location', 'eastoutside'); %#ok<NASGU>
+        lgd = legend(ax(2), {'95%CI', 'CI>0', 'mean'}, 'location', 'eastoutside'); %#ok<NASGU>
 
         % Summary statement
         fields = ["pos" "neg"];
@@ -2928,190 +3766,6 @@ methods
     end
     
     
-    function dataR = ZZallP_hist2d_rho_tw_v_iw_effectsize(F, metric, thresh, min_electrodes)
-        % Shows a 2d histogram of the correlations between the tw and the
-        % iw. Uses a resampling procedure to estimate the effect size of the
-        % pos/neg discharge rate in 2*HALFWIN second windows
-        if nargin < 2 || isempty(metric), metric = 'M'; end
-        if nargin < 3 || isempty(thresh), thresh = 5e-2; end
-        if nargin < 4 || isempty(min_electrodes), min_electrodes = 40; end
-
-        Nouter = 1e4;
-        HALFWIN = 2;
-
-        h = figure('name', 'hist2d_rho', 'position', [0 0 2 1] * 2);
-        data = F.CompiledData;
-        mask = strcmp(data.metric, metric) ...
-            & data.nchannels > min_electrodes;
-        data = data(mask, :);
-
-        trange = quantile(data.rho_time_offset, [0 1]);
-        tbins = linspace(trange(1), trange(2), diff(trange)/2 + 1);  % Divide times into ~2s intervals
-
-
-        % Group data by patient; get indices;
-        % determine the lowest number of discharges in each
-        % patient. Use this as the resample number
-        G = findgroups(data.patient);
-        N = min(splitapply(@numel, G, G));
-        rho = sign(data.rho) .* double(data.rho_pval < thresh);
-        
-        % Uncomment here to use direction instead of correlation
-%         dir = angle(exp(1j*data.dir - data.iw_angle));
-%         rho = double(abs(dir) <= pi/2) - double(abs(dir) >= pi/2);
-
-        
-        % Create a function to add noise (I set this arbitrarily...) and
-        % function that will shuffle a set of indices
-        noise_for = @(inds) 1 * randn(size(inds)); 
-
-        % Get the relevant indices of data for each patient (i.e. those of
-        % all times and those of sig times)
-        Iall = arrayfun(@(ii) find( (G == ii) ), 1:max(G), 'uni', 0);  % indices of all times for each patient
-
-        
-        % Get our observation
-        obs_pos = arrayfun(@(tt) sum(abs(tt - data.rho_time_offset(rho == 1)) < HALFWIN), tbins);
-        obs_neg = arrayfun(@(tt) sum(abs(tt - data.rho_time_offset(rho == -1)) < HALFWIN), tbins);
-        obs_all = arrayfun(@(tt) sum(abs(tt - data.rho_time_offset) < HALFWIN), tbins);
-        
-        obs = ([obs_pos; obs_neg] ./ obs_all)';
-            
-        % Initialize matrices to store the results
-        dataR = nan(numel(tbins), 3, Nouter);
-        for ii = 1:Nouter
-
-            % Get resampled indices (bootstrap Ninner times from each patient)
-            subs = cellfun(@(x) randi(numel(x), 1, N), Iall, 'uni', 0);  % random resampling of indices
-            IR = cell2mat(cellfun(@(x, s) x(s), Iall, subs, 'uni', 0));  % resampled indices
-
-            rhoR = rho(IR(:));
-            timeR = data.rho_time_offset(IR(:)) + noise_for(IR(:));
-
-            rho_pos = arrayfun(@(tt) sum(abs(tt - timeR(rhoR == 1)) < HALFWIN), tbins);
-            rho_neg = arrayfun(@(tt) sum(abs(tt - timeR(rhoR == -1)) < HALFWIN), tbins);
-            rho_all = arrayfun(@(tt) sum(abs(tt - timeR) < HALFWIN), tbins);
-            dataR(:, :, ii) = [rho_pos; rho_neg; rho_all]';
-        end
-        ybins = [1 -1];
-        proportions = dataR(:, [1 2], :) ./ dataR(:, 3, :);
-
-        ptest = .05; % move this up
-        
-        % Find time points where there are too many nans ( more than ptest)
-        pct_finite = mean(isfinite(proportions), 3);
-        mask = pct_finite < 1-ptest;
-        
-        Q = quantile(proportions, [ptest/2 1-ptest/2], 3);
-        Qlo = Q(:, :, 1); Qlo(mask) = nan;
-        Qhi = Q(:, :, 2); Qhi(mask) = nan;
-%         Q = min(proportions, [], 3);
-        md = nanmedian(proportions, 3); md(mask) = nan;
-        mn = nanmean(proportions, 3); mn(mask) = nan;
-        sd = nanstd(proportions, [], 3); sd(mask) = nan;
-        z = mn ./ sd;
-
-
-        % *** Show the result ***
-        interp_ = @(x) interp(x, 5);
-        fill_ = @(x) fillmissing(x, 'linear', 'endvalues', 'none');
-        fillQ_ = @(x, val) fillmissing(x, 'constant', val, 'endvalues', 'none');
-        
-        tbinsI = interp_(tbins);
-        
-        % Show mean and std
-        mnI = [interp_(fill_(mn(:, 1))) interp_(fill_(mn(:, 2)))];
-        sdI = [interp_(fill_(sd(:, 1))) interp_(fill_(sd(:, 2)))];
-        
-        % Show median and 95CI
-        mnI = [interp_(fill_(md(:, 1))) interp_(fill_(md(:, 2)))];
-        QloI = [interp_(fillQ_(Qlo(:, 1), 0)) interp_(fillQ_(Qlo(:, 2), 0))];
-        QhiI = [interp_(fillQ_(Qhi(:, 1), 1)) interp_(fillQ_(Qhi(:, 2), 1))];
-        
-        T = tiledlayout(h, 2, 1);
-        
-        % show normalized difference
-        tt = [tbinsI fliplr(tbinsI)]';
-%         yy_pos = [Q(:, 1, 1); flipud(Q(:, 1, 2))];  % quantiles instead of std
-
-        dnames = ["Corr" "Anticorr"];
-        m0 = strsplit(metric, 'sub');
-        color = F.Style.(m0(1)).color;
-        gray_ = .5 * [1 1 1];
-        for jj = 1:2
-
-            % Show the CI
-            ax = nexttile(T, jj);
-            
-%             yy = fill_(mnI(:, jj) + 3*[-1 1] .* sdI(:, jj));  % sd limits
-            yy = [QloI(:, jj) QhiI(:, jj)];  % quantile limits
-            
-            yyF = [yy(:, 1); flipud(yy(:, 2))];
-            mask = isfinite(yyF);
-            temp = fill(ax, tt(mask), yyF(mask), 1, ...
-                'facecolor', color, 'facealpha', .5, 'linestyle', 'none');
-
-            % highlight where lower bound is above 0
-            hold(ax, 'on');
-            mask = yy(:, 1) > 0;
-            temp = area(ax, tbinsI(mask), yy(mask, 1), ...
-                'facecolor', gray_, 'linestyle', 'none');
-
-            % Show the mean
-            plot(ax, tbinsI, mnI(:, jj), 'color', color, ...
-                'linewidth', 2, 'displayname', dnames(jj))
-            hold(ax, 'off');
-
-            % highlight IW time and effect size = 0
-%             xline(ax, 0)
-            yline(ax, 0)
-
-            % Prettify
-            grid(ax, 'on')
-            axis(ax, 'tight');
-            title(ax, dnames(jj));
-
-        end
-
-        linkaxes(T.Children, 'xy');
-        ylim(ax, [0 1]);
-%         xlim(ax, [-30 50]);  % Nothing significant beyond this
-        xlabel(ax, 'Time [s]');
-        ylabel(T, 'Rate');
-        temp = legend({'95%CI', 'CI>0', 'median'}, 'location', 'eastoutside');
-
-
-
-        % imagesc visualization
-%         imagesc(tbins, ybins, z', [3 inf]); axis xy
-%         ax = gca;
-%         grid(ax, 'on')
-%         colormap(ax, 1-gray)
-%         cb = colorbar;
-%         title(cb, ["Z" "(\mu/\sigma)"]);
-% 
-%         % show all points where difference is significant to ptest threshold
-%         [xmask, ymask] = find(Q > 0);      
-%         hold on; plot(tbins(xmask), .5*ybins(ymask), 'r.'); hold off
-% 
-%         % highlight IW crossing time (t=0)
-%         xline(0)
-%         yline(0)
-% 
-%         % prettify
-%         legend(sprintf('\\lambda(t)>0, p<%4.2g', 1/Nouter), 'box', 'off', 'location', 'northoutside')
-%         title(sprintf('Effect size \\lambda(t) (%s)', metric))
-%         xlabel('Time [s]');
-%         ylabel(sprintf('\\rho (p<5e%0.0f)', log10(thresh/5)))
-%     %     xlim([-30 30]) 
-%         yticks([-1 0 1])
-%         ylim([-1 1])
-
-
-        % print result
-        F.print(h, F.prefix_better(metric));
-    end
-
     function [counts, shuffles] = allP_hist2d_rho_tw_v_iw_v0(F, metric, thresh, min_electrodes)
         % Shows a 2d histogram of the correlations between the tw and the
         % iw. Uses a bootstrapping & shuffling procedure. 
@@ -3223,424 +3877,73 @@ methods
         % print result
         F.print(h, F.prefix_better(metric));
     end
-
-    function mdl = allP_glm_rho_tw_v_iw(F, metric, thresh, min_electrodes)
-        if nargin < 2 || isempty(metric), metric = 'M'; end
-        if nargin < 3 || isempty(thresh), thresh = 5e-2; end
-        if nargin < 4 || isempty(min_electrodes), min_electrodes = 0; end
+    
+    function [yy, xx, pat] = allP_percent_sigest_rho(F, thresh)
+        % [yy, xx, pat] = allP_percent_sigest_rho(F, thresh=5e-2)
+        %
+        % Plots the percent of the discharges that have strong
+        % relationships with the main IW template. i.e. Percentage of
+        % correlations with p-value less than thresh for each patient and
+        % seizure, using each method in F.Metrics.
+        
+        if nargin < 2 || isempty(thresh), thresh = 5e-2; end
+        
+        h = figure('units', 'inches', 'position', [0 0 1 1] * 2.5, ...
+            'name', 'TW-IW corr');
+        ax = axes(h);
         
         data = F.CompiledData;
-        mask = ...
-            strcmp(data.metric, metric) ...  % limit to metric
-            & isfinite(data.rho) ...  % ... and correlation can be estimated
-            & data.nchannels >= min_electrodes;  % ... and IW observed on at least min_electrodes
-        data = data(mask, :);
-        
-        trange = quantile(data.rho_time_offset, [0 1]);
-        tbins = linspace(trange(1), trange(2), diff(trange)/5 + 1);  % Divide times into intervals
-
-
-        % Need: #(rho > 0) for each time bin; random effects: patient, seizure
-        % N ~ bin
-        
-%         data.bin = categorical(discretize(data.rho_time_offset, tbins));
-        data.rho_pos = data.rho > 0 & data.rho_pval < thresh;
-        data.rho_neg = data.rho < 0 & data.rho_pval < thresh;
-        [G, pat] = findgroups(data.patient);
-        
-        T = table();
-        tbins = -20:40;
-        for tt = tbins
-            temp = table();
-            Npos = splitapply(@sum, abs(data.rho_time_offset - tt) < 2 & data.rho_pos, G);
-            Nneg = splitapply(@sum, abs(data.rho_time_offset - tt) < 2 & data.rho_neg, G);
-            temp.pat = pat;
-            temp.Npos = Npos;
-            temp.Nneg = Nneg;
-            temp.bin = tt * ones(size(Nneg));
-            T = [T; temp]; %#ok<AGROW>
-        end
-        T.bin = categorical(T.bin);
-%         T0 = T;
-%         T = T0(T0.pat ~= "CUCX3", :);
-        mPos = fitglme(T, 'Npos ~ time_bin + (1|patient)', 'Distribution', 'poisson'); 
-        mNeg = fitglme(T, 'Nneg ~ bin + (1|pat)', 'Distribution', 'poisson');
-        est = [mNeg.Coefficients.Estimate, mPos.Coefficients.Estimate];
-        ci = [mNeg.coefCI, mPos.coefCI];
-        lb = ci(:, [1 3]); ub = ci(:, [2 4]);
-        
-        xx = [tbins(:); flipud(tbins(:))];
-        yy_p = [ci(:, 3); flipud(ci(:, 4))];
-        yy_n = [ci(:, 1); flipud(ci(:, 2))];
-        cc = ones(size(yy_p)) .* [1 5];
-        P = fill([xx xx], max([yy_p yy_n], 0) .* [1 -1], cc, 'facealpha', .5, 'linestyle', 'none');
-        hold on; plot(tbins, max(est, 0) .* [-1 1]); hold off
-        legend('corr', 'anti-corr')
-        ax = gca;
-        lbl = get(ax, 'yticklabel');
-        ax.YTickLabel = strrep(lbl, '-', '');
-        ylabel('\lambda')
-        xlabel('Time [s]')
-%         imagesc(tbins, [-1 1], lb', [0 inf]); colormap(1-gray); axis xy; colorbar
-        
-        
-    end
-    
-    function [obs, shuffles] = allP_hist2d_rho_tw_v_iw(F, metric, thresh, min_electrodes)
-        % Shows a 2d histogram of the correlations between the tw and the
-        % iw. Uses a bootstrapping & shuffling procedure. 
-        % Shuffle from the rho values. Keep times fixed
-        
-        if nargin < 2 || isempty(metric), metric = 'M'; end
-        if nargin < 3 || isempty(thresh), thresh = 5e-2; end
-        if nargin < 4 || isempty(min_electrodes), min_electrodes = 0; end
-        
-Nouter = 1e4;
-ptest = .01;
-
-h = figure('name', 'hist2d_rho', 'position', [0 0 1.5 1] * 2);
-data = F.CompiledData;
-mask = ...
-    strcmp(data.metric, metric) ...  % limit to metric
-    & isfinite(data.rho) ...  % ... and correlation can be estimated
-    & data.nchannels >= min_electrodes;  % ... and IW observed on at least min_electrodes
-data = data(mask, :);
-
-trange = quantile(data.rho_time_offset, [0 1]);
-xbins = linspace(trange(1), trange(2), diff(trange)/2 + 1);  % Divide times into intervals
-
-% Make rho into {-1, 0, 1} and get groups by patient
-[G, pat] = findgroups(data.patient);
-rho = sign(data.rho) .* double(data.rho_pval < thresh);
-rho_time = data.rho_time_offset;
-
-% Function to shuffle the data (shuffle the indices)
-inds0 = arrayfun(@(ii) find(G == ii), 1:max(G), 'uni', 0);
-shuffle_fun =@() cellfun(@(x) x(randperm(numel(x))), inds0, 'uni', 0);  % get a shuffle of indices
-bs_fun = @(tt, mask) histcounts(tt(mask), xbins);  % get counts in each interval
-
-
-% Get the observation: proportion of pos/neg rho in each bin
-pos_count = sum(splitapply(@(tt, mask) bs_fun(tt, mask), rho_time, rho > 0, G));
-neg_count = sum(splitapply(@(tt, mask) bs_fun(tt, mask), rho_time, rho < 0, G));
-obs = [neg_count; pos_count];
-
-
-% Get the H0 distribution: resample rho values in each patient;
-% repeat Nouter times
-
-% Initialize the result matrix
-shuffles = nan(2, numel(xbins) - 1, Nouter);
-% rho_time2 = rho_time(cat(1, inds0{:}));
-for ii = 1:Nouter
-
-    % Shuffle the rho values in each patient
-    inds_shuff = shuffle_fun();
-%     rhoR = cell2mat(splitapply(@(x) {shuffle_fun(x)}, rho, G));
-
-    % Get the resampled observation: proportion of pos/neg rho in each bin
-    posR = cellfun(@(i0, iSh) bs_fun(rho_time(i0), rho(iSh) > 0), inds0, inds_shuff, 'uni', 0);
-    negR = cellfun(@(i0, iSh) bs_fun(rho_time(i0), rho(iSh) < 0), inds0, inds_shuff, 'uni', 0);
-
-    posR = sum(cat(1, posR{:}));
-    negR = sum(cat(1, negR{:}));
-    
-    shuffles(1, :, ii) = negR; 
-    shuffles(2, :, ii) = posR; 
-    
-end
-
-% Q = quantile(shuffles, 1-ptest, 3);
-pctl = mean(obs > shuffles, 3);
-
-tt = movmean(xbins, 2); tt = tt(2:end); % get bin centers
-imagesc(tt, [-1 1], pctl, [.95 1]); axis xy
-
-ax = gca;
-grid(ax, 'on')
-colormap(ax, 1-gray)
-cb = colorbar;
-cb.Label.String = 'Percentile';
-
-% show all points where difference is significant to ptest threshold
-inds = find(pctl > 1-ptest);  
-tnew = [tt; tt];
-val = ones(size(tnew)) .* [-1; 1]*.5;
-hold on; plot(tnew(inds), val(inds), 'r.'); hold off
-
-
-% prettify
-xline(0)
-legend(sprintf('p<%4.2g', ptest), 'box', 'off', 'location', 'northoutside')
-title(sprintf('PDF \\rho (%s, p<5e%0.0f)', metric, log10(thresh/5)))
-xlabel('Time [s]');
-% xlim([-30 30])  % No significant values outside of this. If you change things, you might want to double check this.
-yticks([-1 0 1])
-ylim([-1 1])
-ylabel('CC')
-
-% print result
-F.print(h, F.prefix_better(metric));
-
-    end
-
-    function [obs, shuffles] = allP_hist2d_rho_tw_v_iw_v2(F, metric, thresh, min_electrodes)
-        % Shows a 2d histogram of the correlations between the tw and the
-        % iw. Uses a bootstrapping & shuffling procedure. 
-        % Shuffle from the rho values. Keep times fixed
-        
-        if nargin < 2 || isempty(metric), metric = 'M'; end
-        if nargin < 3 || isempty(thresh), thresh = 5e-2; end
-        if nargin < 4 || isempty(min_electrodes), min_electrodes = 0; end
-        
-Nouter = 1e4;
-ptest = .01;
-
-h = figure('name', 'hist2d_rho', 'position', [0 0 1.5 1] * 2);
-data = F.CompiledData;
-mask = ...
-    strcmp(data.metric, metric) ...  % limit to metric
-    & isfinite(data.rho) ...  % ... and correlation can be estimated
-    & data.nchannels >= min_electrodes;  % ... and IW observed on at least min_electrodes
-data = data(mask, :);
-
-trange = quantile(data.rho_time_offset, [0 1]);
-xbins = linspace(trange(1), trange(2), diff(trange)/2 + 1);  % Divide times into intervals
-
-% Make rho into {-1, 0, 1} and get groups by patient
-[G, pat] = findgroups(data.patient);
-rho = sign(data.rho) .* double(data.rho_pval < thresh);
-rho_time = data.rho_time_offset;
-
-% Function to shuffle the data (shuffle the indices)
-inds0 = arrayfun(@(ii) find(G == ii), 1:max(G), 'uni', 0);
-shuffle_fun =@() cellfun(@(x) x(randperm(numel(x))), inds0, 'uni', 0);  % get a shuffle of indices
-bs_fun = @(tt, mask) histcounts(tt(mask), xbins) ./ histcounts(tt, xbins);  % get counts in each interval
-
-
-% Get the observation: proportion of pos/neg rho in each bin
-pos_count = nanmean(splitapply(@(tt, mask) bs_fun(tt, mask), rho_time, rho > 0, G));
-neg_count = nanmean(splitapply(@(tt, mask) bs_fun(tt, mask), rho_time, rho < 0, G));
-obs = [neg_count; pos_count];
-
-
-% Get the H0 distribution: resample rho values in each patient;
-% repeat Nouter times
-
-% Initialize the result matrix
-shuffles = nan(2, numel(xbins) - 1, Nouter);
-rho_time2 = rho_time(cat(1, inds0{:}));
-for ii = 1:Nouter
-
-    % Shuffle the rho values in each patient
-    inds_shuff = shuffle_fun();
-%     rhoR = cell2mat(splitapply(@(x) {shuffle_fun(x)}, rho, G));
-
-    % Get the resampled observation: proportion of pos/neg rho in each bin
-    posR = cellfun(@(i0, iSh) bs_fun(rho_time(i0), rho(iSh) > 0), inds0, inds_shuff, 'uni', 0);
-    negR = cellfun(@(i0, iSh) bs_fun(rho_time(i0), rho(iSh) < 0), inds0, inds_shuff, 'uni', 0);
-
-    posR = nanmean(cat(1, posR{:}));
-    negR = nanmean(cat(1, negR{:}));
-    
-    shuffles(1, :, ii) = negR; 
-    shuffles(2, :, ii) = posR; 
-    
-end
-
-% Q = quantile(shuffles, 1-ptest, 3);
-pctl = mean(obs > shuffles, 3);
-
-tt = movmean(xbins, 2); tt = tt(2:end); % get bin centers
-imagesc(tt, [-1 1], pctl, [.95 1]); axis xy
-
-ax = gca;
-grid(ax, 'on')
-colormap(ax, 1-gray)
-cb = colorbar;
-cb.Label.String = 'Percentile';
-
-% show all points where difference is significant to ptest threshold
-inds = find(pctl > 1-ptest);  
-tnew = [tt; tt];
-val = ones(size(tnew)) .* [-1; 1]*.5;
-hold on; plot(tnew(inds), val(inds), 'r.'); hold off
-
-
-% prettify
-xline(0)
-legend(sprintf('p<%4.2g', ptest), 'box', 'off', 'location', 'northoutside')
-title(sprintf('PDF \\rho (%s, p<5e%0.0f)', metric, log10(thresh/5)))
-xlabel('Time [s]');
-% xlim([-30 30])  % No significant values outside of this. If you change things, you might want to double check this.
-yticks([-1 0 1])
-ylim([-1 1])
-ylabel('CC')
-
-% print result
-F.print(h, F.prefix_better(metric));
-
-    end
-
-    function [obs, shuffles] = allP_hist2d_rho_tw_v_iw_v1(F, metric, thresh, min_electrodes)
-        % Shows a 2d histogram of the correlations between the tw and the
-        % iw. Uses a bootstrapping & shuffling procedure. 
-        % Shuffle from the rho values. Keep times fixed
-        
-        if nargin < 2 || isempty(metric), metric = 'M'; end
-        if nargin < 3 || isempty(thresh), thresh = 5e-2; end
-        if nargin < 4 || isempty(min_electrodes), min_electrodes = 0; end
-        
-Nouter = 1e4;
-
-h = figure('name', 'hist2d_rho', 'position', [0 0 1.5 1] * 2);
-data = F.CompiledData;
-mask = ...
-    strcmp(data.metric, metric) ...  % limit to metric
-    & isfinite(data.rho) ...  % ... and correlation can be estimated
-    & data.nchannels >= min_electrodes;  % ... and IW observed on at least min_electrodes
-data = data(mask, :);
-
-trange = quantile(data.rho_time_offset, [0 1]);
-xbins = linspace(trange(1), trange(2), diff(trange) + 1);  % Divide times into ~2s intervals
-
-% Make rho into {-1, 0, 1} and get groups by patient
-[G, pat] = findgroups(data.patient);
-rho = sign(data.rho) .* double(data.rho_pval < thresh);
-
-% Function to resample
-resample = @(x) x(randi(numel(x), size(x)));
-
-
-% Get the observation: mean proportion of pos/neg rho in each bin
-pos_count = splitapply(@(t, rho) ... % for each patient
-    histcounts(t(rho == 1), xbins), ...  % get #(rho > 0) in each time bin
-    data.rho_time_offset, rho, G);  % using (time_offset, rho) for groups in G (patient)
-neg_count = splitapply(@(t, rho) histcounts(t(rho == -1), xbins), data.rho_time_offset, rho, G);
-all_count = splitapply(@(t) histcounts(t, xbins), data.rho_time_offset, G);
-
-pos = mean(pos_count ./ all_count);
-neg = mean(neg_count ./ all_count);
-obs = [pos; neg];
-
-% Get the H0 distribution: resample rho values in each patient;
-% repeat Nouter times
-
-% Initialize the result matrix
-shuffles = nan(2, numel(xbins) - 1, Nouter);
-for ii = 1:Nouter
-
-    % Resample the rho values in each patient
-    rhoR = cell2mat(splitapply(@(x) {resample(x)}, rho, G));
-
-    % Get the resampled observation: proportion of pos/neg rho in each bin
-    posR = splitapply(@(t, rho) ... % for each patient
-        histcounts(t(rho == 1), xbins), ...  % get #(rho > 0) in each time bin
-        data.rho_time_offset, rhoR, G);  % using (time_offset, rho) for groups in G (patient)
-    negR = splitapply(@(t, rho) histcounts(t(rho == -1), xbins), data.rho_time_offset, rhoR, G);
-
-
-    shuffles(1, :, ii) =  mean(posR ./ all_count);
-    shuffles(2, :, ii) = mean(negR ./ all_count);
-end
-
-Q = quantile(shuffles, .95, 3);
-tt = movmean(xbins, 2); tt = tt(2:end);
-
-plot(tt, max(obs - Q, 0));
-legend('pos', 'neg')
-
-    end
-    
-    function [counts, counts_adj] = ZZallP_hist2d_rho_tw_v_iw(F, metric, thresh, min_electrodes)
-        % Shows a 2d histogram of the correlations between the tw and the
-        % iw. Uses a bootstrapping procedure. 
-        if nargin < 2 || isempty(metric), metric = 'M'; end
-        if nargin < 3 || isempty(thresh), thresh = 5e-2; end
-        if nargin < 4 || isempty(min_electrodes), min_electrodes = 0; end
-        
-        h = figure('name', 'hist2d_rho', 'position', [0 0 1.5 1] * 2);
-        data = F.CompiledData;
-        mask = strcmp(data.metric, metric) & data.nchannels > min_electrodes;
+        mask = ...  % only use data where
+            isfinite(data.rho_pval) ...  % the correlation could be computed (i.e. discharges detected on at least WaveProp.MinFinite electrodes)
+            & data.nchannels >= F.MinIWElectrodes;  % the IW was detected on at least min_electrodes
         data = data(mask, :);
 
-
-        trange = quantile(data.rho_time_offset, [0 1]);
-        xbins = linspace(trange(1), trange(2), diff(trange) + 1);
-        ybins = linspace(-1, 1, 3);
-
-        % Resample N points from each patient to generate a distribution, then
-        % repeat this Nouter times
-        G = findgroups(data.patient);
-        sig_mask = data.rho_pval < thresh;
-        N = min(splitapply(@numel, G(sig_mask), G(sig_mask)));
-        disp(N)
-        Nouter = 1e2;
-        inds = deal(nan(max(G), N));
+        [G, pat, sz, mtc] = findgroups(data.patient, data.seizure, data.metric);
         
-        for dummy = 1:Nouter
-            for ii = 1:max(G)  % Resample N points from each patient
-                
-                % Get high sig indices
-                X = find( (G == ii) & sig_mask );
-                subs = randi(numel(X), 1, N);
-                inds(ii, :) = X(subs);
-                
-            end
+        % Match x-values to order of F.Metrics
+        xx = arrayfun(@(mtc) find(mtc == F.Metrics), mtc);
+        x_mtc = F.Metrics;
+        
+        % Compute the number of rho with p<thresh (i.e. rho \neq 0, p<thresh)
+        yy = splitapply(@(x) mean(x < thresh)*100, data.rho_pval, G);
+        
+        % Plot the results
+        ln = F.gscatter_pat(xx, yy, pat, 'seizure', sz);
+        set(ln, 'linewidth', .5, 'markersize', 4);
+        
+        % Prettify
+        xticks(ax, unique(xx));
+        xticklabels(ax, x_mtc);
+        ylabel('Discharges with \rho \neq 0 [%]')
+        title('TW-IW correlation (\rho)');
+        
+        lgd = legend('location', 'eastoutside'); %#ok<NASGU>
+        xlim(quantile(xx, [0 1]) + [-1 1]*.4);
+        ylim([0 105]);
+        
+        
+        % Summary statement
+        disp('Percent rho \neq 0:')
+        for ii = unique(xx)'
+            dat = yy(xx == ii); 
             
-            % Get rhos that are significantly different from 0
-            xx = data.rho_time_offset(inds(:));
-            yy = data.rho(inds(:));
-
-            % compute the pdf
-            if dummy == 1
-                counts = histcounts2(xx, yy, xbins, ybins, 'normalization', 'pdf');
-            else
-                counts_new = histcounts2(xx, yy, xbins, ybins, 'normalization', 'pdf');
-                counts = counts + counts_new;
-            end
-        end
-
-        % take the average of the resulting pdf
-        counts = counts/dummy;
-        shuffles = nan([size(counts), Nouter]);
-        for ii = 1:numel(xbins)*1000
-            pp = randperm(size(counts, 1));
-            shuffles(:, :, ii) = counts(pp, :);
+            F.summarize_stat(x_mtc(ii), dat);
+            fprintf([ ...
+                '%s: In %d/%d seizures, at least 50%% of discharges\n', ...
+                'have a non-zero correlation with the IW pattern\n'...
+                '(median=%0.1f%%, range=[%0.1f%%,%0.1f%%], qq=[%0.1f%%,%0.1f%%]).\n' ...
+                ], ...
+                x_mtc(ii), sum(dat >= 50), numel(dat), ...
+                quantile(dat, [.5 0 1, .25 .75]));
         end
         
-        counts_adj = counts - quantile(shuffles, .95, 3);
         
-%         counts_adjSM = counts_adj;
-        % Smooth over 5 seconds 
-%         counts_adjSM = smoothdata(counts_adjSM, 2, 'gaussian', .2, 'samplepoints', ybins(2:end));
-%         counts_adjSM = smoothdata(counts_adjSM, 1, 'gaussian', 5, 'SamplePoints', xbins(2:end));
         
-        % Show the result
-%         imagesc(xbins, ybins, counts_adjSM', [0 .01]); axis xy; colorbar
-        imagesc(xbins, ybins, counts_adj' > 0); axis xy; 
-%         [v_max, v_ind] = max(counts_adjSM, [], 2);
+        F.print(F.prefix_better(''));
         
-        [v_max, v_ind] = max(counts - quantile(shuffles, .99, 3), [], 2);
-        lvl = max(quantile(v_max, 10/diff(trange)), 0);
-        mask = v_max > lvl; 
-        yc = (ybins(1:end-1) + ybins(2:end))/2;
-        xc = movmean(xbins, 2); xc = xc(2:end);
-        hold on; plot(xc(mask), yc(v_ind(mask)), 'r.'); hold off
-        xline(0)
-        ax = gca;
-        grid(ax, 'on')
-        colormap(ax, 1-gray)
-%         legend(sprintf('Peak (pdf>%0.4g)', lvl), 'box', 'off', 'location', 'northoutside')
-        legend(sprintf('p<.01'), 'box', 'off', 'location', 'northoutside')
-        title(sprintf('PDF \\rho (%s, p<5e%0.0f)', metric, log10(thresh/5)))
-        xlabel('Time [s]');
-        yticks([-1 0 1])
-        ylim([-1 1])
-        ylabel('CC')
         
-        F.print(h, F.prefix_better(metric));
     end
+    
     
     function [yy, xx, pat] = allP_percent_sigest_rho_v_dir(F, metric, thresh, min_electrodes)
         % [yy, xx, pat] = allP_percent_sigest_rho_v_dir(F, ...
@@ -3762,7 +4065,7 @@ legend('pos', 'neg')
         
     end
     
-    function [yy, ax] = allP_time_of_first_shift(F, metric, thresh)
+    function [yy, ax] = ZZallP_time_of_first_shift(F, metric, thresh)  % ZZ'd 6/14/21 
         data = F.CompiledData;
         if nargin < 2 || isempty(metric), metric = 'M10'; end
         if nargin < 3, thresh = pi/2; end
@@ -3886,7 +4189,7 @@ legend('pos', 'neg')
         F.print(F.prefix_better(sprintf('%s_%s_w%d', m1, m2, win)));
     end
     
-    function [yy, ax] = allP_large_shift_times(F, metric, thresh)
+    function [yy, ax] = ZZallP_large_shift_times(F, metric, thresh)  % ZZ'd 6/14/21 
         % [N, ax] = F.large_shift_times(metric='M10', thresh=pi/2)
         % Shows the number of large shifts for each patient
         if nargin < 2 || isempty(metric), metric = 'M10'; end
@@ -3906,7 +4209,7 @@ legend('pos', 'neg')
         
     end
     
-    function [xx, yy, ax] = allP_large_shift_counts(F, metrics, thresh)
+    function [xx, yy, ax] = ZZallP_large_shift_counts(F, metrics, thresh)  % ZZ'd 6/14/21 
         % [N, ax] = F.large_shift_counts(metric='M10', thresh=pi/2)
         % Shows the number of large shifts for each patient
         if nargin < 2 || isempty(metrics), metrics = F.Metrics; end
@@ -3999,9 +4302,8 @@ legend('pos', 'neg')
     end
     
     function allP_iw_nchannels(F)
+        % Shows the 
         data = F.get_iw_table(0);  % load the iw stats
-%         mask = data.wave_num == data.main_wave;
-%         data = data(mask, :);
         
         data.disagree = ismember( ...
             compose('%s %d', string(data.patient), data.seizure), ...
@@ -4020,7 +4322,7 @@ legend('pos', 'neg')
         
         
         h = figure('name', 'iw_nchannels', 'position', [0 0 .6*4 1.5] * 2);
-        T = tiledlayout(h, 1, 4);
+        T = BVNY.tiledlayout(h, 1, 4);
         
         
         ax = nexttile(T, [1 2]);
@@ -4031,8 +4333,7 @@ legend('pos', 'neg')
         for ll = ln', ll.ZData = -1*ones(size(ll.XData)); end
         
 
-
-        % show disagrees with asterisks
+        % show disagree meain waves with asterisks
         mask = data.disagree & data.wave_num == data.main_wave;
         ln = F.gscatter_pat(data.nchannels(mask), data.patient(mask));
         set(ln, 'marker', '*', 'color', [0 0 0], 'markersize', 6);
@@ -4065,13 +4366,18 @@ legend('pos', 'neg')
         legend(ax, 'Secondary', 'Main')
         title(ax, 'Channels recruited to IW')
         
+        % Summarize mean, range number of channels in primary and secondary
+        % waves
+        F.summarize_stat('Nchan main IW', dat.nchannels, 'range');
+        F.summarize_stat('Nchan secondary IW', dsub.nchannels, 'range');
+        
         F.print(h, F.prefix_better(''));
     end
     
     function [yy, ax] = allP_iw_stats(F, min_electrodes)
         % Show info about detected IW for each patient and seizure
         
-        if nargin < 2, min_electrodes = 0; end
+        if nargin < 2, min_electrodes = F.MinIWElectrodes; end
         PCUTOFF = -8;
         SPEEDCUTOFF = 8;
         
@@ -4111,17 +4417,17 @@ legend('pos', 'neg')
             compose('%s %d', string(data.patient), data.seizure), ...
             F.Disagree.Row);
 
-        T = tiledlayout(gcf, 1, numel(fields));
+        T = BVNY.tiledlayout(gcf, 1, numel(fields));
         for ff = fields
             ax = nexttile(T);
             dat = data;
             
             % Separate mains and secondaries
             mains = data.wave_num == data.main_wave;
-            xx = double(mains & data.nchannels >= min_electrodes);  % x=0 -> secondary; x=1 -> main
+            xx = double(mains & data.nchannels >= min_electrodes);  % x=0 -> non-IW; x=1 -> IW
             yy = dat.(ff);
             % Summarize mean with STD
-            F.summarize_stat(ff, rmmissing(yy(xx == 1)), [], 'std');
+            F.summarize_stat(sprintf('\t%s', ff), rmmissing(yy(xx == 1)), 'std');
             F.ttest2_(rmmissing(yy(xx == 0)), rmmissing(yy(xx == 1)), ...
                 'vartype', 'equal');
             
@@ -4135,7 +4441,7 @@ legend('pos', 'neg')
 
             % show disagrees with asterisks
             mask = dat.disagree & dat.wave_num == dat.main_wave;
-            ln = F.gscatter_pat(xx, yy(mask), dat.patient(mask));
+            ln = F.gscatter_pat(xx(mask), yy(mask), dat.patient(mask));
             set(ln, 'marker', '*', 'color', [0 0 0], 'markersize', 6);
             for ll = ln', ll.ZData = 1*ones(size(ll.XData)); end
 
@@ -4161,8 +4467,12 @@ legend('pos', 'neg')
             ylabel(labels.(ff){2})
             xlim(quantile(xx, [0 1]) + .5*[-1 1])
             xticks([0 1])
-            xticklabels(["Exc" "Inc"])
+            xticklabels(["Non-IW" "IW"])
         end
+        
+        % Print N's for each group
+        fprintf('\t Non-IW n=%d \t IW n=%d\n', histcounts(categorical(xx)));
+        
         lgd = findobj(T, 'type', 'legend');
         set(lgd, 'visible', 'off');
         set(lgd(1), 'visible', 'on', 'location', 'eastoutside')
@@ -4257,7 +4567,7 @@ legend('pos', 'neg')
         sz_num = find(strcmp(pat, F.SeizureInfo.name));
         
         h = figure('name', 'compare_fits', 'position', [0 0 3*1.5+1 2]);
-        T = tiledlayout(h, 2, 3, 'TileSpacing', 'compact');
+        T = BVNY.tiledlayout(h, 2, 3, 'TileSpacing', 'compact');
         
         if pat == "c7_Seizure1", rotate_by = -pi/2; 
         elseif contains(pat, "MG49"), rotate_by = pi;
@@ -4420,7 +4730,7 @@ legend('pos', 'neg')
         
     end
 
-    function h = compare_metrics(F, pat, metrics, print_flag)
+    function h = ZZcompare_metrics(F, pat, metrics, print_flag)  % ZZ'd 6/14/21 
         % Plot direction rasters from metrics for patient in pat
         if nargin < 2 || isempty(pat), pat = "c7_Seizure1"; end
         if isnumeric(pat), pat = string(F.SeizureInfo.name{pat}); end
@@ -4430,7 +4740,7 @@ legend('pos', 'neg')
         sz_num = find(strcmpi(pat, F.SeizureInfo.name));
         
         h = figure('name', 'compare_fits', 'position', [0 0 2.5 1] * 2);
-        T = tiledlayout(h, 3, 6, 'TileSpacing', 'compact');
+        T = BVNY.tiledlayout(h, 3, 6, 'TileSpacing', 'compact');
         
         if pat == "c7_Seizure1", rotate_by = -pi/2; 
         elseif contains(pat, "MG49"), rotate_by = pi;
@@ -4520,12 +4830,11 @@ legend('pos', 'neg')
         
     end
     
-    function data = compile_fits(F, interval, dir_index_win)
+    function data = compile_fits(F, interval)
         % int is the interval surrounding the IW to assign phase 1 (early)
         % or phase 3 (late)
         
         if nargin < 2 || isempty(interval), interval = Inf; end  
-        if nargin < 3 || isempty(dir_index_win), dir_index_win = 5; end
         USE_MID = true;  % compute the intervals from the midpoint of the IW (or from the bounds)
         
         % Load the IW and TW data
@@ -4910,7 +5219,6 @@ end
 
 methods (Static)
     [files, names] = txt2files(fname) 
-    style = set_style
     
     function [hyp, p, ci, stats] = ttest2_(x, y, varargin)
         % Wrapper for ttest2. Prints some information to stdout
@@ -4923,67 +5231,71 @@ methods (Static)
         fprintf('Estimated difference in means: [%0.3g, %0.3g]\n', ci);
     end
    
-    function summarize_stat(str, xx, method, stat)
-        % methods are '', 'ang', or 'halfang'; stat is 'ci', 'std', 'range'
-        % '': normal
-        % 'ang': circular mean
-        % 'halfang': half normal converted to °
-        % Using stat='ci' means estimating the distribution mean with CI;
-        % using stat='std' means estimating the sample mean with STD; using
-        % stat='range' returns the median and range of the observations
-        % stat='iqr' returns the median and IQR
+    function summarize_stat(str, xx, stat)
+        % summarize_stat(str, xx, stat="std")
+        % stat: 
+            % 'VM': returns estimated mean and 95%CI assuming Von Mises data
+            % 'ci': returns estimated mean and 95%CI assuming normal data
+            % 'std': returns sample mean and STD 
+            % 'range': returns sample median and range
+            % 'iqr': returns sample median and quartiles [.25, .75]
+            % 'mad': returns sample median and median abs dev
+            % 'ang_var': returns sample angular mean and variance
+            % 'ang_range': sample angular median and median-centered range
+            % 'ang_iqr': sample angular median and 1st & 3rd quantiles
+            % 'ang': Angular equivalent of the default stat
+            
         
-        if nargin < 3 || isempty(method), method = ''; end
-        if nargin < 4 || isempty(stat), stat = "iqr"; end
-        method = validatestring(method, {'', 'ang', 'halfang'});
-        stat = validatestring(stat, ["ci", "std", "range", "iqr"]);
+        DEFAULT_STAT = "std";
+        if nargin < 4 || isempty(stat), stat = DEFAULT_STAT; end
+        stat = validatestring(stat, ["ci", "std", "range", "iqr", "mad", ...
+            "vm", "ang_var", "ang_range", "ang_iqr", "ang"]);
+        if stat == "ang", stat = sprintf("ang_%s", DEFAULT_STAT); end
+        
         str = sprintf('%8s', str);  % Align messages
         
-        switch method
-            case ''
-                if stat == "ci"
-                    fprintf('%s: mean, [95%%CI] = %0.3g, [%0.3g, %0.3g]\n', ...
-                        str, mean(xx), mean(xx) + 2/sqrt(numel(xx))*std(xx) * [-1 1]);
-                elseif stat == "std"
-                    fprintf('%s: mean (STD) = %0.3g (%0.3g)\n', ...
-                        str, mean(xx), std(xx));
-                elseif stat == "range"
-                    fprintf('%s: median [range] = %0.3g [%0.3g, %0.3g]\n', ...
-                        str, median(xx), quantile(xx, [0 1]));
-                elseif stat == "iqr"
-                    fprintf('%s: median [IQR] = %0.3g [%0.3g]\n', ...
-                        str, nanmedian(xx), iqr(xx));
-                end
-            case 'ang'
-                if stat == "ci"
-                    fprintf('%s: circ mean, [95%%CI] = %0.3f°, [%0.3f°, %0.3f°]\n', ...
-                        str, rad2deg(circ_mean(rmmissing(xx))), ...
-                        rad2deg(circ_mean(rmmissing(xx)) + circ_confmean(rmmissing(xx)) * [-1 1]));
-                elseif stat == "std"
-                    fprintf('%s: circ mean (circ var) = %0.3f° (%0.3f)\n', ...
-                        str, rad2deg(circ_mean(rmmissing(xx))), ...
-                        circ_var(rmmissing(xx)));
-                elseif stat == "range"
-                    md = circ_median(xx);
-                    Q = quantile(fix_angle(xx - md), [0 1]);
-                    Q = fix_angle(Q + md);
-                    fprintf('%s: median [range] = %0.3g° [%0.3g°, %0.3g°]\n', ...
-                        str, rad2deg(md), Q);
-                elseif stat == "iqr"
-                    md = circ_median(rmmissing(xx));
-                    Q = quantile(fix_angle(xx - md), [0.25 .75]);
-                    Q = fix_angle(Q + md);
-                    fprintf('%s: median [IQR] = %0.3g° [%0.3g°]\n', ...
-                        str, rad2deg(md), rad2deg(fix_angle(diff(Q))));
-                end
-            case 'halfang'
-                % ... you're never going to use this... not updating
-                sig2mean = @(sigma) sigma * sqrt(2)/sqrt(pi);
-                [sigma, ci] = mle(xx, 'distribution', 'Half Normal');
-                
-                fprintf('%s: halfnorm mean, [95%%CI] = %0.3f°, [%0.3f°, %0.3f°]\n', ...
-                    str, rad2deg(sig2mean(sigma)), ...
-                    rad2deg(sig2mean(ci)));
+        switch stat
+            case "mad"
+                fprintf('%s: median (MAD) = %0.3g (%0.3g)\n', ...
+                    str, median(xx), mad(xx));
+            case "ci"
+                fprintf('%s: mean, [95%%CI] = %0.3g, [%0.3g, %0.3g]\n', ...
+                    str, mean(xx), mean(xx) + 2/sqrt(numel(xx))*std(xx) * [-1 1]);
+            case "std"
+                fprintf('%s: mean (STD) = %0.3g (%0.3g)\n', ...
+                    str, mean(xx), std(xx));
+            case "range"
+                fprintf('%s: median [range] = %0.3g [%0.3g, %0.3g]\n', ...
+                    str, median(xx), quantile(xx, [0 1]));
+            case "iqr"
+                fprintf('%s: median [IQR] = %0.3g [%0.3g, %0.3g]\n', ...
+                    str, quantile(xx, [.5 .25 .75]));
+            case ["vm" "ang_ci"]
+                fprintf('%s: circ mean, [95%%CI] = %0.3f°, [%0.3f°, %0.3f°]\n', ...
+                    str, rad2deg(circ_mean(rmmissing(xx))), ...
+                    rad2deg(circ_mean(rmmissing(xx)) + circ_confmean(rmmissing(xx)) * [-1 1]));
+            case ["ang_var" "ang_std"]
+                fprintf('%s: circ mean (circ var) = %0.3f° (%0.3f)\n', ...
+                    str, rad2deg(circ_mean(rmmissing(xx))), ...
+                    circ_var(rmmissing(xx)));
+            case "ang_mad"
+                md = circ_median(xx);
+                abs_devs = abs(fix_angle(xx - md));
+                ang_mad = circ_mean(abs_devs);
+                fprintf('%s: circ median [MAD] = %0.3g (%0.3g)\n', ...
+                    str, rad2deg(md), rad2deg(ang_mad));
+            case "ang_range"
+                md = circ_median(xx);
+                Q = quantile(fix_angle(xx - md), [0 1]);
+                Q = fix_angle(Q + md);
+                fprintf('%s: median [range] = %0.3g° [%0.3g°, %0.3g°]\n', ...
+                    str, rad2deg(md), Q);
+            case "ang_iqr"
+                md = circ_median(rmmissing(xx));
+                Q = quantile(fix_angle(xx - md), [0.25 .75]);
+                Q = fix_angle(Q + md);
+                fprintf('%s: median [IQR] = %0.3g° [%0.3g°, %0.3g°]\n', ...
+                    str, rad2deg(md), rad2deg(Q));            
         end
         
     end
@@ -5013,10 +5325,20 @@ methods (Static)
         iw_info = foldercontents2struct('iw_info');
    end
     
-   function [sc] = gscatter_pat(ax, xx, yy, pat, varargin)
-        %[sc] = gscatter_pat(ax=gca, xx=[], yy, pat, ::'range', (Nx2)::)
-        % only 6 because MG49 only shows up once now and this way colors
-        % match with fig0
+   function ln = gscatter_pat(ax, xx, yy, pat, varargin)
+        % ln = gscatter_pat(ax=gca, xx=[], yy, pat, ::'range', (Nx2)::, ::'seizure', Nx1::)
+        % Optional name-value pairs: 
+        %   'range', [Nx2]:     shows lines representing the data range for each
+        %                       y-value
+        %   'seizure', [Nx1]:   groups by patient as well as seizure; still
+        %                       colors by patient; shows lines
+        
+        
+        % only 6 because I was showing two IW from MG49 at one point and
+        % this matches that scheme. Not doing that anymore, but used to
+        % this encoding now, so don't want to change it.
+        
+        % Get the same color and linestyle every time
         cmap = repmat(lines(6), 2, 1);
         lso = 'oooooo^^^^^';
         
@@ -5060,8 +5382,14 @@ methods (Static)
         end
         assert(iscell(pat) || isstring(pat), ...
             'Expected F.(ax*, xx*, yy, pat). Asterisks denote optional.');
+        if iscell(pat), pat = string(pat); end
+        
+        % Get the patient numbers
+        patient_number = arrayfun(@(p) BVNY.PatientNum(p), pat);
+        
         sts = ax.NextPlot;
         
+        % See if 'range' was given as an argument and respond
         range_ind = false(size(varargin));
         range_ind(1:2:end) = contains(lower(varargin(1:2:end)), 'range');
         if any(range_ind)
@@ -5071,53 +5399,77 @@ methods (Static)
         end
         assert(size(data_range, 1) == numel(yy));
         
+        % See if 'seizure' was given as an argument and respond
+        seiz_ind = false(size(varargin));
+        seiz_ind(1:2:end) = contains(lower(varargin(1:2:end)), 'seizure');
+        if any(seiz_ind)
+            seiz = varargin{find(seiz_ind) + 1};
+            group = findgroups(pat, seiz);
+            linestyle = '-';
+        else
+            group = findgroups(patient_number);
+            linestyle = '';
+        end
         
-        % Create mapping and reorder data
-        sz = SeizureInfo;
-        [~, p, pa] = findgroups(sz.patient, sz.patientAlt);
-        MAP = containers.Map(p, pa);
-        G2 = cellfun(@(x) MAP(x), pat);
         
-        [G2, so] = sort(G2);
-        yy = yy(so);
-        pat = pat(so);
-        data_range = data_range(so, :);
-        
-        % maintain the same colors/lines every time
-        
-
+        % Get the xx values
         if isempty(xx)
-            xx = rescale(G2, .8, 1.2, ...
+            xx = rescale(patient_number, .8, 1.2, ...
                 'inputmin', 1, 'inputmax', 11);
             XLIM = [.6 1.4];
             XTICK = [];
             if ~all(isnan(data_range))
-                xx = splitapply(@(x) {x(1)+.15*normalize(1:numel(x), 'center')'}, G2, G2);
-                xx = cat(1, xx{:});
+                % Spread the xx's apart a little
+                for ii = unique(patient_number)'
+                    mask = patient_number == ii;
+                    xx(mask) = patient_number(mask) + .15*normalize(1:sum(mask), 'center')';
+                end
                 XLIM = quantile(xx, [0 1]) + .1*range(xx) * [-1 1];
             end
         else
-            xx = xx(so);
             XLIM = [];
             XTICK = 'auto';
         end
 
-        for ii = 1
+        
+        % Put everything in a table for convenience
+        T = table(xx, yy, pat, data_range, group, patient_number);
+        T = sortrows(T, 'patient_number');
+        
 
-            ln = plot(ax, [xx(:), xx(:)]', data_range');
-            hold(ax, 'on');
-            set(ax, 'colororder', cmap(G2, :));
-            sc = gscatter(ax, xx, yy, pat, ...
-                cmap(unique(G2), :), lso(unique(G2)), [], 'on');
-            for ss = sc', ss.MarkerFaceColor = ss.Color; end
-            hold(ax, 'off');
-            grid on
-            box off
-            xticks(XTICK);
-            xlabel([]);
-            if ~isempty(XLIM), xlim(XLIM); end
-            
+        % Show ranges
+        ln_range = [];
+        if ~all(isnan(T.data_range), 'all')
+            ln_range = plot(ax, [T.xx(:), T.xx(:)]', T.data_range', ...
+                'tag', 'range');
+            set(ax, 'colororder', cmap(T.patient_number, :));
         end
+        
+        % Show scatters
+        hold(ax, 'on');
+        ln = splitapply(@(x, y, pat_num, pat) ...
+                plot(ax, x, y, [linestyle lso(pat_num(1))], ...
+                    'displayname', pat(1), ...
+                    'color', cmap(pat_num(1), :), ...
+                    'markerfacecolor', cmap(pat_num(1), :)), ...
+            T.xx, T.yy, T.patient_number, T.pat, T.group);
+        hold(ax, 'off');
+        
+        % Make a legend with one entry per patient
+        [~, ~, pnum] = findgroups(T.group, T.patient_number);
+        [~, upats] = unique(pnum);
+        legend(ax, ln(upats));
+        
+        % Prettify
+        grid on
+        box off
+        xticks(XTICK);
+        xlabel([]);
+        if ~isempty(XLIM), xlim(XLIM); end
+        
+        % return all lines
+        ln = [ln; ln_range];  
+            
         ax.NextPlot = sts;
 
     end
@@ -5129,6 +5481,7 @@ end
 
 
 %% --- Local functions ---
+
 
 function save_fig_(F, h)
 
