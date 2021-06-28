@@ -208,9 +208,6 @@ classdef SCM < handle
 
 
                                 % Potassium is dynamic but dV*, Dii have sigmoid response functions            
-
-                                
-
                                 scm.dVe = [-Inf, Inf]; % limits are naturally imposed with sigmoid functions
                                 scm.dVi = [-Inf, Inf];
 
@@ -893,9 +890,7 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
         
         function map = get.excitability_map(P)
 			if isempty(P.excitability_map)
-                map = zeros(P.grid_size);
-                map(P.ellipse) = .5;
-                P.excitability_map = map;
+                P.excitability_map = P.ellipse([], [], .5);
 			end
             map = P.excitability_map;
 
