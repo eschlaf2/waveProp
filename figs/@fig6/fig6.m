@@ -11,7 +11,8 @@ properties
     Smoothing = 1  % seconds
     CompiledData
     FitDiffs
-    SlidingDirs
+    SlidingDirs  % Renamed to StableDirs on 6/14/21
+    StableDirs
     Disagree
     WaveFits
     ExampleSeizures = ["c7_Seizure1" "MG49_Seizure43" "BW09_Seizure2" "CUCX4_Seizure1"]
@@ -735,7 +736,6 @@ methods
         
     end
     
-    
     function out = kl_divergence(F)
         % This computes a bunch of measures comparing the methods and the
         % resulting distributions; not just kl_divergence. 
@@ -812,7 +812,7 @@ methods
                 means = cellfun(@(s) circ_mean(rmmissing(s.Direction)), {fit1 fit2});
                 Dmean(ii, jj) = angle(exp(1j* diff(means) ));
             
-                % compute the KS stat between the distributions
+                % compute the K-stat between the distributions
                 pdf_kstat(ii, jj) = kstat(pdf1, pdf2);
                 
                 % Compute the circular cross correlation and determine the
@@ -960,6 +960,7 @@ methods
         end
         out = F.FitDiffs;
     end
+    
     function W = get_wave_fit(F, name)
         ind = strcmpi(F.WaveFits.Name, string(name));
         for ff = fieldnames(F.WaveFits)'
@@ -967,6 +968,7 @@ methods
         end
         
     end
+    
     function seizure_numbers = make_polarhist(F, seizure_numbers, window)
         if nargin < 2 || isempty(seizure_numbers)
             seizure_numbers = 1:height(F.SeizureInfo);
@@ -1349,8 +1351,8 @@ methods
                 xx = abs(rad2deg(out.pdf_xcorr_angular_lag));
                 yy = out.pdf_kstat_corr_aligned;
                 F.gscatter_pat(ax, xx, yy, out.pat);
-                title('PDF(M) v. PDF(D10)')
-                xlabel('Shift (\circ)')
+                title('\Phi_M v. \Phi_{D10}')
+                xlabel('Rotation (\circ)')
                 ylabel('K-stat')
                 xlim([-20 200]); xticks(-0:30:180); 
                 ylim([0 1.1*max(yy)])
@@ -1503,7 +1505,7 @@ methods
 
     end
     
-    function ax = show_max_dphi_dt(F, ax)
+    function ax = ZZshow_max_dphi_dt(F, ax)  % ZZ'd 6/14/21 
         % ax = show_max_dphi_dt(F, ax=gca)
         
         % Assumes only two methods.
@@ -1610,12 +1612,16 @@ methods
         
     end
     
-        
     function ax = show_stat_with_range(F, ax, stat, units)
         % ax = show_stat_with_range(F, ax=gca, stat='bias', units="")
         % Shows a stat for each seizure (e.g. bias, variance, cc) with its
         % range of observations from each 10s sliding window. Median is
         % shown with a marker; the line behind shows Q[0.05, 0.95])
+        
+        SHOW_SUMMARY_MARKERS = false;  
+            % indicator to show all values along the y-axis. Helpful for
+            % thinking things through, but not worth showing in the final
+            % figures.
         
         % Parse inputs
         if nargin < 2 || isempty(ax), ax = gca; end
@@ -1647,10 +1653,12 @@ methods
         F.gscatter_pat(ax, yy, out.pat, 'range', y_range);
         switch stat
             case 'Bias'
-                hold(ax, 'on')
-                plot(ax, 0*yy, y_range(:, 2), 'go', 'markersize', 4);  % max bias
-                plot(ax, 0*yy, yy, 'r.', 'markersize', 6);
-                hold(ax, 'off')
+                if SHOW_SUMMARY_MARKERS
+                    hold(ax, 'on') %#ok<UNRCH>
+                    plot(ax, 0*yy, y_range(:, 2), 'go', 'markersize', 4);  % max bias
+                    plot(ax, 0*yy, yy, 'r.', 'markersize', 6);
+                    hold(ax, 'off')
+                end
                 if units == "deg"
                     fprintf('%d seizures with max bias > 60°.\n', sum(abs(y_range(:, 2)) > 60));
                     fprintf('%d seizures with median bias < 60°.\n', sum(yy < 60));
@@ -1659,10 +1667,12 @@ methods
                     fprintf('%d seizures with median bias < π/3.\n', sum(yy < pi/3));
                 end
             case 'Variance'
-                hold(ax, 'on')
-                plot(ax, 0*yy, y_range(:, 1), 'bo', 'markersize', 4);  % min variance
-                plot(ax, 0*yy, yy, 'r.', 'markersize', 6);
-                hold(ax, 'off')
+                if SHOW_SUMMARY_MARKERS
+                    hold(ax, 'on') %#ok<UNRCH>
+                    plot(ax, 0*yy, y_range(:, 1), 'bo', 'markersize', 4);  % min variance
+                    plot(ax, 0*yy, yy, 'r.', 'markersize', 6);
+                    hold(ax, 'off')
+                end
                 if units == "deg"
                     fprintf('%d seizures with min var > 60°.\n', sum(abs(y_range(:, 1)) > 60));
                     fprintf('%d seizures with median var < 60°.\n', sum(yy < 60));
@@ -1671,10 +1681,12 @@ methods
                     fprintf('%d seizures with median var < 0.5.\n', sum(yy < 0.5));
                 end
             case 'STD'
-                hold(ax, 'on')
-                plot(ax, 0*yy, y_range(:, 1), 'bo', 'markersize', 4);  % min variance
-                plot(ax, 0*yy, yy, 'r.', 'markersize', 6);
-                hold(ax, 'off')
+                if SHOW_SUMMARY_MARKERS
+                    hold(ax, 'on') %#ok<UNRCH>
+                    plot(ax, 0*yy, y_range(:, 1), 'bo', 'markersize', 4);  % min variance
+                    plot(ax, 0*yy, yy, 'r.', 'markersize', 6);
+                    hold(ax, 'off')
+                end
                 if units == "deg"
                     fprintf('%d seizures with min std > 60°.\n', sum(abs(y_range(:, 1)) > 60));
                 else
@@ -1753,6 +1765,15 @@ methods
         ax.NextPlot = sts;
         
             
+    end
+    
+    figs = shifts(F)
+    function allP_shifts(F)
+        
+        figs = F.shifts();
+        for h = figs
+            F.print(h, F.prefix_better(h.Name));
+        end
     end
     
     function allP_pdf_distance2(F)
@@ -1936,9 +1957,8 @@ methods
 
         F.print(h, F.prefix_better(''));
     end
-
     
-    function allP_pdf_distance(F)
+    function ZZallP_pdf_distance(F)  % ZZ'd 6/14/21 
         
         out = F.FitDiffs;
         out.Dmean_diffs = rad2deg(out.Dmean_diffs);
@@ -2069,41 +2089,7 @@ methods
         F.print(h, F.prefix_better(''));
         
     end
-    
-    function ZZallP_main_iw(F, min_electrodes)  % ZZ'd 6/1/21
-        % allP_main_iw(F, min_electrodes=50)
-        if nargin < 2 || isempty(min_electrodes), min_electrodes = 50; end
         
-        iw_all = BVNY.get_iw_main;
-        Nch = structfun(@(s) numfinite(s.template.template(s.main_wave, :)), iw_all);
-        mask = Nch >= min_electrodes;
-        h = figure('name', 'iw_templates'); fullwidth(true);
-        T = BVNY.tiledlayout(h, 'flow');
-        
-        fields = fieldnames(iw_all);
-        for ff = string(fields(mask)')
-            tpl = squeeze(iw_all.(ff).template.template(iw_all.(ff).main_wave, :, :));  % TOA
-            fr_tpl = squeeze(iw_all.(ff).template.firing_rate(iw_all.(ff).main_wave, :, :));
-            [xx, yy] = find(isfinite(tpl));
-            t_val = tpl(isfinite(tpl));
-            fr_val = fr_tpl(isfinite(tpl));
-            
-            ax = nexttile(T);
-            scatter(ax, xx, yy, min(fr_val*.75, 200), t_val, 'filled');
-            axis square
-            colorbar
-            title(strrep(ff, '_', ' '))
-            xlim([0 11])
-            ylim([0 11])
-            xticks([])
-            yticks([])
-            box on
-        end
-        
-        F.print(h, F.prefix_better(''));
-        
-    end
-    
     function allP_dir_v_rho(F, ax, metric, min_electrodes)
         % Correlation v. angle (relative to IW angle)
         if nargin < 2 || isempty(ax), ax = []; end
@@ -2345,132 +2331,203 @@ methods
         
     end
     
-    function dirs = get.SlidingDirs(F)
-        % Computes the estimated mode direction in sliding MEAN_WIN=5s
-        % windows (OVERLAP=4s). Returns a structure with the estimated
-        % modes and angular variance for each TOA method in F.Metrics. Used
-        % to show the max shift and to count the large shifts to better to
-        % compute and store.
-        
+    function dirs = get.StableDirs(F)
         % If stored, get value and return
-        if ~isempty(F.SlidingDirs), dirs = F.SlidingDirs; return; end
+        if isempty(F.StableDirs)
+            F.StableDirs = F.compute_stable_intervals(); 
+        end
+        dirs = F.StableDirs;
+    end
+    
+    function dirs = compute_stable_intervals(F)
+        % Computes the TW direction in sliding WIN=5s windows (OVERLAP=4s)
+        % with low variance.
+        %
+        % For each seizure compute the sample mode and variance on sliding
+        % WIN s intervals (step size = STEP/10; oversample for increased
+        % robustness). *Undefine* (i.e. set to NaN) intervals with
+        % fewer than MIN_SAMPLES in the interval or where the variance is
+        % greater than ANGVAR_MAX. Further exclude intervals where less than
+        % 80% of the STEP s window surrounding the interval is undefined.
+        % Use a STEP s moving median to remove any remaining outliers.
+        % Shrink to the set of finite modes and split phases when dt >
+        % GAP_TOLERANCE or dphi > PHI_THRESH. Downsample to STEP. 
+        %
+        % STEP = 1; WIN = 5; PHI_THRESH = pi/6; GAP_TOLERANCE = 2;
+        % MIN_SAMPLES = 10; ANGVAR_MAX = .7◊.5 (M◊D10)
+        %
+        % Returns:
+        %   shifts: the change in direction between phases [rad]
+        %   duration_of_phase: the duration of each phase [s]
+        %   
+        % 
+        
         
         WIN = 5;
         OVERLAP = 4;
         STEP = WIN - OVERLAP;
+        PHI_THRESH = deg2rad(30);  % pi/6;
+        GAP_TOLERANCE = 2;
         
-        MIN_SAMPLES = max(WIN, 10); % require 1 sample per second
+        MIN_SAMPLES = max(WIN, 10); % require at least 1 sample per second or 10 samples
         ANGVAR_MAX = containers.Map(["M", "D10"], [.7 .05]);  % .5 is 60° of variance (i.e. 60° on either side of mean), so this is a little higher
+%         ANGCI_MAX = containers.Map(["M", "D10"], [pi/12 pi/24]);
 
+        WNG = warning;
         
         data = F.CompiledData;
         data = data(isfinite(data.dir), :);  % only use samples where phi is detected
         
         % Useful functions
-        test_times_ =@(samp_times) ceil(samp_times(1)):STEP:floor(samp_times(end));  
-        cellfun_ = @(varargin) cellfun(varargin{:}, 'uni', 0);
+        test_times_ =@(samp_times) ...
+            (ceil(samp_times(1)): STEP/10 : floor(samp_times(end)))';  
 
-        
         % Compute everything groupwise (grouped by seizure and metric)
-        [G, pat, sz, mtc] = findgroups(data.patient, data.seizure, data.metric);
-        dir = splitapply(@(dir) {dir}, data.dir, G);
-        samp_times = splitapply(@(time) {time}, data.time, G);
-        iw_center = splitapply(@(iwc) iwc(1), data.iw_center, G);
-        iw_angle = splitapply(@(iwa) iwa(1), data.iw_angle, G);
+        keys = ["patient" "seizure" "metric"];
+        [G, data_summ] = findgroups(grouptransform( ...
+            data(:, [keys, "iw_center", "iw_angle", "nchannels"]), keys, ...
+            @(x) fillmissing(x, 'constant', inf)));
 
-        % Get test_times for each group and initialize the rest of the computed vars
-        test_times = cellfun_(@(s_times) test_times_(s_times)', samp_times);
-        [ang_var, ang_mode, Nobs, shifts] = ...
-            deal(cellfun_(@(t_times) nan(size(t_times)), test_times));
-        % shifts = cellfun_(@(t_times) nan(size(t_times)), test_times);
-
+        TT = splitapply(@(t) {test_times_(t)}, data(:, "time"), G);
+        
+        %% For each seizure ...
         for ii = 1:max(G)
             
-            % Get sample times in the interval surrounding tt
-            inds_ = @(tt) abs(samp_times{ii} - tt) <= WIN/2;  
+            %% Get sample times in the interval surrounding tt
+            inds_ = @(tt) abs(data.time(G == ii) - tt) <= WIN/2;  
+            dirs = data.dir(G == ii);
+            dat = repmat(data_summ(ii, :), numel(TT{ii}), 1);
+            dat.test_times = TT{ii};
+            dat.time_rel = rescale(dat.test_times);
 
-            % Only compute measures where there are enough samples (if you try to
-            % compute where there are no samples you will get an error)
-            Nobs{ii} = arrayfun(@(tt) sum(inds_(tt)), test_times{ii});
-            time_mask = Nobs{ii} >= MIN_SAMPLES;
-            [~, ang_var{ii}(time_mask)] = arrayfun(@(tt) ...
-                circ_var(dir{ii}(inds_(tt))), test_times{ii}(time_mask));
+            %% Only compute measures where there are enough samples (if you
+            % try to compute where there are no samples you will get an
+            % error)
+            dat.Nobs = arrayfun(@(tt) sum(inds_(tt)), dat.test_times);
+            dat(dat.Nobs < MIN_SAMPLES, :) = [];
+            
+            %% Compute stats
+            warning('off', 'circ_confmean:requirementsNotMet');
+            [~, dat.ang_var] = arrayfun(@(tt) ...
+                circ_var(dirs(inds_(tt))), dat.test_times);
+            dat.ang_ci = arrayfun(@(tt) ...
+                circ_confmean(dirs(inds_(tt))), dat.test_times);
+            dat.ang_mean = arrayfun(@(tt) ...
+                circ_mean(dirs(inds_(tt))), dat.test_times);
+            dat.ang_mode = arrayfun(@(tt) ...
+                circ_mode(dirs(inds_(tt))), dat.test_times);
+            
+            %% Set time points with high var to nan
+%             dat.ang_mode(dat.ang_ci > ANGCI_MAX(mtc(ii))) = nan;
+            dat.ang_mode(dat.ang_var > ANGVAR_MAX(data_summ.metric(ii))) = nan;
+            
+            %% Require at least 80% of samples to be finite on a STEP second
+            % window
+            finite_pct = movmean(isfinite(dat.ang_mode), STEP, ...
+                'SamplePoints', dat.test_times);
+            dat.ang_mode(finite_pct < .8) = nan;
 
-            % Update time_mask to include points where variance is too high
-            time_mask = Nobs{ii} >= MIN_SAMPLES ...
-                & ang_var{ii} <= ANGVAR_MAX(mtc(ii));
-
-            ang_mode{ii}(time_mask) = arrayfun(@(tt) ...
-                circ_mode(dir{ii}(inds_(tt))), test_times{ii}(time_mask));
-
-            % Find stable periods and shifts
-            isstable = isfinite(ang_mode{ii});
-            new_stable = [isstable(1); diff(isstable) > 0];
-            new_unstable = [diff(isstable) < 0; isstable(end)];
-            assert(sum(new_stable) == sum(new_unstable));  % Make sure this is doing what you think it's doing
-            stable_starts = ang_mode{ii}(new_stable);
-            stable_ends = ang_mode{ii}(new_unstable);
-            shifts_ = fix_angle(stable_starts(2:end) - stable_ends(1:end-1));
-            shift_inds = find(new_stable);
-            shifts{ii}(shift_inds(2:end)) = shifts_;
+            %% Smooth outliers using a moving median
+            ang_mode0 = unwrap(dat.ang_mode);
+            nans = isnan(ang_mode0);  % preserve nans
+            ang_modeS = movmedian(ang_mode0, STEP, 'omitnan', ...
+                'SamplePoints', dat.test_times);
+            ang_modeS(nans) = nan;
+            dat.ang_mode = fix_angle(ang_modeS);
+            
+            %% Shrink to set of finite modes
+            finite = isfinite(dat.ang_mode);
+            dat = dat(finite, :);
+            
+            %% Split phases when dt > GAP_TOLERANCE or PHI_THRESH > pi/6
+%             PHI_THRESH = acos(1 - ANGVAR_MAX(mtc(ii))) / 2;
+            dphi = [nan; abs(diff_phase(dat.ang_mode))];
+            dt = [nan; diff(dat.test_times)];
+            splits = find(round(dt/STEP)*STEP > GAP_TOLERANCE | dphi > PHI_THRESH);
+            
+            % Save dphi and dt values so you can see which caused the split
+            if isempty(dat), [dphi, dt] = deal([]); end
+            dat.dphi = dphi;
+            dat.dt = dt;
+            
+            %% Store phase numbers
+            row_num = 1:height(dat);
+            phase = arrayfun(@(row) find(row < [splits; inf], 1), row_num');
+            dat.phase_num = phase;
+            
+            %% Downsample to STEP
+            test_times = unique(round(dat.test_times / STEP) * STEP);
+            if height(dat) < 2
+                rows = find(isfinite(test_times));
+            else
+                rows = interp1(dat.test_times, 1:height(dat), test_times, ...
+                    'nearest', 'extrap');
+            end
+            dat = dat(rows, :);
+            
+            
+            % Set test_times to interpolated values (do splits first?)
+            dat.test_times = test_times;
+            
+            
+%             % Split phases when dt > 5 or dphi > pi/6
+% %             PHI_THRESH = acos(1 - ANGVAR_MAX(mtc(ii))) / 2;
+%             dphi = [nan; abs(diff_phase(dat.ang_mode))];
+%             dt = [nan; diff(dat.test_times)];
+%             splits = find(dt > 5 | dphi > PHI_THRESH);
+%             
+%             % Save dphi and dt values so you can see which caused the split
+%             if isempty(dat), [dphi, dt] = deal([]); end
+%             dat.dphi = dphi;
+%             dat.dt = dt;
+%             
+%             % Store phase numbers
+%             row_num = 1:height(dat);
+%             phase = arrayfun(@(row) find(row < [splits; inf], 1), row_num');
+%             dat.phase_num = phase;
+            
+            
+            % This should do nothing unless there was a short noisy
+            % phase that got cut out.
+            dat.phase_num = findgroups(dat.phase_num);
+            
+            %% Get shifts (dφ between phases)
+            switch isempty(dat)
+                case false
+                    splits = diff(dat.phase_num) == 1;
+                    dphi = abs(diff_phase(dat.ang_mode));
+                    dt = diff(dat.test_times);
+                    dat.dt = [nan; dt];
+                    dat.dphi = [nan; dphi];
+                    dat.isshift = [false; splits];
+                case true
+                    [dat.dt, dat.dphi, dat.isshift] = deal([]);
+            end
+            
+            TT{ii} = dat;
             
         end
     
-        % At this point you should have a cell with the computed measures
-        % for each group.
+        % At this point you should have a cell array with tables of the computed
+        % measures for each group. Join with <data>. Concatenate
+        dirs = cat(1, TT{:});
         
-        % Do something with singletons? (See d2021_06_11.m)
+        % Compute the duration of each phase
+        dirs.duration_of_phase = grouptransform(dirs.test_times, ...
+            findgroups(dirs(:, [keys, "phase_num"])), @(x) range(x));
         
-        % Number the phases
-        phase_num = cellfun_(@(mode) double(isfinite(mode)), ang_mode);
-        for ii = 1:numel(phase_num)
-            S = phase_num{ii};
-            if S(1) == 0  % if first phase starts unstable, find the next unstable start
-                starts = [1; find(diff(S) < 0) + 1; numel(S)+1];
-            else % ... else find the next stable start
-                starts = [1; find(diff(S) > 0) + 1; numel(S)+1];
-            end
-
-            for jj = 1:numel(starts)-1
-                inds = starts(jj):starts(jj+1)-1;
-                S(inds) = jj;
-            end
-            phase_num{ii} = S;
-        end
-        
-        
-        
-        % Return a table of everything similar to CompiledData
-        % Convert all table variables to vectors
-        Gind = arrayfun(@(ii) repmat(ii, numel(test_times{ii}), 1), ...
-            1:length(test_times), 'uni', 0);
-        Gind = cat(1, Gind{:});
-        patient = pat(Gind);
-        seizure = sz(Gind);
-        metric = mtc(Gind);
-        iw_center = iw_center(Gind);
-        iw_angle = iw_angle(Gind);
-        time = cat(1, test_times{:});
-        mode = cat(1, ang_mode{:});
-        ang_var = cat(1, ang_var{:});
-        intervalN = cat(1, Nobs{:});
-        shifts = cat(1, shifts{:});
-        isstable = isfinite(mode);
-                
-        
-        % Put it all together
-        dirs = table(patient, seizure, metric, time, mode, ...
-            ang_var, intervalN, shifts, isstable, iw_center, iw_angle);
-        
-        % Compute and return the duration of each phase
-        G = findgroups(dirs.patient, dirs.seizure, dirs.metric, dirs.phase_num, dirs.isstable);
-        durs = splitapply(@(time) numel(time) * diff(time(1:2)), dirs.time, G);
-        dirs.duration_of_phase = durs(G);
-        
+%         dirs.Properties.UserData = struct(...
+%             'Win', WIN, 'Overlap', OVERLAP, 'max_ci_map', ANGCI_MAX);
         dirs.Properties.UserData = struct(...
             'Win', WIN, 'Overlap', OVERLAP, 'max_var_map', ANGVAR_MAX);
-        F.SlidingDirs = dirs;
+        F.StableDirs = dirs;
         
+        warning(WNG);
+    end
+        
+    function dirs = get.SlidingDirs(F)
+        warning('Change reference from <SlidingDirs> to <StableDirs>.');  % 6/13/21
+        dirs = F.StableDirs;
     end
     
     function dirs = ZZget.SlidingDirs(F)  % ZZ'd 6/13/21
@@ -2624,20 +2681,18 @@ methods
         % pair of consecutive modes (modes computed in <F.SlidingDirs>)
         
         
-                
         if nargin < 2 || isempty(ax), ax = gca; end
                 
-        data = F.SlidingDirs;
-        data = data(data.isstable, :);
-        [G, pat, sz, mtc] = findgroups(data.patient, data.seizure, data.metric);
+        data = F.StableDirs;
+        data(~data.isshift, :) = [];
+        data.shift = abs(data.dphi);
         
+        sumry = groupsummary(data, ["patient" "seizure" "metric"], 'max', 'shift');
         
-        shift_max = splitapply(@(mode) max(abs(diff_phase(mode))), data.mode, G);
+        xx = double(sumry.metric == F.Metrics(2)) + 1;
+        yy = rad2deg(sumry.max_shift);
         
-        xx = arrayfun(@(mtc) find(mtc == F.Metrics), mtc);
-        yy = rad2deg(shift_max);
-        
-        ln = F.gscatter_pat(ax, xx, yy, pat, 'seizure', sz);
+        ln = F.gscatter_pat(ax, xx, yy, sumry.patient, 'seizure', sumry.seizure);
         set(ln, 'linewidth', .5, 'markersize', 4);
 
         title('Max shift')
@@ -2653,7 +2708,7 @@ methods
         disp(ax.Title.String);
         for ii = 1:2
             mm = F.Metrics(ii);
-            F.summarize_stat(mm, deg2rad(yy(mtc == mm)), 'ang');
+            F.summarize_stat(mm, deg2rad(yy(sumry.metric == mm)), 'ang');
         end
         
        
@@ -3072,7 +3127,6 @@ methods
         F.print(h, F.prefix_better(patient));
 
     end
-    
     
     function sc = allP_corr_v_time(F, metric, thresh, min_electrodes)
         % Shows the correlation v time for each patient (different seizures
@@ -4417,18 +4471,38 @@ methods
             compose('%s %d', string(data.patient), data.seizure), ...
             F.Disagree.Row);
 
+        % Separate mains and secondaries
+        data.mains = data.wave_num == data.main_wave;
+        data.Gx = findgroups(data.mains & data.nchannels >= min_electrodes);  % Gx=1 -> non-IW; Gx=2 -> IW
+        N = max(histcounts(categorical(data.Gx)));
+        
         T = BVNY.tiledlayout(gcf, 1, numel(fields));
         for ff = fields
             ax = nexttile(T);
-            dat = data;
             
-            % Separate mains and secondaries
-            mains = data.wave_num == data.main_wave;
-            xx = double(mains & data.nchannels >= min_electrodes);  % x=0 -> non-IW; x=1 -> IW
+            % Get the sorted data and extract variables
+            dat = sortrows(data, ff, 'desc');
+            Gx = dat.Gx;
+            mains = dat.mains;
             yy = dat.(ff);
+            
+            % Add a spread to xx so x increases as y decreases
+            LL = [.01 3]; logLL = log(LL);
+            yyR = rescale(yy, LL(1), LL(2));
+            spread = -(log(yyR) - mean(logLL))/range(logLL) * .8;
+%             for iG = unique(Gx)'
+%                 mask_ = Gx == iG;
+%                 offset = zeros(sum(mask_), 1);
+%                 offset(1:2:end) = .1;
+%                 spread(mask_) = spread(mask_) + offset;
+%             end
+%             spread = + (rand(size(yyR)) - .5) * .3;
+            xx = Gx + spread;
+
+            
             % Summarize mean with STD
-            F.summarize_stat(sprintf('\t%s', ff), rmmissing(yy(xx == 1)), 'std');
-            F.ttest2_(rmmissing(yy(xx == 0)), rmmissing(yy(xx == 1)), ...
+            F.summarize_stat(sprintf('\t%s', ff), rmmissing(yy(Gx == 2)), 'std');
+            F.ttest2_(rmmissing(yy(Gx == 1)), rmmissing(yy(Gx == 2)), ...
                 'vartype', 'equal');
             
 
@@ -4440,15 +4514,15 @@ methods
 
 
             % show disagrees with asterisks
-            mask = dat.disagree & dat.wave_num == dat.main_wave;
+            mask = dat.disagree & mains;
             ln = F.gscatter_pat(xx(mask), yy(mask), dat.patient(mask));
             set(ln, 'marker', '*', 'color', [0 0 0], 'markersize', 6);
             for ll = ln', ll.ZData = 1*ones(size(ll.XData)); end
 
             % show main wave in color
-            [G, pat] = findgroups(dat.patient, dat.seizure);
-            yy = splitapply(@(a, b, c) c(a == b), dat.wave_num, dat.main_wave, dat.(ff), G);
-            ln = F.gscatter_pat(xx(mains), yy, pat);             
+%             [G, pat] = findgroups(dat.patient, dat.seizure);
+%             yy = splitapply(@(a, b, c) c(a == b), dat.wave_num, dat.main_wave, dat.(ff), G);
+            ln = F.gscatter_pat(xx(mains), yy(mains), dat.patient(mains));             
             for ll = ln', ll.ZData = 0*ones(size(ll.XData)); end
             
             if ff == "nchannels"
@@ -4466,12 +4540,13 @@ methods
             title(labels.(ff){1})
             ylabel(labels.(ff){2})
             xlim(quantile(xx, [0 1]) + .5*[-1 1])
-            xticks([0 1])
+            xticks([1 2])
             xticklabels(["Non-IW" "IW"])
         end
+        set(findobj(T, 'type', 'line'), 'markersize', 4);
         
         % Print N's for each group
-        fprintf('\t Non-IW n=%d \t IW n=%d\n', histcounts(categorical(xx)));
+        fprintf('\t Non-IW n=%d \t IW n=%d\n', histcounts(categorical(Gx)));
         
         lgd = findobj(T, 'type', 'legend');
         set(lgd, 'visible', 'off');
