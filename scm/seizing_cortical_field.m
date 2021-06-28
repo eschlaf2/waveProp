@@ -308,39 +308,6 @@ NP = rmfield(NP, no_return);
         % time; the effect from the IW is separate and also a constant
         % function of time.
         
-        switch scm.drive_style
-            case {'', 'excitatory'}
-                % Make sure I_drive and Qi_collapse are set to 0, nan or
-                % else those will still show up in the voltage updates. 
-                % Works with the Martinet FS parameters.
-                if time(ii) > 0 
-                    [new.map, new.state] = update_map_smooth( ...
-                        last.state, scm.expansion_rate * dt / dx, ...
-                        scm.excitability_map, dt);
-                    if time(ii) <= scm.duration
-                        new.dVe(new.map) = scm.source_drive; 
-                        if isempty(scm.source), return, end
-                        which_source = mod(floor(time(ii) / 2), size(scm.source, 3)) + 1;
-                        new.dVe(scm.source(:, :, which_source)) = scm.source_drive;
-                    else
-                        if isnan(scm.post_ictal_source_drive), return; end			
-                        new.dVe(new.map) = scm.post_ictal_source_drive;
-                    end
-                end
-                
-            case 'inhibitory'
-                % The map for the IW updates here, but is applied directly
-                % to the Qi dynamics rather than by changing dVi. This
-                % makes it easier to modulate dVi with K+ if you want to do
-                % that. Inhibitory collapse is applied here, however.
-                
-                
-                
-                
-                
-            otherwise
-                error('Drive style ''%s'' not recognized');
-        end
 	end
 
 %% Nested logistical functions
@@ -349,7 +316,7 @@ NP = rmfield(NP, no_return);
 	function get_electrode_values
 		
         
-		if ~exist('NP', 'var')  % Initialize
+        if ~exist('NP', 'var')  % Initialize
 			for v = out_vars
 				NP.(v{:}) = zeros([Nsteps, scm.dimsNP], 'single');  % Microscale
 % 				EC.(v{:}) = zeros([Nsteps, scm.dimsEC], 'single');  % Macroscale
@@ -425,14 +392,10 @@ end
 
 %------------------------------------------------------------------------
 function Y = del2_(X)
+    % 5-point stencil Laplacian
 
 L = [0 1 0; 1 -4 1; 0 1 0];  % 5-point stencil Laplacian
-% Y = convolve2(X, L, 'wrap');
-% return
-% r = 4/3 * (1 + 1 / sqrt(2));
-% b = 1 / r; a = 1 / (sqrt(2) * r);
-% a = .25; b = .5;
-% L = [a b a; b -3 b; a b a];  % 9-point stencil Laplacian
+
 
 % zero-flux BCs
 	X = [repmat(X(1, :), 2, 1); X; repmat(X(end, :), 2, 1)];
@@ -443,7 +406,9 @@ L = [0 1 0; 1 -4 1; 0 1 0];  % 5-point stencil Laplacian
 end
 
 %------------------------------------------------------------------------
-function fig = create_fig_(out_vars, grid_size, addyNP, addyEC)
+function fig = create_fig_(out_vars, grid_size, addyNP, ~)
+    % fig = create_fig_(out_vars, grid_size, addyNP, addyEC)
+    
 	stop_at = 'seizing_cortical_field>update_gap_resting';
 	titles = out_vars;
 	N = numel(titles);
