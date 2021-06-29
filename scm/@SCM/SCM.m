@@ -864,7 +864,7 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
             % <state> represents time since IW onset on each node
             state = time - scm.map; 
             em = scm.excitability_map;  % convenience (this is the duration of the IW or the boost to Qi_max depending on the drive style)
-            em(em <= 0) = -inf;  % I think I used -1 to indicate "not excitable" somewhere
+%             em(em <= 0) = -inf;  % I think I used -1 to indicate "not excitable" somewhere
             iw_mask = state > 0 & state <= em;  % Determine which nodes are in IW
             
             switch scm.drive_style
