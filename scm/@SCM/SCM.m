@@ -433,9 +433,9 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
             if scm.expansion_rate <= 0, return; end
             dt_ = scm.dt * 10;  % lower precision is ok; worth increase in speed
             
-            % Negative binomial with expected waiting time of N steps
-            N = scm.expansion_rate / scm.dx / dt_;
-            p_wavefront = (1 - N/(N + 1))/2;  % divide by 2 to account for 2 dimensions of spread
+            % Bernoulli => geometric distribution of waiting times
+            k = scm.dx / dt_ / scm.expansion_rate;
+            p_wavefront = (1/k)/2;  % divide by 2 to account for 2 dimensions of spread
             
             recruited = false(scm.grid_size);  % set state negative to indicate "not recruited"
             recruited(scm.stim_center(1), scm.stim_center(2)) = true;  % stim center is recruited at t = 0;
