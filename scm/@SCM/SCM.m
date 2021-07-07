@@ -88,42 +88,32 @@ classdef SCM < handle
                                 
                                 scm.noise_sf = 2;
                                 scm.noise_sc = .2;
+                                
                             case 'FS'
                                 % Generates a sim with a fixed source. Uses
-                                % [10, 10] padding and a duration of 80
+                                % [10, 10] padding and a duration of 32
                                 
-                                scm = SCM('IW');  % no dynamics on external drives
+                                scm = SCM('IW_big');  % no dynamics on external drives
                                 scm.label = 'FS';
                                 scm.basename = 'SCM/FS/FS';
-                                scm.dx = 0.1;
-                                scm.dt = 2e-4;
-                                scm.grid_size = round( [5 5] / scm.dx);
 
                                 
                                 scm.save = true;
                                 scm.visualization_rate = 0;
-                                scm.depo_block = false;
                                 scm.padding = [10 10];
                                 scm.duration = 32;
-                                
-                                
-                                % Save and visualize some extra fields for testing
-                                scm.return_fields = {'Qe', 'Ve', 'Qi', 'Vi', 'K', 'Dii'};
-                                scm.out_vars = {'Qe', 'Ve', 'dVe', 'K', 'Qi', 'Vi', 'dVi', 'Dii', 'map', 'state', 'GABA'};
 
-                                % Design the IW
-%                                 scm.expansion_rate = 0.1;  % 0.25
-%                                 scm.excitability_map(scm.excitability_map > 0) = 3;
-%                                 scm.I_drive = .3;
-                                scm.expansion_rate = 0;
-
+                                % No IW
+%                                 scm.expansion_rate = 0;
+                                scm.map(:) = inf;
+                                
 
                                 % Add a fixed source. Use the same value as
                                 % in 'IW', but change the location
                                 center = round( [1.5 1.5] / scm.dx );
                                 radius = round( [.25 .25] / scm.dx );
 
-                                dVe = max(scm.source, 'all');  
+                                dVe = max(scm.source, [], 'all');  
                                 scm.source = double(scm.ellipse(center, radius)) * dVe;
 
 
@@ -133,16 +123,8 @@ classdef SCM < handle
                                 scm.dimsNP = [4 4];
                                 scm.centerNP = round( scm.grid_size ./ 2 );
 
-
-%                                 % Add an IW source
-%                                 scm.stim_center = round( [1.5 3.5] / scm.dx );  % 4.6 is edge
-
                                 % No post ictal drive
                                 scm.post_ictal_source_drive = nan;
-
-                                
-                                scm.drive_style = 'firing_rate';
-                                
                                 
                                 % Only simulate FS portion (i.e. update the
                                 % IC to look like after IW passage)
@@ -157,6 +139,7 @@ classdef SCM < handle
 %                                 scm.IC.dVi = .3;
 %                                 scm.IC.K = .6;
 %                                 scm.expansion_rate = 0;
+
                             case 'SW'
                                 scm = SCM('FS');
                                 scm.label = 'SW';
@@ -215,25 +198,36 @@ classdef SCM < handle
 
                                 scm.drive_style = 'firing_rate';
 
-                            case 'IW_big'
-                                scm = SCM('IW');
-                                scm.label = 'IW_big';
-                                scm.basename = 'SCM/IW_big/IW_big';
-                                scm.dimsNP = [24 24];
-                                scm.centerNP = scm.stim_center;
+                            case 'IW_big'  % From 2021_06_28.m
+                                scm = SCM('IW');  % use 'IW' as the base
+                                scm.visualization_rate = 0;  % no visualize on SCC
+                                scm.duration = 60;
+                                scm.padding = [10 10];
+
+                                abcd = 'c';
+                                scm.sim_num = 3;  % make sure all have the same noise instantiation
+
+                                % Make the directories and clear any old files
+                                scm.label = ['IW' abcd];
+                                scm.basename = sprintf('SCM/IW%s/IW%s', abcd, abcd);
+                                disp(scm.basename)
+                                mkdir(['SCM/' scm.label]);
+                                mkdir(scm.label);
+                                scm.clean;
+
+                                % set the layout
+                                scm.set_layout(abcd);
+
+                                % Mess with some other parameters
+                                scm.I_drive = 0;  % This was the best run from 4/20/21.m    
+                                scm.sigmoid_kdVe(2) = .5;  % lower max K+ -> Ve offset (OK)
                                 
-                                scm.visualization_rate = 0;
-                                scm.duration = 35;
-                                scm.padding = [2 2];
+                                scm.excitability_map(:) = 0;  % no delay on IW
+                                scm.source = scm.source * .5;  % lower source drive 
+                                scm.map = scm.generate_contagion;
+
                                 
-                                % make a small version to compare (upper
-                                % left corner of big MEA)
-%                                 scm.dimsNP = [4 4];
-%                                 scm.centerNP = [9 24];
-%                                 scm.visualization_rate = 10;
-                                
-                                
-                            case 'IW_coloc'
+                            case 'ZZIW_coloc'  % ZZ'd 7/6/21
                                 scm = SCM('IW');
                                 scm.label = 'IW_coloc';
                                 scm.basename = 'SCM/IW_coloc/IW_coloc';
@@ -241,7 +235,7 @@ classdef SCM < handle
                                 scm.source = scm.ellipse(scm.stim_center, 3, 1);
                                 scm.visualization_rate = 0;
 
-                            case 'IW_c7'
+                            case 'IW_c7'  % ZZ'd 7/6/21
                                 
                                 scm = SCM('IW');  % no dynamics on external drives
                                 scm.sim_num = 90;
@@ -252,7 +246,7 @@ classdef SCM < handle
                                 scm.dimsNP = [4 4];
                                 scm.map = scm.generate_contagion;
                                 
-                            case 'IW_mg63'
+                            case 'IW_mg63'  % ZZ'd 7/6/21
                                 
                                 scm = SCM('IW');  % no dynamics on external drives
                                 scm.sim_num = 91;
@@ -425,6 +419,7 @@ scm.map = scm.generate_map; % This works ok with scm.Qi_collapse low
         function clean(scm)
             delete(sprintf('%s_%d_*.mat', scm.basename, scm.sim_num));
         end
+        
         function map_ = generate_contagion(scm)
             % pre-generate the contagion style recruitment map
             rng(scm.sim_num+1);  % add 1 in case you use sim_num=0

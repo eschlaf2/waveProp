@@ -1,17 +1,17 @@
 function figs = shifts(F)
+    % Makes the plots that show shifts and Φ-progressions. Includes methods
+    % for stable interval detections and merges.
         
     figs = [ ...  % figures for fig6
+        combine_stable_discrete_figs_(F, 'orientation', 'horizontal') ...
+        oneS_stable_modes_(F, "MG63", 4, "M", ...
+            'create_fig', true, 'center_by', 'iw').Parent ... %% One example: stable modes in MG63 s4
+        oneS_stable_modes_(F, "MG49", 36, "M", ...
+            'create_fig', true, 'center_by', 'iw').Parent ... %% One example: stable modes in MG49 s36
+        hist_shifts_discrete_dirs_(F) ...  %% Histograms
+        allP_nshifts_v_ndirs_(F) ...  Nshifts v. Ndirs
         allP_stable_modes_(F, 'center_by', 'iw') ...  Stable modes in all patients
     ];
-%     figs = [ ...  % figures for fig6
-%         combine_stable_discrete_figs_(F) ...
-%         combine_stable_discrete_figs_(F, 'orientation', 'horizontal') ...
-%         oneS_stable_modes_(F, "MG63", 4, "M", 'create_fig', true).Parent ... %% One example: stable modes in MG63 s4
-%         oneS_stable_modes_(F, "MG49", 36, "M", 'create_fig', true).Parent ... %% One example: stable modes in MG49 s36
-%         hist_shifts_discrete_dirs_(F) ...  %% Histograms
-%         allP_nshifts_v_ndirs_(F) ...  Nshifts v. Ndirs
-%         allP_stable_modes_(F, 'center_by', 'none') ...  Stable modes in all patients
-%     ];
 
     make_words_(get_data_(F));
     
@@ -1405,7 +1405,7 @@ function PP = parse_inputs_(varargin)
     elseif isempty(non_defaults), fig_suffix = ''; 
     else
         fig_suffix = '';
-        for ff = string(non_defaults)'
+        for ff = string(non_defaults(:))'
             val = PP.Results.(ff);
             if isnumeric(val) && isscalar(val)
                 fig_suffix = sprintf('%s_%s_%0.3g', ...
