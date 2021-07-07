@@ -125,7 +125,7 @@ classdef SCM < handle
 
                                 % No post ictal drive
                                 scm.post_ictal_source_drive = nan;
-                                
+                               
                                 % Only simulate FS portion (i.e. update the
                                 % IC to look like after IW passage)
                                 % This was pretty interesting when running
